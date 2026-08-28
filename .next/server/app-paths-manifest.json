@@ -1,0 +1,8 @@
+{
+  "/login/page": "app/login/page.js",
+  "/auth/route/page": "app/auth/route/page.js",
+  "/page": "app/page.js",
+  "/superadmin/page": "app/superadmin/page.js",
+  "/superadmin/customers/page": "app/superadmin/customers/page.js",
+  "/superadmin/pre-visits/page": "app/superadmin/pre-visits/page.js"
+}

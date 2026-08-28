@@ -1,0 +1,119 @@
+[
+    {
+        "version": "2026.6.23",
+        "date": "2026-06-23",
+        "summary": "Rules modularization: split GEMINI.md into 6 focused rule files with conditional loading. Also cleaned up README support sections.",
+        "changes": {
+            "Changed": [
+                "Modular rules architecture: split the monolithic GEMINI.md into 6 focused files (core-protocol, request-routing, universal-rules, code-rules, design-rules, quick-reference) with conditional loading."
+            ],
+            "Removed": [
+                "GEMINI.md: replaced by the 6 modular rule files."
+            ]
+        }
+    },
+    {
+        "version": "2026.6.7",
+        "date": "2026-06-07",
+        "summary": "Documentation website overhaul: a redesigned MDX rendering system, full multi-language support (English, Tiếng Việt, 中文, 日本語), a working table of contents, and a new in-site changelog page.",
+        "changes": {
+            "Added": [
+                "Multi-language docs (en / vi / zh / ja) with a flag-dropdown language switcher that persists and switches instantly; all chrome, 7 docs pages, and 10 guide examples translated.",
+                "Changelog page at /docs/changelog, linked from the sidebar and footer.",
+                "Working 'On This Page' table of contents with scroll-spy active highlighting.",
+                "Syntax highlighting via rehype-pretty-code (shiki) and proper web fonts (Inter + JetBrains Mono).",
+                "Follow-on-X dialog inviting visitors to follow @antigravitykit (one-time auto-popup, re-openable from the header)."
+            ],
+            "Changed": [
+                "Redesigned MDX components (terminal/dev-tool aesthetic): Terminal window chrome, Step connector line, Callout, FeatureGrid, ProTips, StatusList.",
+                "Neutral accent color (follows foreground) instead of cyan/emerald.",
+                "Synced docs catalogs to the real repo: 45 skills, 20 agents, 13 workflows."
+            ],
+            "Fixed": [
+                "Heading ids forwarded through MDX mapping so the TOC and anchor links work.",
+                "Inline code no longer double-boxes fenced code blocks; lists use list-outside.",
+                "Corrected the installation Node requirement (18+) and CLI flag/status docs."
+            ]
+        }
+    },
+    {
+        "version": "2026.6.2",
+        "date": "2026-06-02",
+        "summary": "Full-kit accuracy audit. Reviewed every component of AG Kit — all 45 skills, 20 agents, 13 workflows, the GEMINI.md rules, and both overview docs — against verified 2026 facts (OWASP Top 10:2025, MCP spec 2025-06-18, Rust 2024 edition, Node 24 LTS). Also taught the CLI to surface update notifications from ag-kit status.",
+        "changes": {
+            "Added": [
+                "CLI update check on `status`: `ag-kit status` now prints the installed CLI version and checks npm for a newer release, with a `--quiet` flag for CI/CD."
+            ],
+            "Changed": [
+                "All 45 skills audited: corrected stale tech (Rust 2024 edition, MCP Streamable HTTP, OWASP 2025, redis.asyncio) and removed fabricated benchmarks/prices/time-estimates.",
+                "20 agents & 13 workflows audited: removed dead references, fixed corrupted rust-pro frontmatter, added missing tool fields, corrected the orchestrate roster to 20, softened auto-install protocols to opt-in.",
+                "ARCHITECTURE.md & AGENT_FLOW.md catalogs now match the repo exactly (45 skills, 16 scripts).",
+                "Bumped root, web, and cli package versions to 2026.6.2."
+            ],
+            "Fixed": [
+                "Dead references across the kit (react-best-practices → nextjs-react-expert, phantom skills/scripts removed).",
+                "Broken Markdown tables/fences, mojibake, and leftover Turkish text.",
+                "Stale (2025) date stamps stripped from titles and intros for evergreen docs."
+            ]
+        }
+    },
+    {
+        "version": "2026.5.31",
+        "date": "2026-05-31",
+        "summary": "Skill accuracy pass. Audited and upgraded the app-builder skill plus 8 tech skills against verified 2026 facts (Next.js 16, React 19, Node 24 LTS, Tailwind v4, Express 5). Focus: kill version drift, internal contradictions, fabricated numbers, and stale date stamps.",
+        "changes": {
+            "Added": [
+                "Conflict Resolution in app-builder: priority order for ambiguous requests (platform > domain, head noun, then Socratic Gate).",
+                "Per-template version notes: all 13 app-builder templates carry a verified-date note and use a 'major line + latest stable' style."
+            ],
+            "Changed": [
+                "app-builder architecture normalized to Layer-based, matching nextjs-fullstack/TEMPLATE.md.",
+                "All 13 app-builder templates refreshed to 2026 best-practice structure; auth standardized to Auth.js v5 / Clerk; Node 24 LTS and React 19 across the board.",
+                "nodejs-best-practices rebaselined to Node 24 LTS.",
+                "Softened or sourced unsupported 'Nx faster' claims; stripped stale (2025) date stamps."
+            ],
+            "Fixed": [
+                "orchestrate.md plan-file convention: replaced docs/PLAN.md with the house-standard {task-slug}.md.",
+                "Removed fabricated numbers (fake endpoint counts, time estimates, 'Fastify 2-3x', 'Oxide 10x').",
+                "Reconciled nextjs-react-expert rule counts to 58 and aligned the name frontmatter with the folder.",
+                "Fixed a broken glob in react_performance_checker.py that matched zero files.",
+                "Corrected PlanetScale FK support and replaced deprecated aioredis with redis.asyncio."
+            ]
+        }
+    },
+    {
+        "version": "2026.5.25",
+        "date": "2026-05-25",
+        "summary": "Folder structure normalization and website documentation sync.",
+        "changes": {
+            "Added": [
+                "Vietnamese Documentation: created README-VI.md, a professional Vietnamese translation of the project guide."
+            ],
+            "Changed": [
+                "Migrated the workspace from `.agent` to `.agents` folder naming across docs, architecture guides, and CLI configs.",
+                "Renamed the specialist agents directory to `agent/` for clean singular naming.",
+                "Synced Next.js documentation pages to the new folder paths: 20 agents, 45 skills, 13 workflows."
+            ],
+            "Fixed": [
+                "Dynamic path detection in the Python validation suite (detects `.agents` or `.agent` at runtime).",
+                "Corrected component counts (13 workflows, 45 skills) in ARCHITECTURE.md and README tables."
+            ]
+        }
+    },
+    {
+        "version": "2026.5.13",
+        "date": "2026-05-13",
+        "summary": "Project rebrand to AG Kit, calendar versioning, and orchestration/memory skills.",
+        "changes": {
+            "Added": [
+                "Code Review Graph skill: token-efficient code review using Tree-sitter AST graphs and MCP blast-radius analysis.",
+                "New AG Kit logo as PNG and SVG assets for the website and Open Graph metadata."
+            ],
+            "Changed": [
+                "Switched releases from semantic versioning to calendar versioning (YYYY.M.D). First calendar release: 2026.5.13.",
+                "Project rebrand to AG Kit across package metadata, READMEs, docs, templates, scripts, and workflows.",
+                "Simplified the landing page and switched the hero identity to the new logo."
+            ]
+        }
+    }
+]

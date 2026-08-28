@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boss Prompt Library — AI Data Assistant Requirements</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --yellow: #d97706;
+      --yellow-bg: #fffbeb;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--gray-900);
+      line-height: 1.6;
+      background: #fff;
+      padding: 40px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 30px;
+      border-bottom: 3px solid var(--primary);
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--gray-900);
+      margin-bottom: 8px;
+    }
+
+    .header .subtitle {
+      font-size: 16px;
+      color: var(--gray-500);
+      font-weight: 500;
+    }
+
+    .header .meta {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--gray-500);
+    }
+
+    /* Sections */
+    .section {
+      margin-bottom: 36px;
+      page-break-inside: avoid;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title .icon {
+      font-size: 22px;
+    }
+
+    /* Prompt Cards */
+    .prompt-group {
+      margin-bottom: 24px;
+    }
+
+    .prompt-group-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 10px;
+    }
+
+    .prompt-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .prompt-item {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 14px;
+      color: var(--gray-700);
+      font-style: italic;
+      position: relative;
+      padding-left: 36px;
+    }
+
+    .prompt-item::before {
+      content: '"';
+      position: absolute;
+      left: 14px;
+      top: 6px;
+      font-size: 22px;
+      color: var(--primary);
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    thead th {
+      background: var(--gray-900);
+      color: #fff;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    thead th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+
+    thead th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+
+    tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    tbody tr:nth-child(even) {
+      background: var(--gray-50);
+    }
+
+    tbody tr:last-child td:first-child {
+      border-radius: 0 0 0 8px;
+    }
+
+    tbody tr:last-child td:last-child {
+      border-radius: 0 0 8px 0;
+    }
+
+    /* Priority Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .badge-yellow {
+      background: var(--yellow-bg);
+      color: var(--yellow);
+    }
+
+    .badge-green {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    /* Checkbox */
+    .checkbox {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--gray-300);
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+
+    /* Info boxes */
+    .info-box {
+      padding: 16px 20px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    .info-box.blue {
+      background: var(--primary-light);
+      border: 1px solid #bfdbfe;
+    }
+
+    .info-box.red {
+      background: var(--red-bg);
+      border: 1px solid #fecaca;
+    }
+
+    .info-box-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    /* Page break helper */
+    .page-break {
+      page-break-before: always;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid var(--gray-200);
+      text-align: center;
+      font-size: 12px;
+      color: var(--gray-500);
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        padding: 20px;
+        font-size: 12px;
+      }
+
+      .header h1 { font-size: 24px; }
+      .section-title { font-size: 17px; }
+      .prompt-item { font-size: 12px; padding: 8px 14px 8px 30px; }
+
+      .section {
+        page-break-inside: avoid;
+      }
+
+      .no-print {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>📋 Boss Prompt Library</h1>
+    <div class="subtitle">AI Data Assistant — Expected User Prompts & Requirements</div>
+    <div class="meta">
+      Domain: Churn · Customers · Sales · Gross Adds &nbsp;|&nbsp; Data Source: BigQuery &nbsp;|&nbsp; Internal Tool
+    </div>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📊</span> Daily Check-ins</div>
+    <div class="prompt-group">
+      <div class="prompt-group-title">Every morning — quick overview of today's performance</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Show me today's numbers</li>
+        <li class="prompt-item">What are today's KPIs?</li>
+        <li class="prompt-item">Give me the daily summary</li>
+        <li class="prompt-item">How did we perform yesterday?</li>
+        <li class="prompt-item">Show me churn, gross adds, and sales for today</li>
+        <li class="prompt-item">What's our active customer count right now?</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🔄</span> Comparisons</div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">Day-over-Day</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Compare today's churn vs yesterday</li>
+        <li class="prompt-item">How are gross adds today compared to yesterday?</li>
+        <li class="prompt-item">Is sales up or down from yesterday?</li>
+      </ul>
+    </div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">Week-over-Week</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Compare this week's performance to last week</li>
+        <li class="prompt-item">How does this week's churn compare to last week?</li>
+        <li class="prompt-item">Are we doing better or worse than last week?</li>
+      </ul>
+    </div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">Month-over-Month</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Compare July vs June numbers</li>
+        <li class="prompt-item">How is this month's gross adds compared to last month?</li>
+        <li class="prompt-item">Show me month-over-month churn trend</li>
+      </ul>
+    </div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">Custom Periods</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Compare Q2 vs Q1 performance</li>
+        <li class="prompt-item">Show me the last 7 days vs the previous 7 days</li>
+        <li class="prompt-item">How did we do this week vs same week last year?</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📈</span> Trends & Patterns</div>
+    <div class="prompt-group">
+      <ul class="prompt-list">
+        <li class="prompt-item">Show me churn trend for the last 30 days</li>
+        <li class="prompt-item">Is our customer base growing or shrinking?</li>
+        <li class="prompt-item">What's the trend for gross adds this month?</li>
+        <li class="prompt-item">Are sales trending up or down?</li>
+        <li class="prompt-item">Show me the weekly trend for the last 3 months</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🚨</span> Anomalies & Problems</div>
+    <div class="prompt-group">
+      <ul class="prompt-list">
+        <li class="prompt-item">Why did churn spike yesterday?</li>
+        <li class="prompt-item">What's causing the drop in gross adds?</li>
+        <li class="prompt-item">Any unusual changes in today's data?</li>
+        <li class="prompt-item">Which region has the highest churn right now?</li>
+        <li class="prompt-item">Are there any red flags I should know about?</li>
+        <li class="prompt-item">Why is revenue down this week?</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="section page-break">
+    <div class="section-title"><span class="icon">🔍</span> Drill-down & Segmentation</div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">By Region</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Break down churn by region</li>
+        <li class="prompt-item">Which region has the best sales performance?</li>
+        <li class="prompt-item">Show me gross adds by region for this week</li>
+      </ul>
+    </div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">By Product / Plan</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Which product has the highest churn?</li>
+        <li class="prompt-item">Break down sales by plan type</li>
+        <li class="prompt-item">Show me gross adds by product</li>
+      </ul>
+    </div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">By Time</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">Which day this week had the highest churn?</li>
+        <li class="prompt-item">What time of month do we get the most gross adds?</li>
+        <li class="prompt-item">Show me daily breakdown for this month</li>
+      </ul>
+    </div>
+
+    <div class="prompt-group">
+      <div class="prompt-group-title">By Customer Segment</div>
+      <ul class="prompt-list">
+        <li class="prompt-item">What's the churn rate for prepaid vs postpaid?</li>
+        <li class="prompt-item">Which customer segment is growing fastest?</li>
+        <li class="prompt-item">Show me enterprise vs consumer numbers</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 6 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🔮</span> Forecasting</div>
+    <div class="prompt-group">
+      <ul class="prompt-list">
+        <li class="prompt-item">What's the churn forecast for next month?</li>
+        <li class="prompt-item">Predict gross adds for the next 2 weeks</li>
+        <li class="prompt-item">Will we hit our sales target this month?</li>
+        <li class="prompt-item">What's the projected customer count by end of quarter?</li>
+        <li class="prompt-item">At this rate, where will churn be by December?</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 7 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🎯</span> Targets & Performance</div>
+    <div class="prompt-group">
+      <ul class="prompt-list">
+        <li class="prompt-item">Are we on track to hit this month's target?</li>
+        <li class="prompt-item">How far are we from our gross adds target?</li>
+        <li class="prompt-item">What percentage of our sales target have we achieved?</li>
+        <li class="prompt-item">How many more gross adds do we need to hit target?</li>
+        <li class="prompt-item">Show me actual vs target for all KPIs</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 8 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📋</span> Reports & Exports</div>
+    <div class="prompt-group">
+      <ul class="prompt-list">
+        <li class="prompt-item">Generate a weekly report</li>
+        <li class="prompt-item">Give me the numbers I need for the Monday meeting</li>
+        <li class="prompt-item">Create a summary for management</li>
+        <li class="prompt-item">Export this month's data to sheets</li>
+        <li class="prompt-item">Prepare the monthly performance review</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 9 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💡</span> Strategic / Ad-hoc</div>
+    <div class="prompt-group">
+      <ul class="prompt-list">
+        <li class="prompt-item">What's our biggest problem right now?</li>
+        <li class="prompt-item">Where should we focus to reduce churn?</li>
+        <li class="prompt-item">Which region needs the most attention?</li>
+        <li class="prompt-item">What would happen if churn stays at this rate?</li>
+        <li class="prompt-item">What's driving our growth this month?</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TEST PRIORITY TABLE -->
+  <div class="section page-break">
+    <div class="section-title"><span class="icon">🧪</span> Testing Priority</div>
+
+    <div class="info-box blue">
+      <div class="info-box-title">How to use this table</div>
+      Test your Agent Space agent with prompts from each tier. If Tier 1 fails, the agent has fundamental issues that must be fixed first.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th>Category</th>
+          <th>Must Handle?</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-red">Tier 1</span></td>
+          <td>Daily check-ins + Basic comparisons</td>
+          <td><strong>Must work</strong></td>
+          <td><span class="checkbox"></span> Pass &nbsp; <span class="checkbox"></span> Fail</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-yellow">Tier 2</span></td>
+          <td>Drill-downs + Anomaly detection</td>
+          <td><strong>Should work</strong></td>
+          <td><span class="checkbox"></span> Pass &nbsp; <span class="checkbox"></span> Fail</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-green">Tier 3</span></td>
+          <td>Forecasting + Strategic questions</td>
+          <td>Nice to have</td>
+          <td><span class="checkbox"></span> Pass &nbsp; <span class="checkbox"></span> Fail</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- QUICK TEST SCRIPT -->
+  <div class="section">
+    <div class="section-title"><span class="icon">⚡</span> Quick Agent Test (5 Prompts)</div>
+
+    <div class="info-box red">
+      <div class="info-box-title">Run these 5 prompts on your Agent Space agent</div>
+      If it fails on any Tier 1 prompt, the agent needs fundamental fixes.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Test Prompt</th>
+          <th>Expected Result</th>
+          <th>Pass?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><em>"Show me yesterday's churn, gross adds, and sales"</em></td>
+          <td>Returns correct numbers</td>
+          <td><span class="checkbox"></span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><em>"Compare this week vs last week"</em></td>
+          <td>Shows comparison with % change</td>
+          <td><span class="checkbox"></span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><em>"Which region has the highest churn?"</em></td>
+          <td>Returns region breakdown</td>
+          <td><span class="checkbox"></span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><em>"Why did churn increase yesterday?"</em></td>
+          <td>Attempts to explain with data</td>
+          <td><span class="checkbox"></span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><em>"Are we on track for this month's target?"</em></td>
+          <td>Shows actual vs target</td>
+          <td><span class="checkbox"></span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PROMPT COUNT SUMMARY -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📊</span> Summary</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Prompt Count</th>
+          <th>Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>📊 Daily Check-ins</td>
+          <td>6 prompts</td>
+          <td><span class="badge badge-red">Tier 1</span></td>
+        </tr>
+        <tr>
+          <td>🔄 Comparisons</td>
+          <td>12 prompts</td>
+          <td><span class="badge badge-red">Tier 1</span></td>
+        </tr>
+        <tr>
+          <td>📈 Trends & Patterns</td>
+          <td>5 prompts</td>
+          <td><span class="badge badge-red">Tier 1</span></td>
+        </tr>
+        <tr>
+          <td>🚨 Anomalies & Problems</td>
+          <td>6 prompts</td>
+          <td><span class="badge badge-yellow">Tier 2</span></td>
+        </tr>
+        <tr>
+          <td>🔍 Drill-down & Segmentation</td>
+          <td>12 prompts</td>
+          <td><span class="badge badge-yellow">Tier 2</span></td>
+        </tr>
+        <tr>
+          <td>🔮 Forecasting</td>
+          <td>5 prompts</td>
+          <td><span class="badge badge-green">Tier 3</span></td>
+        </tr>
+        <tr>
+          <td>🎯 Targets & Performance</td>
+          <td>5 prompts</td>
+          <td><span class="badge badge-yellow">Tier 2</span></td>
+        </tr>
+        <tr>
+          <td>📋 Reports & Exports</td>
+          <td>5 prompts</td>
+          <td><span class="badge badge-green">Tier 3</span></td>
+        </tr>
+        <tr>
+          <td>💡 Strategic / Ad-hoc</td>
+          <td>5 prompts</td>
+          <td><span class="badge badge-green">Tier 3</span></td>
+        </tr>
+        <tr>
+          <td><strong>Total</strong></td>
+          <td><strong>61 prompts</strong></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    Boss Prompt Library — AI Data Assistant Requirements &nbsp;|&nbsp; Generated July 2026 &nbsp;|&nbsp; Internal Use Only
+  </div>
+
+</body>
+</html>
