@@ -4,100 +4,87 @@
   min-height: 100vh;
   margin: 0 auto;
   padding: 24px 16px 100px;
-  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--bg);
 }
 
-.header {
-  margin-bottom: 24px;
+.hero {
+  border-radius: 20px;
+}
+
+.heroContent {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 24px;
 }
 
 .eyebrow {
-  margin: 0 0 6px;
-  color: #6b7280;
+  margin: 0 0 8px;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 1.2px;
+  letter-spacing: 0.12em;
 }
 
-.header h1 {
-  margin: 0;
-  color: #111827;
+.title {
+  margin: 0 0 12px;
   font-size: 28px;
-}
-
-.salesCode {
-  margin: 6px 0 0;
-  color: #6b7280;
-  font-size: 14px;
+  line-height: 1.15;
 }
 
 .stats {
-  margin-bottom: 18px;
-}
-
-.statCard {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  background: #111827;
-  border-radius: 18px;
-  color: white;
-}
-
-.statCard span {
-  font-size: 14px;
-}
-
-.statCard strong {
-  font-size: 30px;
+  width: 100%;
 }
 
 .menu {
-  display: grid;
-  gap: 12px;
+  width: 100%;
+  padding: 8px;
 }
 
-.menuCard {
+.menuLink {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 18px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  color: #111827;
-  text-decoration: none;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 76px;
 }
 
-.menuCard strong {
+.menuLink > div {
+  display: grid;
+  gap: 4px;
+}
+
+.menuLink strong {
   font-size: 16px;
 }
 
-.menuCard p {
-  margin: 5px 0 0;
-  color: #6b7280;
+.menuLink span {
   font-size: 13px;
+  color: color-mix(in oklab, currentColor 60%, transparent);
 }
 
-.menuCard > span {
-  color: #9ca3af;
-  font-size: 28px;
+.chevron {
+  flex: 0 0 auto;
+  font-size: 28px !important;
+  line-height: 1;
 }
 
-.errorCard {
-  padding: 20px;
-  background: white;
-  border: 1px solid #fecaca;
-  border-radius: 18px;
+.alertTitle {
+  margin: 0 0 6px;
+  font-size: 18px;
 }
 
-.errorCard h2 {
-  margin-top: 0;
-  color: #991b1b;
-}
+@media (max-width: 480px) {
+  .page {
+    padding-top: 16px;
+  }
 
-.errorCard p {
-  color: #6b7280;
-  line-height: 1.5;
+  .heroContent {
+    padding: 20px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
 }
