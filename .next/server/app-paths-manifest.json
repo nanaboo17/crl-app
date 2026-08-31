@@ -1,7 +1,4 @@
 {
-  "/login/page": "app/login/page.js",
-  "/agent/route/page": "app/agent/route/page.js",
-  "/admin/pre-visits/[agentEmail]/page": "app/admin/pre-visits/[agentEmail]/page.js",
-  "/agent/customers/page": "app/agent/customers/page.js",
-  "/agent/customers/[customerId]/page": "app/agent/customers/[customerId]/page.js"
+  "/page": "app/page.js",
+  "/login/page": "app/login/page.js"
 }
