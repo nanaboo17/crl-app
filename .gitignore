@@ -8,5 +8,35 @@ node_modules
 
 # Explicitly ignore the project env file if present
 .env.local
+.env.development.local
+.env.production.local
+.env.test.local
 
+# Claude Code local machine settings
+.claude/settings.local.json
+.claude/settings.json
+
+# AG Kit workspace internals
 .agents
+.ag-kit/
+.claude/
+.claude-backup-*/
+
+# Next.js build output and local artifacts
+.next/
+.next/**
+*.tsbuildinfo
+
+# General generated folders
+build/
+dist/
+coverage/
+
+# Claude / AG Kit internal files & scripts arya punya
+.claude-backup-*/
+AGENTS.md
+CLAUDE.md
+*.ps1
+
+# Next.js build output
+.next/

@@ -1,6 +1,13 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import {
+  Building2,
+  ClipboardList,
+  MapPin,
+  Users,
+} from 'lucide-react'
 import { createClient } from '../../lib/supabase-server'
+import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 
 export default async function SuperadminPage() {
   const supabase = await createClient()
@@ -9,6 +16,7 @@ export default async function SuperadminPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // The layout already guards this route; kept for narrowing below.
   if (!user?.email) {
     redirect('/login')
   }
@@ -23,97 +31,74 @@ export default async function SuperadminPage() {
     redirect('/auth/route')
   }
 
-  const [
-    agentsResult,
-    customersResult,
-    preVisitsResult,
-    visitsResult,
-  ] = await Promise.all([
-    supabase
-      .from('agents')
-      .select('*', { count: 'exact', head: true }),
+  const [agentsResult, customersResult, preVisitsResult, visitsResult] =
+    await Promise.all([
+      supabase.from('agents').select('*', { count: 'exact', head: true }),
+      supabase.from('customers').select('*', { count: 'exact', head: true }),
+      supabase.from('pre_visits').select('*', { count: 'exact', head: true }),
+      supabase.from('visits').select('*', { count: 'exact', head: true }),
+    ])
 
-    supabase
-      .from('customers')
-      .select('*', { count: 'exact', head: true }),
+  const stats = [
+    {
+      href: '/superadmin/agents',
+      label: 'Agents',
+      count: agentsResult.count ?? 0,
+      icon: Users,
+    },
+    {
+      href: '/superadmin/customers',
+      label: 'Customers',
+      count: customersResult.count ?? 0,
+      icon: Building2,
+    },
+    {
+      href: '/superadmin/pre-visits',
+      label: 'Pre-Visits',
+      count: preVisitsResult.count ?? 0,
+      icon: ClipboardList,
+    },
+    {
+      href: '/superadmin/visits',
+      label: 'Visits',
+      count: visitsResult.count ?? 0,
+      icon: MapPin,
+    },
+  ]
 
-    supabase
-      .from('pre_visits')
-      .select('*', { count: 'exact', head: true }),
-
-    supabase
-      .from('visits')
-      .select('*', { count: 'exact', head: true }),
-  ])
+  const firstName = agent.agent_name?.trim().split(/\s+/)[0] ?? 'Superadmin'
 
   return (
-    <main className="mobile-page">
-      <section className="page-header">
-        <p className="eyebrow">CRL FIELD APP</p>
-        <h1>Superadmin</h1>
+    <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+      <SuperadminPageHeader
+        breadcrumbs={[
+          { label: 'Superadmin', href: '/superadmin' },
+          { label: 'Dashboard' },
+        ]}
+        title="Dashboard"
+        description={`Welcome back, ${firstName}. Here is what is happening across CRL field operations.`}
+      />
+
+      {/* Each stat links into its management section */}
+      <section
+        aria-label="Statistics"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {stats.map(({ href, label, count, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="stat border border-base-300 bg-base-100 transition-colors hover:border-base-content/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
+          >
+            <div className="stat-figure text-base-content/25">
+              <Icon aria-hidden="true" className="h-6 w-6" />
+            </div>
+            <div className="stat-title">{label}</div>
+            <div className="stat-value text-3xl">{count}</div>
+            <div className="stat-desc">Manage {label.toLowerCase()} →</div>
+          </Link>
+        ))}
       </section>
-
-      <section className="card">
-        <strong>{agent.agent_name}</strong>
-        <p>{agent.email}</p>
-        <span>Superadmin</span>
-      </section>
-
-      <section className="stats-grid">
-        <div className="card stat-card">
-          <strong>{agentsResult.count ?? 0}</strong>
-          <span>Agents</span>
-        </div>
-
-        <div className="card stat-card">
-          <strong>{customersResult.count ?? 0}</strong>
-          <span>Customers</span>
-        </div>
-
-        <div className="card stat-card">
-          <strong>{preVisitsResult.count ?? 0}</strong>
-          <span>Pre-Visits</span>
-        </div>
-
-        <div className="card stat-card">
-          <strong>{visitsResult.count ?? 0}</strong>
-          <span>Visits</span>
-        </div>
-      </section>
-
-      <section className="action-list">
-        <Link href="/superadmin/agents" className="action-card">
-          Manage Agents
-        </Link>
-
-        <Link href="/superadmin/customers" className="action-card">
-          Manage Customers
-        </Link>
-
-        <Link href="/superadmin/pre-visits" className="action-card">
-          Manage Pre-Visits
-        </Link>
-
-        <Link href="/superadmin/visits" className="action-card">
-          Manage Visits
-        </Link>
-
-        
-
-        <Link
-  href="/superadmin/visits"
-  className="action-card"
->
-  <div>
-    <strong>Visit Monitoring</strong>
-    <p>
-      Review visits by agent and by day
-    </p>
-  </div>
-
-  <span>›</span>
-</Link>
-      </section>
-    </main>
+    </div>
   )
 }

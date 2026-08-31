@@ -1,3 +1,18 @@
+/* Layer order declared BEFORE the tailwind import so "legacy" (the original
+   handwritten classes below) sits between base and components — daisyUI and
+   Tailwind utilities can then override it, instead of the old unlayered rules
+   hijacking .btn/.card/.avatar/.input. */
+@layer theme, base, legacy, components, utilities;
+
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: light --default;
+}
+
+/* Original app styles (agent/admin/login pages). Keep verbatim. */
+@layer legacy {
+
 :root {
   --bg: #f4f6f8;
   --surface: #ffffff;
@@ -710,3 +725,5 @@ textarea { min-height: 108px; resize: vertical; }
     grid-column: auto;
   }
 }
+
+} /* end @layer legacy */
