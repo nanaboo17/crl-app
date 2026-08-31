@@ -1,9 +1,103 @@
-'use client'
 import Link from 'next/link'
-import { useEffect,useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
-import { getCurrentProfile } from '@/lib/auth'
-import type { Agent } from '@/lib/types'
-import Loading from '@/components/Loading'
+import { redirect } from 'next/navigation'
+import { createClient } from '../../lib/supabase-server'
 
-export default function SuperadminDashboard(){const[profile,setProfile]=useState<Agent|null>(null);const[counts,setCounts]=useState({agents:0,customers:0,pre:0,visits:0});const[error,setError]=useState('');useEffect(()=>{(async()=>{try{const p=await getCurrentProfile();if(p.role!=='superadmin')return window.location.replace(p.role==='admin'?'/admin':'/agent');setProfile(p);const s=createClient();const[{count:agents},{count:customers},{count:pre},{count:visits}]=await Promise.all([s.from('agents').select('*',{count:'exact',head:true}),s.from('customers').select('*',{count:'exact',head:true}),s.from('pre_visits').select('*',{count:'exact',head:true}),s.from('visits').select('*',{count:'exact',head:true})]);setCounts({agents:agents||0,customers:customers||0,pre:pre||0,visits:visits||0})}catch(e:any){setError(e.message)}})()},[]);if(!profile&&!error)return <main className="container"><Loading text="Loading control center…"/></main>;return <main className="container"><div className="page-header"><div><div className="muted small">CRL CONTROL CENTER</div><h1 className="page-title">Superadmin</h1></div></div>{error&&<div className="card error-card">{error}</div>}{profile&&<><section className="card profile-card"><div className="avatar">{profile.agent_name.slice(0,2).toUpperCase()}</div><div><div className="profile-name">{profile.agent_name}</div><div className="muted small">{profile.email}</div></div></section><section className="section"><div className="grid grid-4"><div className="card kpi-card"><div className="kpi-label">Agents</div><div className="kpi">{counts.agents}</div></div><div className="card kpi-card"><div className="kpi-label">Customers</div><div className="kpi">{counts.customers}</div></div><div className="card kpi-card"><div className="kpi-label">Pre-Visits</div><div className="kpi">{counts.pre}</div></div><div className="card kpi-card"><div className="kpi-label">Visits</div><div className="kpi">{counts.visits}</div></div></div></section><section className="section card"><h2 className="section-title">Management</h2><div className="actions"><Link className="btn" href="/superadmin/agents">Manage Agents</Link><Link className="btn secondary" href="/superadmin/customers">Manage Customers</Link><Link className="btn secondary" href="/superadmin/pre-visits">Manage Pre-Visits</Link><Link className="btn secondary" href="/superadmin/visits">Manage Visits</Link></div></section></>}</main>}
+export default async function SuperadminPage() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.email) {
+    redirect('/login')
+  }
+
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('agent_name, email, role, active')
+    .eq('email', user.email.toLowerCase())
+    .maybeSingle()
+
+  if (!agent || !agent.active || agent.role !== 'superadmin') {
+    redirect('/auth/route')
+  }
+
+  const [
+    agentsResult,
+    customersResult,
+    preVisitsResult,
+    visitsResult,
+  ] = await Promise.all([
+    supabase
+      .from('agents')
+      .select('*', { count: 'exact', head: true }),
+
+    supabase
+      .from('customers')
+      .select('*', { count: 'exact', head: true }),
+
+    supabase
+      .from('pre_visits')
+      .select('*', { count: 'exact', head: true }),
+
+    supabase
+      .from('visits')
+      .select('*', { count: 'exact', head: true }),
+  ])
+
+  return (
+    <main className="mobile-page">
+      <section className="page-header">
+        <p className="eyebrow">CRL FIELD APP</p>
+        <h1>Superadmin</h1>
+      </section>
+
+      <section className="card">
+        <strong>{agent.agent_name}</strong>
+        <p>{agent.email}</p>
+        <span>Superadmin</span>
+      </section>
+
+      <section className="stats-grid">
+        <div className="card stat-card">
+          <strong>{agentsResult.count ?? 0}</strong>
+          <span>Agents</span>
+        </div>
+
+        <div className="card stat-card">
+          <strong>{customersResult.count ?? 0}</strong>
+          <span>Customers</span>
+        </div>
+
+        <div className="card stat-card">
+          <strong>{preVisitsResult.count ?? 0}</strong>
+          <span>Pre-Visits</span>
+        </div>
+
+        <div className="card stat-card">
+          <strong>{visitsResult.count ?? 0}</strong>
+          <span>Visits</span>
+        </div>
+      </section>
+
+      <section className="action-list">
+        <Link href="/superadmin/agents" className="action-card">
+          Manage Agents
+        </Link>
+
+        <Link href="/superadmin/customers" className="action-card">
+          Manage Customers
+        </Link>
+
+        <Link href="/superadmin/pre-visits" className="action-card">
+          Manage Pre-Visits
+        </Link>
+
+        <Link href="/superadmin/visits" className="action-card">
+          Manage Visits
+        </Link>
+      </section>
+    </main>
+  )
+}
