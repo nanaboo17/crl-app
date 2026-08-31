@@ -1,1 +1,12 @@
 node_modules
+
+# Local environment files
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Explicitly ignore the project env file if present
+.env.local
+
+.agents
