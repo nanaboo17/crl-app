@@ -1,0 +1,107 @@
+/*!*********************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[5].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[5].use[3]!./app/agent/page.module.css ***!
+  \*********************************************************************************************************************************************************************************************************************************************************************/
+.page_page__oWb0h {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24px 16px 100px;
+  background: #f8fafc;
+}
+
+.page_header__3Gwoy {
+  margin-bottom: 24px;
+}
+
+.page_eyebrow__bHMm5 {
+  margin: 0 0 6px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.page_header__3Gwoy h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+}
+
+.page_salesCode__j5ZhH {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.page_stats__bBHVz {
+  margin-bottom: 18px;
+}
+
+.page_statCard__uaoOq {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: #111827;
+  border-radius: 18px;
+  color: white;
+}
+
+.page_statCard__uaoOq span {
+  font-size: 14px;
+}
+
+.page_statCard__uaoOq strong {
+  font-size: 30px;
+}
+
+.page_menu__9AqbB {
+  display: grid;
+  grid-gap: 12px;
+  gap: 12px;
+}
+
+.page_menuCard__Zecjf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  color: #111827;
+  text-decoration: none;
+}
+
+.page_menuCard__Zecjf strong {
+  font-size: 16px;
+}
+
+.page_menuCard__Zecjf p {
+  margin: 5px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.page_menuCard__Zecjf > span {
+  color: #9ca3af;
+  font-size: 28px;
+}
+
+.page_errorCard__eqwbM {
+  padding: 20px;
+  background: white;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+}
+
+.page_errorCard__eqwbM h2 {
+  margin-top: 0;
+  color: #991b1b;
+}
+
+.page_errorCard__eqwbM p {
+  color: #6b7280;
+  line-height: 1.5;
+}

@@ -1,11 +1,83 @@
-'use client'
-import { FormEvent,useEffect,useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
-import type { Agent,Customer } from '@/lib/types'
-import { rupiah } from '@/lib/format'
-import PageTop from '@/components/PageTop'
-import Loading from '@/components/Loading'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase-server'
 
-const blank={customer_id:'',customer_name:'',phone_number:'',service_address:'',product:'',outstanding_amount:'0',unpaid_since:'',agent_email:''}
-export default function ManageCustomers(){const[rows,setRows]=useState<Customer[]>([]);const[agents,setAgents]=useState<Agent[]>([]);const[form,setForm]=useState<any>(blank);const[loading,setLoading]=useState(true);const[saving,setSaving]=useState(false);const[error,setError]=useState('');async function load(){const s=createClient();const[{data:c,error:ce},{data:a,error:ae}]=await Promise.all([s.from('customers').select('*').order('customer_name'),s.from('agents').select('*').eq('role','agent').eq('active',true).order('agent_name')]);if(ce||ae)setError((ce||ae)!.message);else{setRows((c||[])as Customer[]);setAgents((a||[])as Agent[])}setLoading(false)}useEffect(()=>{load()},[]);async function add(e:FormEvent){e.preventDefault();setSaving(true);setError('');const s=createClient();const{error}=await s.from('customers').insert({...form,outstanding_amount:Number(form.outstanding_amount),agent_email:form.agent_email||null,unpaid_since:form.unpaid_since||null,customer_status:form.agent_email?'1. Assigned':'Unassigned'});if(error)setError(error.message);else{setForm(blank);await load()}setSaving(false)}async function del(id:string){if(!confirm('Delete this customer and linked records?'))return;const s=createClient();const{error}=await s.from('customers').delete().eq('customer_id',id);if(error)setError(error.message);else setRows(r=>r.filter(x=>x.customer_id!==id))}
-return <main className="container"><PageTop title="Manage Customers" eyebrow="CRL SUPERADMIN" back/><form className="card form-card" onSubmit={add}><h2 className="section-title">Add customer</h2><div className="field"><label>Customer ID</label><input className="input" value={form.customer_id} onChange={e=>setForm({...form,customer_id:e.target.value})} required/></div><div className="field"><label>Name</label><input className="input" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required/></div><div className="field"><label>Phone</label><input className="input" value={form.phone_number} onChange={e=>setForm({...form,phone_number:e.target.value})}/></div><div className="field"><label>Address</label><textarea value={form.service_address} onChange={e=>setForm({...form,service_address:e.target.value})}/></div><div className="field"><label>Product</label><input className="input" value={form.product} onChange={e=>setForm({...form,product:e.target.value})}/></div><div className="field"><label>Outstanding amount</label><input className="input" type="number" value={form.outstanding_amount} onChange={e=>setForm({...form,outstanding_amount:e.target.value})}/></div><div className="field"><label>Unpaid since</label><input className="input" type="date" value={form.unpaid_since} onChange={e=>setForm({...form,unpaid_since:e.target.value})}/></div><div className="field"><label>Assign agent</label><select value={form.agent_email} onChange={e=>setForm({...form,agent_email:e.target.value})}><option value="">Unassigned</option>{agents.map(a=><option key={a.email} value={a.email}>{a.agent_name}</option>)}</select></div>{error&&<div className="inline-error">{error}</div>}<button className="btn" disabled={saving}>{saving?'Adding…':'Add Customer'}</button></form><section className="section">{loading?<Loading/>:<div className="list-stack">{rows.map(c=><div className="card customer-card" key={c.customer_id}><div className="card-row"><div><strong>{c.customer_name}</strong><div className="muted small">{c.customer_id}</div></div><strong className="amount">{rupiah(c.outstanding_amount)}</strong></div><div className="muted small">{c.agent_email||'Unassigned'}</div><button className="btn danger compact section-sm" onClick={()=>del(c.customer_id)}>Delete</button></div>)}</div>}</section></main>}
+export default async function ManageCustomersPage() {
+  const supabase = await createClient()
+
+  const { data: customers, error } = await supabase
+    .from('customers')
+    .select(`
+      customer_id,
+      customer_name,
+      phone_number,
+      outstanding_amount,
+      customer_status,
+      agent_email
+    `)
+    .order('customer_name')
+
+  if (error) {
+    return (
+      <main className="mobile-page">
+        <p>{error.message}</p>
+      </main>
+    )
+  }
+
+  return (
+    <main className="mobile-page">
+      <div className="edit-header">
+        <Link href="/superadmin" className="back-button">
+          ← Back
+        </Link>
+
+        <div>
+          <p className="eyebrow">SUPERADMIN</p>
+          <h1>Manage Customers</h1>
+        </div>
+      </div>
+
+      <Link
+        href="/superadmin/customers/new"
+        className="primary-button"
+      >
+        + Add Customer
+      </Link>
+
+      <div className="customer-list">
+        {customers?.map((customer) => (
+          <Link
+            key={customer.customer_id}
+            href={`/superadmin/customers/${encodeURIComponent(
+              customer.customer_id
+            )}`}
+            className="customer-row"
+          >
+            <div>
+              <strong>{customer.customer_name}</strong>
+
+              <p>{customer.customer_id}</p>
+
+              <small>
+                {customer.agent_email || 'Not assigned'}
+              </small>
+            </div>
+
+            <div className="customer-right">
+              <strong>
+                Rp
+                {Number(
+                  customer.outstanding_amount ?? 0
+                ).toLocaleString('id-ID')}
+              </strong>
+
+              <small>{customer.customer_status}</small>
+
+              <span>›</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </main>
+  )
+}

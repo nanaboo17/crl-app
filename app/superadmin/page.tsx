@@ -97,6 +97,22 @@ export default async function SuperadminPage() {
         <Link href="/superadmin/visits" className="action-card">
           Manage Visits
         </Link>
+
+        
+
+        <Link
+  href="/superadmin/visits"
+  className="action-card"
+>
+  <div>
+    <strong>Visit Monitoring</strong>
+    <p>
+      Review visits by agent and by day
+    </p>
+  </div>
+
+  <span>›</span>
+</Link>
       </section>
     </main>
   )

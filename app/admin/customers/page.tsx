@@ -1,16 +1,311 @@
 'use client'
-import { useEffect,useMemo,useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
-import type { Agent,Customer } from '@/lib/types'
-import { rupiah } from '@/lib/format'
-import PageTop from '@/components/PageTop'
-import Loading from '@/components/Loading'
 
-export default function AdminCustomersPage(){
- const [rows,setRows]=useState<Customer[]>([]); const [agents,setAgents]=useState<Agent[]>([]); const [q,setQ]=useState(''); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(''); const [error,setError]=useState('')
- async function load(){const s=createClient();const [{data:c,error:ce},{data:a,error:ae}]=await Promise.all([s.from('customers').select('*').order('customer_name'),s.from('agents').select('*').eq('role','agent').eq('active',true).order('agent_name')]);if(ce||ae)setError((ce||ae)!.message);else{setRows((c||[]) as Customer[]);setAgents((a||[]) as Agent[])}setLoading(false)}
- useEffect(()=>{load()},[])
- async function assign(customerId:string,email:string){setSaving(customerId);setError('');const s=createClient();const {error}=await s.from('customers').update({agent_email:email||null,customer_status:email?'1. Assigned':'Unassigned'}).eq('customer_id',customerId);if(error)setError(error.message);else setRows(r=>r.map(c=>c.customer_id===customerId?{...c,agent_email:email||null,customer_status:email?'1. Assigned':'Unassigned'}:c));setSaving('')}
- const filtered=useMemo(()=>rows.filter(c=>`${c.customer_name} ${c.customer_id}`.toLowerCase().includes(q.toLowerCase())),[rows,q])
- return <main className="container"><PageTop title="Customer Assignment" eyebrow="CRL ADMIN" back/><input className="input" placeholder="Search customer" value={q} onChange={e=>setQ(e.target.value)}/>{error&&<div className="inline-error section">{error}</div>}{loading?<Loading/>:<div className="list-stack">{filtered.map(c=><div className="card customer-card" key={c.customer_id}><div className="card-row"><div><strong>{c.customer_name}</strong><div className="muted small">{c.customer_id}</div></div><strong className="amount">{rupiah(c.outstanding_amount)}</strong></div><div className="field compact-field"><label>Assigned agent</label><select value={c.agent_email||''} onChange={e=>assign(c.customer_id,e.target.value)} disabled={saving===c.customer_id}><option value="">Unassigned</option>{agents.map(a=><option key={a.email} value={a.email}>{a.agent_name} · {a.sales_code}</option>)}</select></div></div>)}</div>}</main>
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase-browser'
+import styles from './page.module.css'
+
+export default function AdminCustomersPage() {
+  const supabase = createClient()
+
+  const [customers, setCustomers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const [search, setSearch] = useState('')
+  const [paymentFilter, setPaymentFilter] = useState('all')
+  const [visitFilter, setVisitFilter] = useState('all')
+  const [assignmentFilter, setAssignmentFilter] = useState('all')
+
+  useEffect(() => {
+    async function loadCustomers() {
+      setLoading(true)
+      setError('')
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user?.email) {
+        window.location.href = '/login'
+        return
+      }
+
+      const email = user.email.trim().toLowerCase()
+
+      const { data: currentUser } = await supabase
+        .from('agents')
+        .select('role, active')
+        .eq('email', email)
+        .maybeSingle()
+
+      if (
+        !currentUser ||
+        !currentUser.active ||
+        !['admin', 'superadmin'].includes(currentUser.role)
+      ) {
+        window.location.href = '/auth/route'
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('customers')
+        .select(`
+          customer_id,
+          customer_name,
+          priority_rank,
+          city,
+          district,
+          sub_district,
+          invoice_amount,
+          payment_status,
+          visit_status,
+          customer_status,
+          agent_email
+        `)
+        .order('priority_rank', {
+          ascending: true,
+        })
+
+      if (error) {
+        setError(error.message)
+      } else {
+        setCustomers(data ?? [])
+      }
+
+      setLoading(false)
+    }
+
+    loadCustomers()
+  }, [])
+
+  const filteredCustomers = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return customers.filter((customer) => {
+      const matchesSearch =
+        !query ||
+        customer.customer_name
+          ?.toLowerCase()
+          .includes(query) ||
+        customer.customer_id
+          ?.toLowerCase()
+          .includes(query) ||
+        customer.agent_email
+          ?.toLowerCase()
+          .includes(query) ||
+        customer.city
+          ?.toLowerCase()
+          .includes(query) ||
+        customer.sub_district
+          ?.toLowerCase()
+          .includes(query)
+
+      const matchesPayment =
+        paymentFilter === 'all' ||
+        customer.payment_status === paymentFilter
+
+      const matchesVisit =
+        visitFilter === 'all' ||
+        (visitFilter === 'visited' &&
+          customer.visit_status
+            ?.trim()
+            .toLowerCase() === 'visited') ||
+        (visitFilter === 'not-visited' &&
+          customer.visit_status
+            ?.trim()
+            .toLowerCase() !== 'visited')
+
+      const matchesAssignment =
+        assignmentFilter === 'all' ||
+        (assignmentFilter === 'assigned' &&
+          !!customer.agent_email) ||
+        (assignmentFilter === 'unassigned' &&
+          !customer.agent_email)
+
+      return (
+        matchesSearch &&
+        matchesPayment &&
+        matchesVisit &&
+        matchesAssignment
+      )
+    })
+  }, [
+    customers,
+    search,
+    paymentFilter,
+    visitFilter,
+    assignmentFilter,
+  ])
+
+  if (loading) {
+    return (
+      <main className={styles.page}>
+        <p>Loading customers...</p>
+      </main>
+    )
+  }
+
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <Link href="/admin" className={styles.backButton}>
+          ← Back
+        </Link>
+
+        <div>
+          <p className={styles.eyebrow}>ADMIN</p>
+          <h1>Customers</h1>
+          <p>Search and filter customer assignments.</p>
+        </div>
+      </header>
+
+      <section className={styles.filterCard}>
+        <label>
+          Search
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, customer ID, agent, area..."
+          />
+        </label>
+
+        <div className={styles.filterGrid}>
+          <label>
+            Payment
+            <select
+              value={paymentFilter}
+              onChange={(e) =>
+                setPaymentFilter(e.target.value)
+              }
+            >
+              <option value="all">All</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </label>
+
+          <label>
+            Visit
+            <select
+              value={visitFilter}
+              onChange={(e) =>
+                setVisitFilter(e.target.value)
+              }
+            >
+              <option value="all">All</option>
+              <option value="visited">Visited</option>
+              <option value="not-visited">
+                Need Visit
+              </option>
+            </select>
+          </label>
+
+          <label>
+            Assignment
+            <select
+              value={assignmentFilter}
+              onChange={(e) =>
+                setAssignmentFilter(e.target.value)
+              }
+            >
+              <option value="all">All</option>
+              <option value="assigned">Assigned</option>
+              <option value="unassigned">
+                Unassigned
+              </option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className={styles.resultHeader}>
+        <span>Results</span>
+        <strong>{filteredCustomers.length}</strong>
+      </section>
+
+      {error && (
+        <div className={styles.errorCard}>
+          {error}
+        </div>
+      )}
+
+      <section className={styles.list}>
+        {filteredCustomers.length > 0 ? (
+          filteredCustomers.map((customer) => (
+            <Link
+              key={customer.customer_id}
+              href={`/admin/customers/${encodeURIComponent(
+                customer.customer_id
+              )}`}
+              className={styles.customerCard}
+            >
+              <div className={styles.cardTop}>
+                <div>
+                  <span className={styles.priority}>
+                    Priority {customer.priority_rank ?? '-'}
+                  </span>
+
+                  <h2>{customer.customer_name}</h2>
+                  <p>{customer.customer_id}</p>
+                </div>
+
+                <span className={styles.arrow}>›</span>
+              </div>
+
+              <div className={styles.infoGrid}>
+                <div>
+                  <span>Area</span>
+                  <strong>
+                    {customer.sub_district ||
+                      customer.district ||
+                      customer.city ||
+                      '-'}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Invoice</span>
+                  <strong>
+                    Rp
+                    {Number(
+                      customer.invoice_amount ?? 0
+                    ).toLocaleString('id-ID')}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Payment</span>
+                  <strong>
+                    {customer.payment_status
+                      ? customer.payment_status.toUpperCase()
+                      : 'NOT SET'}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Visit</span>
+                  <strong>
+                    {customer.visit_status || 'Not Visited'}
+                  </strong>
+                </div>
+              </div>
+
+              <div className={styles.assignmentRow}>
+                <span>
+                  {customer.agent_email
+                    ? customer.agent_email
+                    : 'Not Assigned'}
+                </span>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className={styles.emptyState}>
+            No customers match the current filters.
+          </div>
+        )}
+      </section>
+    </main>
+  )
 }

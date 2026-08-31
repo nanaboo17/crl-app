@@ -1,0 +1,351 @@
+.page {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 18px 16px 110px;
+  background: #f8fafc;
+}
+
+.backButton {
+  margin-bottom: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.header {
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 26px;
+}
+
+.customerCard {
+  margin-bottom: 14px;
+  padding: 18px;
+  background: #111827;
+  border-radius: 18px;
+  color: white;
+}
+
+.customerCard span {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.customerCard h2 {
+  margin: 5px 0;
+  font-size: 20px;
+}
+
+.customerCard p {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.card {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 18px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+}
+
+.card h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 17px;
+}
+
+.card label {
+  display: grid;
+  gap: 7px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.card input,
+.card select,
+.card textarea {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: white;
+  color: #111827;
+  font: inherit;
+  font-size: 16px;
+}
+
+.card textarea {
+  min-height: 95px;
+  resize: vertical;
+}
+
+.card input:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.givenLocation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.givenLocation span,
+.gpsResult span {
+  display: block;
+  margin-bottom: 4px;
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.givenLocation strong,
+.gpsResult strong {
+  display: block;
+  color: #111827;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.gpsButton {
+  width: 100%;
+  min-height: 50px;
+  padding: 13px;
+  border: 0;
+  border-radius: 12px;
+  background: #111827;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gpsButton:disabled {
+  opacity: 0.55;
+}
+
+.gpsSuccess {
+  padding: 12px 14px;
+  background: #ecfdf5;
+  border-radius: 12px;
+  color: #047857;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.gpsResult {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px;
+  background: #f3f4f6;
+  border-radius: 12px;
+}
+
+.locationMatch,
+.locationMismatch {
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.locationMatch {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.locationMismatch {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.locationMatch span,
+.locationMismatch span {
+  display: block;
+  margin-bottom: 5px;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.locationMatch strong,
+.locationMismatch strong {
+  display: block;
+  font-size: 18px;
+}
+
+.locationMatch p {
+  margin: 7px 0 0;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.locationMismatch p {
+  margin: 7px 0 0;
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mapBox {
+  overflow: hidden;
+  width: 100%;
+  height: 260px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+}
+
+.mapBox iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.mapButton {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  color: #111827;
+  text-align: center;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.warningBox {
+  padding: 12px;
+  background: #fff7ed;
+  border-radius: 12px;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.photoPreview {
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+}
+
+.photoPreview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.photoPreview span {
+  display: block;
+  padding: 10px 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.checkboxRow {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px !important;
+  line-height: 1.5;
+}
+
+.checkboxRow input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.errorCard {
+  margin-bottom: 14px;
+  padding: 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.submitButton {
+  width: 100%;
+  min-height: 54px;
+  padding: 15px;
+  border: 0;
+  border-radius: 14px;
+  background: #111827;
+  color: white;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.submitButton:disabled {
+  opacity: 0.55;
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 16px 14px 100px;
+  }
+
+  .givenLocation,
+  .gpsResult {
+    grid-template-columns: 1fr;
+  }
+
+  .mapBox {
+    height: 220px;
+  }
+}
+
+.helperText {
+  margin: -6px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.autoStatus {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  background: #f3f4f6;
+  border-radius: 12px;
+}
+
+.autoStatus span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.autoStatus strong {
+  color: #111827;
+  font-size: 13px;
+}

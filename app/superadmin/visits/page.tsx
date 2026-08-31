@@ -1,8 +1,136 @@
-'use client'
-import { useEffect,useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
-import type { Visit } from '@/lib/types'
-import { dateTime } from '@/lib/format'
-import PageTop from '@/components/PageTop'
-import Loading from '@/components/Loading'
-export default function ManageVisits(){const[rows,setRows]=useState<Visit[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState('');useEffect(()=>{(async()=>{const s=createClient();const{data,error}=await s.from('visits').select('*').order('visit_date',{ascending:false});if(error)setError(error.message);else setRows((data||[])as Visit[]);setLoading(false)})()},[]);async function del(id:string){if(!confirm('Delete this visit?'))return;const s=createClient();const{error}=await s.from('visits').delete().eq('visit_id',id);if(error)setError(error.message);else setRows(r=>r.filter(x=>x.visit_id!==id))}return <main className="container"><PageTop title="Manage Visits" eyebrow="CRL SUPERADMIN" back/>{error&&<div className="inline-error">{error}</div>}{loading?<Loading/>:<div className="list-stack">{rows.map(r=><div className="card customer-card" key={r.visit_id}><div className="card-row"><strong>{r.visit_id}</strong><span className="status-pill">{r.visit_result||'Submitted'}</span></div><div className="muted small">{r.customer_id} · {r.agent_email}</div><div className="muted small">{dateTime(r.visit_date)}</div><button className="btn danger compact section-sm" onClick={()=>del(r.visit_id)}>Delete</button></div>)}</div>}</main>}
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase-server'
+import styles from './page.module.css'
+
+export default async function SuperadminVisitsPage() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.email) {
+    redirect('/login')
+  }
+
+  const email = user.email.trim().toLowerCase()
+
+  const { data: currentUser } = await supabase
+    .from('agents')
+    .select('role, active')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (
+    !currentUser ||
+    !currentUser.active ||
+    !['superadmin'].includes(currentUser.role)
+  ) {
+    redirect('/auth/route')
+  }
+
+  const { data: agents, error } = await supabase
+    .from('agents')
+    .select(`
+      email,
+      agent_name,
+      sales_code,
+      active
+    `)
+    .eq('role', 'agent')
+    .order('agent_name')
+
+  if (error) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.errorCard}>
+          {error.message}
+        </div>
+      </main>
+    )
+  }
+
+  const agentData = await Promise.all(
+    (agents ?? []).map(async (agent) => {
+      const { count } = await supabase
+        .from('visits')
+        .select('*', {
+          count: 'exact',
+          head: true,
+        })
+        .eq('agent_email', agent.email)
+
+      return {
+        ...agent,
+        visit_count: count ?? 0,
+      }
+    })
+  )
+
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <Link
+          href="/superadmin"
+          className={styles.backButton}
+        >
+          ← Back
+        </Link>
+
+        <div>
+          <p className={styles.eyebrow}>
+            SUPERADMIN
+          </p>
+
+          <h1>Visit Monitoring</h1>
+
+          <p>
+            Select agent to review visit activity.
+          </p>
+        </div>
+      </header>
+
+      <section className={styles.summaryCard}>
+        <span>Total Agents</span>
+        <strong>{agentData.length}</strong>
+      </section>
+
+      <section className={styles.list}>
+        {agentData.map((agent) => (
+          <Link
+            key={agent.email}
+            href={`/superadmin/visits/${encodeURIComponent(
+              agent.email
+            )}`}
+            className={styles.agentCard}
+          >
+            <div>
+              <h2>{agent.agent_name}</h2>
+
+              <p>
+                {agent.sales_code || '-'}
+              </p>
+
+              <small>
+                {agent.email}
+              </small>
+            </div>
+
+            <div className={styles.right}>
+              <strong>
+                {agent.visit_count}
+              </strong>
+
+              <span>Visits</span>
+
+              <span className={styles.arrow}>
+                ›
+              </span>
+            </div>
+          </Link>
+        ))}
+      </section>
+    </main>
+  )
+}

@@ -1,8 +1,138 @@
-'use client'
-import { useEffect,useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
-import type { PreVisit } from '@/lib/types'
-import { dateTime } from '@/lib/format'
-import PageTop from '@/components/PageTop'
-import Loading from '@/components/Loading'
-export default function ManagePreVisits(){const[rows,setRows]=useState<PreVisit[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState('');useEffect(()=>{(async()=>{const s=createClient();const{data,error}=await s.from('pre_visits').select('*').order('created_at',{ascending:false});if(error)setError(error.message);else setRows((data||[])as PreVisit[]);setLoading(false)})()},[]);async function del(id:string){if(!confirm('Delete this pre-visit?'))return;const s=createClient();const{error}=await s.from('pre_visits').delete().eq('previsit_id',id);if(error)setError(error.message);else setRows(r=>r.filter(x=>x.previsit_id!==id))}return <main className="container"><PageTop title="Manage Pre-Visits" eyebrow="CRL SUPERADMIN" back/>{error&&<div className="inline-error">{error}</div>}{loading?<Loading/>:<div className="list-stack">{rows.map(r=><div className="card customer-card" key={r.previsit_id}><div className="card-row"><strong>{r.previsit_id}</strong><span className="status-pill">{r.previsit_status}</span></div><div className="muted small">{r.customer_id} · {r.agent_email}</div><div className="muted small">{dateTime(r.appointment_date)}</div><button className="btn danger compact section-sm" onClick={()=>del(r.previsit_id)}>Delete</button></div>)}</div>}</main>}
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase-server'
+import styles from './page.module.css'
+
+export default async function AdminPreVisitsPage() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.email) {
+    redirect('/login')
+  }
+
+  const email = user.email.trim().toLowerCase()
+
+  const { data: currentUser } = await supabase
+    .from('agents')
+    .select('role, active')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (
+    !currentUser ||
+    !currentUser.active ||
+    !['admin', 'superadmin'].includes(currentUser.role)
+  ) {
+    redirect('/auth/route')
+  }
+
+  const { data: agents, error } = await supabase
+    .from('agents')
+    .select(`
+      email,
+      agent_name,
+      sales_code,
+      active
+    `)
+    .eq('role', 'agent')
+    .order('agent_name')
+
+  if (error) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.errorCard}>
+          {error.message}
+        </div>
+      </main>
+    )
+  }
+
+  const agentData = await Promise.all(
+    (agents ?? []).map(async (agent) => {
+      const { count } = await supabase
+        .from('pre_visits')
+        .select('*', {
+          count: 'exact',
+          head: true,
+        })
+        .eq('agent_email', agent.email)
+
+      return {
+        ...agent,
+        previsit_count: count ?? 0,
+      }
+    })
+  )
+
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <Link
+          href="/admin"
+          className={styles.backButton}
+        >
+          ← Back
+        </Link>
+
+        <div>
+          <p className={styles.eyebrow}>
+            ADMIN
+          </p>
+
+          <h1>Pre-Visit Monitoring</h1>
+
+          <p>
+            Select agent to review pre-visit activity.
+          </p>
+        </div>
+      </header>
+
+      <section className={styles.summaryCard}>
+        <span>Total Agents</span>
+        <strong>{agentData.length}</strong>
+      </section>
+
+      <section className={styles.list}>
+        {agentData.map((agent) => (
+          <Link
+            key={agent.email}
+            href={`/superadmin/pre-visits/${encodeURIComponent(
+              agent.email
+            )}`}
+            className={styles.agentCard}
+          >
+            <div>
+              <h2>{agent.agent_name}</h2>
+
+              <p>
+                {agent.sales_code || '-'}
+              </p>
+
+              <small>
+                {agent.email}
+              </small>
+            </div>
+
+            <div className={styles.right}>
+              <strong>
+                {agent.previsit_count}
+              </strong>
+
+              <span>
+                Pre-Visits
+              </span>
+
+              <span className={styles.arrow}>
+                ›
+              </span>
+            </div>
+          </Link>
+        ))}
+      </section>
+    </main>
+  )
+}

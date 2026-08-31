@@ -1,52 +1,141 @@
-'use client'
-
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase-browser'
-import { getCurrentProfile } from '@/lib/auth'
-import type { Agent } from '@/lib/types'
-import AgentNav from '@/components/AgentNav'
-import Loading from '@/components/Loading'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase-server'
+import styles from './page.module.css'
 
-export default function AgentDashboard() {
-  const [profile, setProfile] = useState<Agent | null>(null)
-  const [counts, setCounts] = useState({ customers: 0, ready: 0, visits: 0 })
-  const [error, setError] = useState('')
+export default async function AgentPage() {
+  const supabase = await createClient()
 
-  useEffect(() => { (async () => {
-    try {
-      const p = await getCurrentProfile()
-      if (p.role !== 'agent') return window.location.replace(p.role === 'admin' ? '/admin' : '/superadmin')
-      setProfile(p)
-      const supabase = createClient()
-      const [{ count: customers }, { count: ready }, { count: visits }] = await Promise.all([
-        supabase.from('customers').select('*', { count: 'exact', head: true }).gt('outstanding_amount', 0),
-        supabase.from('pre_visits').select('*', { count: 'exact', head: true }).eq('previsit_status', 'Ready for Visit'),
-        supabase.from('visits').select('*', { count: 'exact', head: true }),
-      ])
-      setCounts({ customers: customers ?? 0, ready: ready ?? 0, visits: visits ?? 0 })
-    } catch (e: any) { setError(e.message) }
-  })() }, [])
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!profile && !error) return <main className="container"><Loading text="Loading dashboard…"/></main>
-  const initials = profile?.agent_name.split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase()
+  if (!user?.email) {
+    redirect('/login')
+  }
 
-  return <main className="container">
-    <header className="page-header"><div><div className="muted small">CRL FIELD APP</div><h1 className="page-title">Home</h1></div></header>
-    {error && <div className="card error-card">{error}</div>}
-    {profile && <>
-      <section className="card profile-card"><div className="avatar">{initials}</div><div className="truncate"><div className="profile-name">{profile.agent_name}</div><div className="muted small">{profile.sales_code || 'No sales code'}</div><div className="muted small truncate">{profile.email}</div></div></section>
-      <section className="section"><h2 className="section-title">My workload</h2><div className="grid grid-3">
-        <div className="card kpi-card"><div className="kpi-label">Unpaid customers</div><div className="kpi">{counts.customers}</div></div>
-        <div className="card kpi-card"><div className="kpi-label">Ready for visit</div><div className="kpi">{counts.ready}</div></div>
-        <div className="card kpi-card"><div className="kpi-label">Visits submitted</div><div className="kpi">{counts.visits}</div></div>
-      </div></section>
-      <section className="section"><h2 className="section-title">Quick actions</h2><div className="actions">
-        <Link className="btn" href="/agent/customers">My Customers</Link>
-        <Link className="btn secondary" href="/agent/pre-visits">Pre-Visits</Link>
-        <Link className="btn secondary" href="/agent/visits">Visit History</Link>
-      </div></section>
-    </>}
-    <AgentNav/>
-  </main>
+  const email = user.email.trim().toLowerCase()
+
+  const { data: agent, error } = await supabase
+    .from('agents')
+    .select(`
+      email,
+      agent_name,
+      sales_code,
+      role,
+      active
+    `)
+    .eq('email', email)
+    .maybeSingle()
+
+  if (error) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.errorCard}>
+          <h2>Account Error</h2>
+          <p>{error.message}</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!agent) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.errorCard}>
+          <h2>Agent Not Found</h2>
+          <p>
+            Your login email is:
+          </p>
+
+          <strong>{email}</strong>
+
+          <p>
+            This email was not found in the Agents table.
+          </p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!agent.active) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.errorCard}>
+          <h2>Account Inactive</h2>
+          <p>
+            Your CRL account is currently inactive.
+          </p>
+        </div>
+      </main>
+    )
+  }
+
+  if (agent.role !== 'agent') {
+    redirect('/auth/route')
+  }
+
+  const { count: customerCount } = await supabase
+    .from('customers')
+    .select('*', {
+      count: 'exact',
+      head: true,
+    })
+    .eq('agent_email', email)
+
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <p className={styles.eyebrow}>
+          CRL FIELD APP
+        </p>
+
+        <h1>
+          Hi, {agent.agent_name}
+        </h1>
+
+        <p className={styles.salesCode}>
+          {agent.sales_code || 'No Sales Code'}
+        </p>
+      </header>
+
+      <section className={styles.stats}>
+        <div className={styles.statCard}>
+          <span>My Customers</span>
+          <strong>{customerCount ?? 0}</strong>
+        </div>
+      </section>
+
+      <section className={styles.menu}>
+        <Link
+          href="/agent/customers"
+          className={styles.menuCard}
+        >
+          <div>
+            <strong>My Customers</strong>
+            <p>
+              View customers assigned to you
+            </p>
+          </div>
+
+          <span>›</span>
+        </Link>
+
+        <Link
+  href="/agent/route"
+  className={styles.menuCard}
+>
+  <div>
+    <strong>Visit Route</strong>
+
+    <p>
+      Plan today's customers from nearest location
+    </p>
+  </div>
+
+  <span>›</span>
+</Link>
+      </section>
+    </main>
+  )
 }

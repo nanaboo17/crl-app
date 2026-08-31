@@ -1,0 +1,103 @@
+.page {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24px 16px 100px;
+  background: #f8fafc;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+}
+
+.salesCode {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.stats {
+  margin-bottom: 18px;
+}
+
+.statCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: #111827;
+  border-radius: 18px;
+  color: white;
+}
+
+.statCard span {
+  font-size: 14px;
+}
+
+.statCard strong {
+  font-size: 30px;
+}
+
+.menu {
+  display: grid;
+  gap: 12px;
+}
+
+.menuCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  color: #111827;
+  text-decoration: none;
+}
+
+.menuCard strong {
+  font-size: 16px;
+}
+
+.menuCard p {
+  margin: 5px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.menuCard > span {
+  color: #9ca3af;
+  font-size: 28px;
+}
+
+.errorCard {
+  padding: 20px;
+  background: white;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+}
+
+.errorCard h2 {
+  margin-top: 0;
+  color: #991b1b;
+}
+
+.errorCard p {
+  color: #6b7280;
+  line-height: 1.5;
+}

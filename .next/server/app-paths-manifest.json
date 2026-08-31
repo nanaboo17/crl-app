@@ -1,8 +1,7 @@
 {
   "/login/page": "app/login/page.js",
-  "/auth/route/page": "app/auth/route/page.js",
-  "/page": "app/page.js",
-  "/superadmin/page": "app/superadmin/page.js",
-  "/superadmin/customers/page": "app/superadmin/customers/page.js",
-  "/superadmin/pre-visits/page": "app/superadmin/pre-visits/page.js"
+  "/agent/route/page": "app/agent/route/page.js",
+  "/admin/pre-visits/[agentEmail]/page": "app/admin/pre-visits/[agentEmail]/page.js",
+  "/agent/customers/page": "app/agent/customers/page.js",
+  "/agent/customers/[customerId]/page": "app/agent/customers/[customerId]/page.js"
 }
