@@ -7,7 +7,14 @@ export const metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light">
+      <head>
+        <link
+          href="https://cdn.jsdelivr.net/npm/daisyui@5"
+          rel="stylesheet"
+          type="text/css"
+        />
+      </head>
       <body>{children}</body>
     </html>
   )
