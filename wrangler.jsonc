@@ -8,7 +8,7 @@
     "global_fetch_strictly_public"
   ],
   "build": {
-    "command": "npx --yes @opennextjs/cloudflare@1.20.4 build"
+    "command": "npm install --no-save --legacy-peer-deps @opennextjs/cloudflare@1.20.4 && npx opennextjs-cloudflare build"
   },
   "assets": {
     "directory": ".open-next/assets",
