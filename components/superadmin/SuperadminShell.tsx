@@ -5,31 +5,34 @@ import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import SuperadminSidebar from './SuperadminSidebar'
 import SuperadminNavbar from './SuperadminNavbar'
-import { superadminConfig, type ShellConfig } from '@/components/shell/config'
+import {
+  adminConfig,
+  superadminConfig,
+  type ShellConfig,
+} from '@/components/shell/config'
 
 export default function SuperadminShell({
   agentName,
   email,
   children,
-  config = superadminConfig,
+  mode = 'superadmin',
 }: {
   agentName: string
   email: string
   children: React.ReactNode
-  config?: ShellConfig
+  mode?: 'admin' | 'superadmin'
 }) {
   const pathname = usePathname()
   const [navOpen, setNavOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(false)
+  const config: ShellConfig = mode === 'admin' ? adminConfig : superadminConfig
 
-  // Close the drawer after navigation.
   useEffect(() => {
     setNavOpen(false)
   }, [pathname])
 
-  // Escape to close, scroll lock, and initial focus while the drawer is open.
   useEffect(() => {
     if (!navOpen) return
 
@@ -47,7 +50,6 @@ export default function SuperadminShell({
     }
   }, [navOpen])
 
-  // Return focus to the menu trigger when the drawer closes.
   useEffect(() => {
     if (wasOpen.current && !navOpen) menuButtonRef.current?.focus()
     wasOpen.current = navOpen
@@ -55,7 +57,6 @@ export default function SuperadminShell({
 
   return (
     <div className="min-h-screen bg-[#f4f6f8]">
-      {/* Desktop sidebar — fixed, never overlaps content (content gets lg:pl-64) */}
       <aside
         aria-label="Superadmin sidebar"
         className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-gray-200 bg-white lg:block"
@@ -63,12 +64,10 @@ export default function SuperadminShell({
         <SuperadminSidebar agentName={agentName} config={config} />
       </aside>
 
-      {/* Mobile navigation drawer */}
       <div
         id="superadmin-mobile-nav"
         className={`fixed inset-0 z-50 lg:hidden ${navOpen ? '' : 'pointer-events-none'}`}
       >
-        {/* Backdrop blocks interaction with the page behind the drawer */}
         <div
           aria-hidden="true"
           onClick={() => setNavOpen(false)}
@@ -102,7 +101,6 @@ export default function SuperadminShell({
         </div>
       </div>
 
-      {/* Content column */}
       <div className="flex min-h-screen flex-col lg:pl-64">
         <SuperadminNavbar
           agentName={agentName}
