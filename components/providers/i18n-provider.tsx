@@ -41,23 +41,19 @@ function readCookieLocale(): Locale {
   return isValidLocale(value) ? value : defaultLocale
 }
 
-function getInitialLocale(): Locale {
-  if (typeof window === 'undefined') return defaultLocale
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    if (isValidLocale(stored)) return stored
-  } catch {
-    /* ignore */
-  }
-  return readCookieLocale()
-}
-
-export function I18nProvider({ children }: { children: ReactNode }) {
+export function I18nProvider({
+  initialLocale,
+  children,
+}: {
+  initialLocale: Locale
+  children: ReactNode
+}) {
   const router = useRouter()
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale)
+  const [locale, setLocaleState] = useState<Locale>(initialLocale)
 
-  // Persist to localStorage and sync the cookie so server components render
-  // the selected locale, then refresh to re-render server pages.
+  // Persist to localStorage and mirror to the cookie (so server components
+  // render this locale), then refresh only when the cookie actually changed —
+  // this skips the first paint where cookie === initialLocale.
   useEffect(() => {
     document.documentElement.lang = locale
     try {
@@ -65,12 +61,28 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    const previous = readCookieLocale()
     document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`
-    // Only refresh when the effect runs from an actual change (skip first paint).
-    if (readCookieLocale() !== locale && typeof window !== 'undefined') {
+    if (previous !== locale) {
       router.refresh()
     }
   }, [locale, router])
+
+  // Reconcile with the stored preference after mount. Reads localStorage only
+  // now (not during render) so the server-rendered HTML matches the client's
+  // first render exactly (no hydration mismatch).
+  useEffect(() => {
+    let stored: Locale | null = null
+    try {
+      const value = window.localStorage.getItem(STORAGE_KEY)
+      if (isValidLocale(value)) stored = value
+    } catch {
+      /* ignore */
+    }
+    if (stored && stored !== locale) {
+      setLocaleState(stored)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState((current) => {
