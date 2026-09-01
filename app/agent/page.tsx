@@ -1,12 +1,18 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Building2, ClipboardList, MapPin, Route } from 'lucide-react'
+import { Building2, ClipboardList, LayoutDashboard, MapPin, Route, UserRound } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AgentPage() {
   const supabase = await createClient()
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const {
     data: { user },
@@ -34,7 +40,7 @@ export default async function AgentPage() {
     return (
       <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
         <div className="rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
-          Kesalahan Akun: {error.message}
+          {t('agent.dashboard.accountError', { message: error.message })}
         </div>
       </div>
     )
@@ -44,7 +50,7 @@ export default async function AgentPage() {
     return (
       <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
         <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-          Agen tidak ditemukan. Email masuk Anda: {email}
+          {t('agent.dashboard.agentNotFound', { email })}
         </div>
       </div>
     )
@@ -54,7 +60,7 @@ export default async function AgentPage() {
     return (
       <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
         <div className="rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
-          Akun CRL Anda saat ini tidak aktif.
+          {t('agent.dashboard.accountInactive')}
         </div>
       </div>
     )
@@ -75,25 +81,25 @@ export default async function AgentPage() {
   const stats = [
     {
       href: '/agent/customers',
-      label: 'Customers',
+      label: t('agent.dashboard.statCustomers'),
       count: customersResult.count ?? 0,
       icon: Building2,
     },
     {
       href: '/agent/route',
-      label: 'Route',
+      label: t('agent.dashboard.statRoute'),
       count: 0,
       icon: Route,
     },
     {
       href: '/agent/pre-visits',
-      label: 'Pre-Visits',
+      label: t('agent.dashboard.statPreVisits'),
       count: preVisitsResult.count ?? 0,
       icon: ClipboardList,
     },
     {
       href: '/agent/visits',
-      label: 'Visits',
+      label: t('agent.dashboard.statVisits'),
       count: visitsResult.count ?? 0,
       icon: MapPin,
     },
@@ -102,21 +108,21 @@ export default async function AgentPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
       <SuperadminPageHeader
-        breadcrumbs={[{ label: 'Agent', href: '/agent' }, { label: 'Dashboard' }]}
-        title="Dashboard"
-        description={`Welcome back, ${firstName}. Here is what is happening across your field operations.`}
+        breadcrumbs={[{ label: t('agent.dashboard.breadcrumbAgent'), href: '/agent', icon: UserRound }, { label: t('agent.dashboard.breadcrumbDashboard'), icon: LayoutDashboard }]}
+        title={t('agent.dashboard.title')}
+        description={t('agent.dashboard.description', { name: firstName })}
         actions={
           <Link
             href="/agent/customers"
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-content transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            Pelanggan Saya
+            {t('agent.dashboard.myCustomers')}
           </Link>
         }
       />
 
       <section
-        aria-label="Statistics"
+        aria-label={t('agent.dashboard.statsAria')}
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         {stats.map(({ href, label, count, icon: Icon }) => (
@@ -130,7 +136,7 @@ export default async function AgentPage() {
             </div>
             <div className="dui-stat-title">{label}</div>
             <div className="dui-stat-value text-3xl">{count.toLocaleString()}</div>
-            <div className="dui-stat-desc">Manage {label.toLowerCase()} →</div>
+            <div className="dui-stat-desc">{t('agent.dashboard.manage', { name: label.toLowerCase() })}</div>
           </Link>
         ))}
       </section>

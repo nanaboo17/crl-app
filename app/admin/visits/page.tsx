@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './page.module.css'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function AdminVisitsPage() {
+  const { t } = useI18n()
   const supabase = createClient()
 
   const [agents, setAgents] = useState<any[]>([])
@@ -137,7 +139,7 @@ export default function AdminVisitsPage() {
   if (loading) {
     return (
       <main className={styles.page}>
-        <p>Loading visit monitoring...</p>
+        <p>{t('admin.visits.loading')}</p>
       </main>
     )
   }
@@ -149,37 +151,37 @@ export default function AdminVisitsPage() {
           href="/admin"
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            ADMIN
+            {t('admin.visits.eyebrow')}
           </p>
 
-          <h1>Visit Monitoring</h1>
+          <h1>{t('admin.visits.title')}</h1>
 
           <p>
-            Review visit activity per agent.
+            {t('admin.visits.subtitle')}
           </p>
         </div>
       </header>
 
       <section className={styles.filterCard}>
         <label>
-          Search Agent
+          {t('admin.visits.searchAgent')}
 
           <input
             value={search}
             onChange={(e) =>
               setSearch(e.target.value)
             }
-            placeholder="Agent name, email, sales code..."
+            placeholder={t('admin.visits.searchPlaceholder')}
           />
         </label>
 
         <label>
-          Activity
+          {t('admin.visits.activity')}
 
           <select
             value={activityFilter}
@@ -188,22 +190,22 @@ export default function AdminVisitsPage() {
             }
           >
             <option value="all">
-              All Agents
+              {t('admin.visits.allAgents')}
             </option>
 
             <option value="has-visits">
-              Has Visits
+              {t('admin.visits.hasVisits')}
             </option>
 
             <option value="no-visits">
-              No Visits
+              {t('admin.visits.noVisits')}
             </option>
           </select>
         </label>
       </section>
 
       <section className={styles.resultHeader}>
-        <span>Agents</span>
+        <span>{t('admin.visits.agents')}</span>
         <strong>
           {filteredAgents.length}
         </strong>
@@ -241,7 +243,7 @@ export default function AdminVisitsPage() {
                 {agent.visit_count}
               </strong>
 
-              <span>Visits</span>
+              <span>{t('admin.visits.count')}</span>
 
               <small>
                 ✓ {agent.gps_match} · ⚠{' '}

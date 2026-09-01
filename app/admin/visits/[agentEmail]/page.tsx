@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './page.module.css'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function AgentVisitDaysPage() {
+  const { t } = useI18n()
   const params = useParams()
   const supabase = createClient()
 
@@ -67,7 +69,7 @@ export default function AgentVisitDaysPage() {
 
       if (agentError || !agentData) {
         setError(
-          agentError?.message || 'Agent not found.'
+          agentError?.message || t('admin.visitDays.agentNotFound')
         )
         setLoading(false)
         return
@@ -180,7 +182,7 @@ export default function AgentVisitDaysPage() {
   if (loading) {
     return (
       <main className={styles.page}>
-        Loading visits...
+        {t('admin.visitDays.loading')}
       </main>
     )
   }
@@ -189,7 +191,7 @@ export default function AgentVisitDaysPage() {
     return (
       <main className={styles.page}>
         <div className={styles.errorCard}>
-          {error || 'Agent not found.'}
+          {error || t('admin.visitDays.agentNotFound')}
         </div>
       </main>
     )
@@ -202,12 +204,12 @@ export default function AgentVisitDaysPage() {
           href="/admin/visits"
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            AGENT VISITS
+            {t('admin.visitDays.eyebrow')}
           </p>
 
           <h1>{agent.agent_name}</h1>
@@ -220,14 +222,14 @@ export default function AgentVisitDaysPage() {
       </header>
 
       <section className={styles.summaryCard}>
-        <span>Filtered Visits</span>
+        <span>{t('admin.visitDays.filtered')}</span>
         <strong>{filteredVisits.length}</strong>
       </section>
 
       <section className={styles.filterCard}>
         <div className={styles.filterGrid}>
           <label>
-            From
+            {t('admin.visitDays.from')}
 
             <input
               type="date"
@@ -239,7 +241,7 @@ export default function AgentVisitDaysPage() {
           </label>
 
           <label>
-            To
+            {t('admin.visitDays.to')}
 
             <input
               type="date"
@@ -257,7 +259,7 @@ export default function AgentVisitDaysPage() {
             className={styles.clearButton}
             onClick={clearFilter}
           >
-            Clear Date Filter
+            {t('admin.visitDays.clearFilter')}
           </button>
         )}
       </section>
@@ -288,7 +290,7 @@ export default function AgentVisitDaysPage() {
                 </span>
 
                 <strong>
-                  {stats.total} Visits
+                  {t('admin.visitDays.totalLabel', { total: stats.total })}
                 </strong>
               </div>
 
@@ -303,7 +305,7 @@ export default function AgentVisitDaysPage() {
           ))
         ) : (
           <div className={styles.empty}>
-            No visits found for this date range.
+            {t('admin.visitDays.empty')}
           </div>
         )}
       </section>

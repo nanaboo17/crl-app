@@ -2,8 +2,14 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AdminPreVisitsPage() {
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
   const supabase = await createClient()
 
   const {
@@ -75,24 +81,24 @@ export default async function AdminPreVisitsPage() {
           href="/admin"
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            ADMIN
+            {t('admin.preVisits.eyebrow')}
           </p>
 
-          <h1>Pre-Visit Monitoring</h1>
+          <h1>{t('admin.preVisits.title')}</h1>
 
           <p>
-            Select agent to review pre-visit activity.
+            {t('admin.preVisits.subtitle')}
           </p>
         </div>
       </header>
 
       <section className={styles.summaryCard}>
-        <span>Total Agents</span>
+        <span>{t('admin.preVisits.totalAgents')}</span>
         <strong>{agentData.length}</strong>
       </section>
 
@@ -123,7 +129,7 @@ export default async function AdminPreVisitsPage() {
               </strong>
 
               <span>
-                Pre-Visits
+                {t('admin.preVisits.count')}
               </span>
 
               <span className={styles.arrow}>

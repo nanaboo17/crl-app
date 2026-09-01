@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AgentDailyPreVisitsPage({
   params,
@@ -12,6 +15,18 @@ export default async function AgentDailyPreVisitsPage({
   }>
 }) {
   const { agentEmail, date } = await params
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
+
+  const statusLabel = (status: string | null | undefined) => {
+    if (status === 'Ready for Visit') return t('admin.status.readyForVisit')
+    if (status === 'Need Follow-up') return t('admin.status.needFollowUp')
+    if (status === 'Supervisor Review') return t('admin.status.supervisorReview')
+    if (status === 'Pending') return t('admin.status.pending')
+    return status ?? '-'
+  }
 
   const decodedEmail =
     decodeURIComponent(agentEmail)
@@ -57,7 +72,7 @@ export default async function AgentDailyPreVisitsPage({
     return (
       <main className={styles.page}>
         <div className={styles.errorCard}>
-          Agent not found.
+          {t('admin.preVisitDaily.agentNotFound')}
         </div>
       </main>
     )
@@ -184,12 +199,12 @@ export default async function AgentDailyPreVisitsPage({
           )}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            DAILY PRE-VISITS
+            {t('admin.preVisitDaily.eyebrow')}
           </p>
 
           <h1>
@@ -214,26 +229,26 @@ export default async function AgentDailyPreVisitsPage({
 
       <section className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <span>Total</span>
+          <span>{t('admin.preVisitDaily.total')}</span>
           <strong>{total}</strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>Ready</span>
+          <span>{t('admin.preVisitDaily.ready')}</span>
           <strong>
             {readyCount}
           </strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>Follow-up</span>
+          <span>{t('admin.preVisitDaily.followUp')}</span>
           <strong>
             {followUpCount}
           </strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>Review</span>
+          <span>{t('admin.preVisitDaily.review')}</span>
           <strong>
             {reviewCount}
           </strong>
@@ -306,7 +321,7 @@ export default async function AgentDailyPreVisitsPage({
                   >
                     <div>
                       <span>
-                        Contact Result
+                        {t('admin.preVisitDaily.contactResult')}
                       </span>
 
                       <strong>
@@ -317,7 +332,7 @@ export default async function AgentDailyPreVisitsPage({
 
                     <div>
                       <span>
-                        Pre-Visit Status
+                        {t('admin.preVisitDaily.status')}
                       </span>
 
                       <strong>
@@ -328,43 +343,43 @@ export default async function AgentDailyPreVisitsPage({
 
                     <div>
                       <span>
-                        Contact
+                        {t('admin.preVisitDaily.contact')}
                       </span>
 
                       <strong>
                         {preVisit.contact_confirmed
-                          ? '✓ Confirmed'
-                          : 'Not Confirmed'}
+                          ? t('admin.preVisitDaily.confirmed')
+                          : t('admin.preVisitDaily.notConfirmed')}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Address
+                        {t('admin.preVisitDaily.address')}
                       </span>
 
                       <strong>
                         {preVisit.address_confirmed
-                          ? '✓ Confirmed'
-                          : 'Not Confirmed'}
+                          ? t('admin.preVisitDaily.confirmed')
+                          : t('admin.preVisitDaily.notConfirmed')}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Appointment
+                        {t('admin.preVisitDaily.appointment')}
                       </span>
 
                       <strong>
                         {preVisit.appointment_confirmed
-                          ? '✓ Confirmed'
-                          : 'Not Confirmed'}
+                          ? t('admin.preVisitDaily.confirmed')
+                          : t('admin.preVisitDaily.notConfirmed')}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Area
+                        {t('admin.preVisitDaily.area')}
                       </span>
 
                       <strong>
@@ -409,7 +424,7 @@ export default async function AgentDailyPreVisitsPage({
                               : styles.pendingBadge
                       }
                     >
-                      {preVisit.previsit_status}
+                      {statusLabel(preVisit.previsit_status)}
                     </span>
                   </div>
                 </Link>
@@ -422,15 +437,13 @@ export default async function AgentDailyPreVisitsPage({
               styles.emptyState
             }
           >
-            <h2>
-              No pre-visits
-            </h2>
+              <h2>
+                {t('admin.preVisitDaily.noTitle')}
+              </h2>
 
-            <p>
-              This agent has no
-              pre-visit activity on
-              this date.
-            </p>
+              <p>
+                {t('admin.preVisitDaily.noDesc')}
+              </p>
           </div>
         )}
       </section>

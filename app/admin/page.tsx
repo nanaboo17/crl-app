@@ -1,13 +1,15 @@
 'use client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Building2, ClipboardList, MapPin, UserCheck } from 'lucide-react'
+import { Building2, ClipboardList, LayoutDashboard, MapPin, UserCheck, UserCog } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { getCurrentProfile } from '@/lib/auth'
 import type { Agent } from '@/lib/types'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function AdminDashboard() {
+  const { t } = useI18n()
   const [profile, setProfile] = useState<Agent | null>(null)
   const [counts, setCounts] = useState({
     total: 0,
@@ -58,39 +60,39 @@ export default function AdminDashboard() {
     return (
       <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
         <SuperadminPageHeader
-          breadcrumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Dashboard' }]}
-          title="Dashboard"
-          description="Memuat ringkasan operasi lapangan CRL…"
+          breadcrumbs={[{ label: t('admin.dashboard.breadcrumbAdmin'), href: '/admin', icon: UserCog }, { label: t('admin.dashboard.breadcrumbDashboard'), icon: LayoutDashboard }]}
+          title={t('admin.dashboard.title')}
+          description={t('admin.dashboard.loading')}
         />
         <div className="dui-loading dui-loading-spinner dui-loading-lg text-primary" />
       </div>
     )
   }
 
-  const firstName = profile?.agent_name?.trim().split(/\s+/)[0] ?? 'Admin'
+  const firstName = profile?.agent_name?.trim().split(/\s+/)[0] ?? t('admin.dashboard.adminFallback')
 
   const stats = [
     {
       href: '/admin/customers',
-      label: 'Customers',
+      label: t('admin.dashboard.statCustomers'),
       count: counts.total,
       icon: Building2,
     },
     {
       href: '/admin/customers',
-      label: 'Assigned',
+      label: t('admin.dashboard.statAssigned'),
       count: counts.assigned,
       icon: UserCheck,
     },
     {
       href: '/admin/pre-visits',
-      label: 'Pre-Visits',
+      label: t('admin.dashboard.statPreVisits'),
       count: counts.preVisits,
       icon: ClipboardList,
     },
     {
       href: '/admin/visits',
-      label: 'Visits',
+      label: t('admin.dashboard.statVisits'),
       count: counts.visits,
       icon: MapPin,
     },
@@ -99,15 +101,15 @@ export default function AdminDashboard() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
       <SuperadminPageHeader
-        breadcrumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Dashboard' }]}
-        title="Dashboard"
-        description={`Welcome back, ${firstName}. Here is what is happening across CRL field operations.`}
+        breadcrumbs={[{ label: t('admin.dashboard.breadcrumbAdmin'), href: '/admin', icon: UserCog }, { label: t('admin.dashboard.breadcrumbDashboard'), icon: LayoutDashboard }]}
+        title={t('admin.dashboard.title')}
+        description={t('admin.dashboard.welcomeBack', { name: firstName })}
         actions={
           <Link
             href="/admin/customers"
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-content transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            Kelola Pelanggan
+            {t('admin.dashboard.manageCustomers')}
           </Link>
         }
       />
@@ -120,7 +122,7 @@ export default function AdminDashboard() {
 
       {profile && (
         <section
-          aria-label="Statistics"
+          aria-label={t('admin.dashboard.statsAria')}
           className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
         >
           {stats.map(({ href, label, count, icon: Icon }) => (
@@ -134,7 +136,7 @@ export default function AdminDashboard() {
               </div>
               <div className="dui-stat-title">{label}</div>
               <div className="dui-stat-value text-3xl">{count}</div>
-              <div className="dui-stat-desc">Manage {label.toLowerCase()} →</div>
+              <div className="dui-stat-desc">{t('admin.dashboard.manage', { label: label.toLowerCase() })}</div>
             </Link>
           ))}
         </section>

@@ -1,14 +1,19 @@
 import Link from 'next/link'
 import {
   AlertCircle,
+  Building2,
   Eye,
   Inbox,
+  ShieldCheck,
   UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import SuperadminPagination from '@/components/superadmin/SuperadminPagination'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 const PAGE_SIZE = 10
 
@@ -19,6 +24,10 @@ export default async function ManageCustomersPage({
 }) {
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -44,17 +53,17 @@ export default async function ManageCustomersPage({
       <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
         <SuperadminPageHeader
           breadcrumbs={[
-            { label: 'Superadmin', href: '/superadmin' },
-            { label: 'Customers' },
+            { label: t('superadmin.bc.superadmin'), href: '/superadmin', icon: ShieldCheck },
+            { label: t('superadmin.bc.customers'), icon: Building2 },
           ]}
-          title="Customers"
-          description="Monitor customer accounts and assignments."
+          title={t('superadmin.customers.title')}
+          description={t('superadmin.customers.description')}
         />
         <SuperadminState
           tone="error"
           icon={AlertCircle}
-          title="Unable to load customers"
-          description="Please try again."
+          title={t('superadmin.customers.errorTitle')}
+          description={t('superadmin.customers.errorDesc')}
         />
       </div>
     )
@@ -64,18 +73,18 @@ export default async function ManageCustomersPage({
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
       <SuperadminPageHeader
         breadcrumbs={[
-          { label: 'Superadmin', href: '/superadmin' },
-          { label: 'Customers' },
+          { label: t('superadmin.bc.superadmin'), href: '/superadmin' },
+          { label: t('superadmin.bc.customers') },
         ]}
-        title="Customers"
-        description="Monitor customer accounts and assignments."
+        title={t('superadmin.customers.title')}
+        description={t('superadmin.customers.description')}
         actions={
           <Link
             href="/superadmin/customers/new"
             className="btn btn-primary btn-sm"
           >
             <UserPlus aria-hidden="true" className="size-4" />
-            Add Customer
+            {t('superadmin.customers.addCustomer')}
           </Link>
         }
       />
@@ -83,8 +92,8 @@ export default async function ManageCustomersPage({
       {customers.length === 0 ? (
         <SuperadminState
           icon={Inbox}
-          title="No customers found"
-          description="There are currently no customer records to display."
+          title={t('superadmin.customers.emptyTitle')}
+          description={t('superadmin.customers.emptyDesc')}
         />
       ) : (
         <>
@@ -92,12 +101,12 @@ export default async function ManageCustomersPage({
             <table className="table table-sm table-zebra">
               <thead>
                 <tr>
-                  <th>Customer</th>
-                  <th className="hidden md:table-cell">Phone</th>
-                  <th className="hidden lg:table-cell">Assigned Agent</th>
-                  <th>Outstanding</th>
-                  <th className="hidden sm:table-cell">Status</th>
-                  <th aria-label="Actions" />
+                  <th>{t('superadmin.customers.thCustomer')}</th>
+                  <th className="hidden md:table-cell">{t('superadmin.customers.thPhone')}</th>
+                  <th className="hidden lg:table-cell">{t('superadmin.customers.thAssignedAgent')}</th>
+                  <th>{t('superadmin.customers.thOutstanding')}</th>
+                  <th className="hidden sm:table-cell">{t('superadmin.customers.thStatus')}</th>
+                  <th aria-label={t('superadmin.customers.thActions')} />
                 </tr>
               </thead>
               <tbody>
@@ -124,7 +133,7 @@ export default async function ManageCustomersPage({
                     <td className="hidden lg:table-cell">
                       {customer.agent_email || (
                         <span className="text-base-content/50">
-                          Not assigned
+                          {t('superadmin.customers.notAssigned')}
                         </span>
                       )}
                     </td>
@@ -145,8 +154,8 @@ export default async function ManageCustomersPage({
                           href={`/superadmin/customers/${encodeURIComponent(
                             customer.customer_id
                           )}`}
-                          aria-label={`View ${customer.customer_name}`}
-                          title="View customer"
+                          aria-label={t('superadmin.customers.viewAria', { name: customer.customer_name })}
+                          title={t('superadmin.customers.viewTitle')}
                           className="btn btn-ghost btn-sm btn-square"
                         >
                           <Eye aria-hidden="true" className="size-4" />

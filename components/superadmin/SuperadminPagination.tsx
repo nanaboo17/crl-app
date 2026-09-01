@@ -1,4 +1,7 @@
 import Link from 'next/link'
+import { getLocale } from '@/lib/i18n/server'
+import { translate, type Locale } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 const PAGE_SIZE = 10
 
@@ -6,7 +9,7 @@ const PAGE_SIZE = 10
  * Server-side pagination bar: URL-driven (?page=N), pure Links — no client JS.
  * daisyUI `join` button group with a compact page list for many pages.
  */
-export default function SuperadminPagination({
+export default async function SuperadminPagination({
   page,
   pageSize = PAGE_SIZE,
   total,
@@ -25,28 +28,31 @@ export default function SuperadminPagination({
   const to = Math.min(current * pageSize, total)
 
   const items = pageList(current, pages)
+  const locale: Locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t('pagination.label')}
       className="flex flex-wrap items-center justify-between gap-3"
     >
       <p className="text-sm text-base-content/60">
-        Showing {from}–{to} of {total}
+        {t('pagination.showing', { from, to, total })}
       </p>
 
       <div className="join">
         {current === 1 ? (
           <span className="btn btn-sm btn-disabled join-item" aria-disabled="true">
-            Previous
+            {t('pagination.previous')}
           </span>
         ) : (
           <Link
             href={`${basePath}?page=${current - 1}`}
             className="btn btn-sm join-item"
-            aria-label="Previous page"
+            aria-label={t('pagination.previousPage')}
           >
-            Previous
+            {t('pagination.previous')}
           </Link>
         )}
 
@@ -68,7 +74,7 @@ export default function SuperadminPagination({
               key={item}
               href={`${basePath}?page=${item}`}
               className="btn btn-sm join-item"
-              aria-label={`Page ${item}`}
+              aria-label={t('pagination.pageAria', { page: item })}
             >
               {item}
             </Link>
@@ -77,15 +83,15 @@ export default function SuperadminPagination({
 
         {current === pages ? (
           <span className="btn btn-sm btn-disabled join-item" aria-disabled="true">
-            Next
+            {t('pagination.next')}
           </span>
         ) : (
           <Link
             href={`${basePath}?page=${current + 1}`}
             className="btn btn-sm join-item"
-            aria-label="Next page"
+            aria-label={t('pagination.nextPage')}
           >
-            Next
+            {t('pagination.next')}
           </Link>
         )}
       </div>

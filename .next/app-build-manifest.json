@@ -17,41 +17,68 @@
       "static/chunks/main-app.js",
       "static/chunks/app/superadmin/loading.js"
     ],
-    "/superadmin/page": [
+    "/superadmin/visits/[agentEmail]/[date]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/superadmin/page.js"
+      "static/css/app/superadmin/visits/[agentEmail]/[date]/page.css",
+      "static/chunks/app/superadmin/visits/[agentEmail]/[date]/page.js"
     ],
-    "/page": [
+    "/agent/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/css/app/agent/layout.css",
+      "static/chunks/app/agent/layout.js"
+    ],
+    "/agent/customers/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/agent/customers/page.js"
+    ],
+    "/agent/pre-visits/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/agent/pre-visits/page.js"
     ],
     "/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/login/page.js"
     ],
-    "/auth/callback/route": [
+    "/agent/pre-visits/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/auth/callback/route.js"
+      "static/chunks/app/agent/pre-visits/[id]/page.js"
     ],
-    "/auth/route/page": [
+    "/superadmin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/auth/route/page.js"
+      "static/chunks/app/superadmin/page.js"
     ],
-    "/admin/layout": [
+    "/superadmin/customers/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/admin/layout.css",
-      "static/chunks/app/admin/layout.js"
+      "static/chunks/app/superadmin/customers/page.js"
     ],
-    "/admin/page": [
+    "/agent/customers/[customerId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
+      "static/chunks/app/agent/customers/[customerId]/page.js"
+    ],
+    "/agent/customers/[customerId]/pre-visit/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/agent/customers/[customerId]/pre-visit/page.js"
+    ],
+    "/agent/pre-visits/new/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/agent/pre-visits/new/page.css",
+      "static/chunks/app/agent/pre-visits/new/page.js"
+    ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
     ]
   }
 }

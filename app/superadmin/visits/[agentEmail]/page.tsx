@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AgentVisitDaysPage({
   params,
@@ -12,6 +15,10 @@ export default async function AgentVisitDaysPage({
 
   const decodedEmail =
     decodeURIComponent(agentEmail)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -53,7 +60,7 @@ export default async function AgentVisitDaysPage({
   if (!agent) {
     return (
       <main className={styles.page}>
-        Agent not found.
+        {t('superadmin.visits.agentDays.notFound')}
       </main>
     )
   }
@@ -129,12 +136,12 @@ export default async function AgentVisitDaysPage({
           href="/superadmin/visits"
           className={styles.backButton}
         >
-          ← Back
+          {t('superadmin.visits.agentDays.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            AGENT VISITS
+            {t('superadmin.visits.agentDays.eyebrow')}
           </p>
 
           <h1>{agent.agent_name}</h1>
@@ -147,7 +154,7 @@ export default async function AgentVisitDaysPage({
       </header>
 
       <section className={styles.summaryCard}>
-        <span>Total Visits</span>
+        <span>{t('superadmin.visits.agentDays.totalVisits')}</span>
         <strong>{visits?.length ?? 0}</strong>
       </section>
 
@@ -177,7 +184,7 @@ export default async function AgentVisitDaysPage({
                 </span>
 
                 <strong>
-                  {stats.total} Visits
+                  {t('superadmin.visits.agentDays.visitsCount', { count: stats.total })}
                 </strong>
               </div>
 
@@ -198,7 +205,7 @@ export default async function AgentVisitDaysPage({
           ))
         ) : (
           <div className={styles.empty}>
-            No visits for this agent yet.
+            {t('superadmin.visits.agentDays.empty')}
           </div>
         )}
       </section>

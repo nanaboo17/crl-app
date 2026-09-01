@@ -4,15 +4,10 @@ import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 const ROLES = ['agent', 'admin', 'superadmin'] as const
 type Role = (typeof ROLES)[number]
-
-const ROLE_LABELS: Record<Role, string> = {
-  agent: 'Agen',
-  admin: 'Admin',
-  superadmin: 'Superadmin',
-}
 
 type FormErrors = {
   email?: string
@@ -22,7 +17,14 @@ type FormErrors = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function roleLabelKey(role: Role): string {
+  if (role === 'admin') return 'superadmin.agents.new.roleAdmin'
+  if (role === 'superadmin') return 'superadmin.agents.new.roleSuperadmin'
+  return 'superadmin.agents.new.roleAgent'
+}
+
 export default function NewAgentPage() {
+  const { locale, setLocale, t } = useI18n()
   const router = useRouter()
 
   const [email, setEmail] = useState('')
@@ -39,13 +41,13 @@ export default function NewAgentPage() {
     const next: FormErrors = {}
 
     if (!email.trim()) {
-      next.email = 'Email wajib diisi.'
+      next.email = t('superadmin.agents.new.emailRequired')
     } else if (!EMAIL_RE.test(email.trim())) {
-      next.email = 'Format email tidak valid.'
+      next.email = t('superadmin.agents.new.emailInvalid')
     }
 
     if (!name.trim()) {
-      next.agent_name = 'Nama agen wajib diisi.'
+      next.agent_name = t('superadmin.agents.new.nameRequired')
     }
 
     return next
@@ -75,7 +77,7 @@ export default function NewAgentPage() {
         .maybeSingle()
 
       if (existing) {
-        setFormError(`Email ${cleanEmail} sudah terdaftar sebagai agen.`)
+        setFormError(t('superadmin.agents.new.emailExists', { email: cleanEmail }))
         setSaving(false)
         return
       }
@@ -98,7 +100,7 @@ export default function NewAgentPage() {
       setFormError(
         err instanceof Error
           ? err.message
-          : 'Gagal menyimpan agen.',
+          : t('superadmin.agents.new.saveError'),
       )
     } finally {
       setSaving(false)
@@ -112,7 +114,7 @@ export default function NewAgentPage() {
           <Link
             href="/superadmin/agents"
             className="dui-btn dui-btn-ghost dui-btn-sm"
-            aria-label="Kembali ke daftar agen"
+            aria-label={t('superadmin.agents.new.backAria')}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m15 18-6-6 6-6" />
@@ -120,7 +122,7 @@ export default function NewAgentPage() {
           </Link>
           <div className="leading-tight">
             <div className="font-extrabold tracking-tight" translate="no">CRL Field App</div>
-            <div className="text-xs text-base-content/60">Tambah Agen</div>
+            <div className="text-xs text-base-content/60">{t('superadmin.agents.new.subtitle')}</div>
           </div>
         </div>
       </div>
@@ -128,11 +130,11 @@ export default function NewAgentPage() {
       <div className="mx-auto w-full max-w-xl px-4 sm:px-6 pt-6">
         <div>
           <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-base-content/50">
-            Superadmin
+            {t('superadmin.bc.superadmin')}
           </div>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Tambah Agen</h1>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{t('superadmin.agents.new.title')}</h1>
           <p className="mt-1 text-sm text-base-content/60">
-            Daftarkan agen baru beserta perannya di aplikasi.
+            {t('superadmin.agents.new.description')}
           </p>
         </div>
 
@@ -140,14 +142,14 @@ export default function NewAgentPage() {
           <div className="dui-card-body gap-4">
             <div className="dui-fieldset">
               <legend className="dui-fieldset-legend">
-                Email
+                {t('superadmin.agents.new.emailLabel')}
                 <span className="text-error">*</span>
               </legend>
               <input
                 type="email"
                 inputMode="email"
                 autoComplete="email"
-                placeholder="nama@contoh.com"
+                placeholder={t('superadmin.agents.new.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={`dui-input w-full ${errors.email ? 'dui-input-error' : ''}`}
@@ -160,13 +162,13 @@ export default function NewAgentPage() {
 
             <div className="dui-fieldset">
               <legend className="dui-fieldset-legend">
-                Nama Agen
+                {t('superadmin.agents.new.nameLabel')}
                 <span className="text-error">*</span>
               </legend>
               <input
                 type="text"
                 autoComplete="name"
-                placeholder="Nama lengkap agen"
+                placeholder={t('superadmin.agents.new.namePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={`dui-input w-full ${errors.agent_name ? 'dui-input-error' : ''}`}
@@ -178,11 +180,11 @@ export default function NewAgentPage() {
             </div>
 
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Sales Code</legend>
+              <legend className="dui-fieldset-legend">{t('superadmin.agents.new.salesCodeLabel')}</legend>
               <input
                 type="text"
                 autoComplete="off"
-                placeholder="Kode penjualan (opsional)"
+                placeholder={t('superadmin.agents.new.salesCodePlaceholder')}
                 value={salesCode}
                 onChange={(e) => setSalesCode(e.target.value)}
                 className="dui-input w-full"
@@ -191,7 +193,7 @@ export default function NewAgentPage() {
 
             <div className="dui-fieldset">
               <legend className="dui-fieldset-legend">
-                Peran
+                {t('superadmin.agents.new.roleLabel')}
                 <span className="text-error">*</span>
               </legend>
               <div className="dui-dropdown">
@@ -201,7 +203,7 @@ export default function NewAgentPage() {
                   role="button"
                   className="dui-btn dui-btn-outline w-full justify-between"
                 >
-                  {ROLE_LABELS[role]}
+                  {t(roleLabelKey(role))}
                   <svg className="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                   </svg>
@@ -217,7 +219,7 @@ export default function NewAgentPage() {
                         className={role === option ? 'dui-menu-active' : ''}
                         onClick={() => setRole(option)}
                       >
-                        {ROLE_LABELS[option]}
+                        {t(roleLabelKey(option))}
                       </button>
                     </li>
                   ))}
@@ -227,8 +229,8 @@ export default function NewAgentPage() {
 
             <label className="flex items-center justify-between gap-3">
               <span>
-                <strong>Akun aktif</strong>
-                <span className="block text-sm text-base-content/60">Izinkan agen masuk dan bekerja.</span>
+                <strong>{t('superadmin.agents.new.activeLabel')}</strong>
+                <span className="block text-sm text-base-content/60">{t('superadmin.agents.new.activeDesc')}</span>
               </span>
               <input
                 type="checkbox"
@@ -252,7 +254,7 @@ export default function NewAgentPage() {
                 href="/superadmin/agents"
                 className="dui-btn dui-btn-outline"
               >
-                Batal
+                {t('superadmin.agents.new.cancel')}
               </Link>
               <button
                 type="submit"
@@ -262,10 +264,10 @@ export default function NewAgentPage() {
                 {saving ? (
                   <>
                     <span className="dui-loading dui-loading-spinner dui-loading-sm" />
-                    Menyimpan…
+                    {t('superadmin.agents.new.saving')}
                   </>
                 ) : (
-                  'Simpan Agen'
+                  t('superadmin.agents.new.save')
                 )}
               </button>
             </div>

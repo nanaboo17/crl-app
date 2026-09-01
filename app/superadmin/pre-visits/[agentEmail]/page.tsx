@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AgentPreVisitDaysPage({
   params,
@@ -12,6 +15,10 @@ export default async function AgentPreVisitDaysPage({
 
   const decodedEmail =
     decodeURIComponent(agentEmail)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -54,7 +61,7 @@ export default async function AgentPreVisitDaysPage({
     return (
       <main className={styles.page}>
         <div className={styles.errorCard}>
-          Agent not found.
+          {t('superadmin.preVisits.agentDays.notFound')}
         </div>
       </main>
     )
@@ -145,12 +152,12 @@ export default async function AgentPreVisitDaysPage({
           href="/superadmin/pre-visits"
           className={styles.backButton}
         >
-          ← Back
+          {t('superadmin.preVisits.agentDays.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            PRE-VISIT ACTIVITY
+            {t('superadmin.preVisits.agentDays.eyebrow')}
           </p>
 
           <h1>{agent.agent_name}</h1>
@@ -162,7 +169,7 @@ export default async function AgentPreVisitDaysPage({
       </header>
 
       <section className={styles.summaryCard}>
-        <span>Total Pre-Visits</span>
+        <span>{t('superadmin.preVisits.agentDays.totalPreVisits')}</span>
 
         <strong>
           {preVisits?.length ?? 0}
@@ -195,21 +202,21 @@ export default async function AgentPreVisitDaysPage({
                 </span>
 
                 <strong>
-                  {stats.total} Pre-Visits
+                  {t('superadmin.preVisits.agentDays.preVisitsCount', { count: stats.total })}
                 </strong>
               </div>
 
               <div className={styles.stats}>
                 <span className={styles.readyBadge}>
-                  Ready {stats.ready}
+                  {t('superadmin.preVisits.agentDays.ready', { count: stats.ready })}
                 </span>
 
                 <span className={styles.followBadge}>
-                  Follow-up {stats.followUp}
+                  {t('superadmin.preVisits.agentDays.followUp', { count: stats.followUp })}
                 </span>
 
                 <span className={styles.reviewBadge}>
-                  Review {stats.review}
+                  {t('superadmin.preVisits.agentDays.review', { count: stats.review })}
                 </span>
 
                 <span className={styles.arrow}>
@@ -220,7 +227,7 @@ export default async function AgentPreVisitDaysPage({
           ))
         ) : (
           <div className={styles.empty}>
-            No pre-visits for this agent yet.
+            {t('superadmin.preVisits.agentDays.empty')}
           </div>
         )}
       </section>

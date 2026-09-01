@@ -18,6 +18,8 @@ export type Customer = {
   unpaid_since: string | null
   customer_status: string
   agent_email: string | null
+  given_latitude?: number | null
+  given_longitude?: number | null
   created_at?: string
 }
 

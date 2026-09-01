@@ -5,12 +5,16 @@ import {
   Eye,
   Inbox,
   MapPin,
+  ShieldCheck,
   Users,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import SuperadminPagination from '@/components/superadmin/SuperadminPagination'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 const PAGE_SIZE = 10
 
@@ -21,6 +25,10 @@ export default async function SuperadminVisitsPage({
 }) {
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -69,17 +77,17 @@ export default async function SuperadminVisitsPage({
       <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
         <SuperadminPageHeader
           breadcrumbs={[
-            { label: 'Superadmin', href: '/superadmin' },
-            { label: 'Visits' },
+            { label: t('superadmin.bc.superadmin'), href: '/superadmin', icon: ShieldCheck },
+            { label: t('superadmin.bc.visits'), icon: MapPin },
           ]}
-          title="Visit Monitoring"
-          description="Select an agent to review visit activity."
+          title={t('superadmin.visits.title')}
+          description={t('superadmin.visits.description')}
         />
         <SuperadminState
           tone="error"
           icon={AlertCircle}
-          title="Unable to load visits"
-          description="Please try again."
+          title={t('superadmin.visits.errorTitle')}
+          description={t('superadmin.visits.errorDesc')}
         />
       </div>
     )
@@ -111,11 +119,11 @@ export default async function SuperadminVisitsPage({
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
       <SuperadminPageHeader
         breadcrumbs={[
-          { label: 'Superadmin', href: '/superadmin' },
-          { label: 'Visits' },
+          { label: t('superadmin.bc.superadmin'), href: '/superadmin' },
+          { label: t('superadmin.bc.visits') },
         ]}
-        title="Visit Monitoring"
-        description="Select an agent to review visit activity."
+        title={t('superadmin.visits.title')}
+        description={t('superadmin.visits.description')}
       />
 
       <div className="stats w-full border border-base-300 bg-base-100">
@@ -123,14 +131,14 @@ export default async function SuperadminVisitsPage({
           <div className="stat-figure text-base-content/25">
             <Users aria-hidden="true" className="size-6" />
           </div>
-          <div className="stat-title">Total Agents</div>
+          <div className="stat-title">{t('superadmin.visits.totalAgents')}</div>
           <div className="stat-value text-3xl">{totalAgents ?? 0}</div>
         </div>
         <div className="stat">
           <div className="stat-figure text-base-content/25">
             <MapPin aria-hidden="true" className="size-6" />
           </div>
-          <div className="stat-title">Total Visits</div>
+          <div className="stat-title">{t('superadmin.visits.totalVisits')}</div>
           <div className="stat-value text-3xl">{totalVisits}</div>
         </div>
       </div>
@@ -138,8 +146,8 @@ export default async function SuperadminVisitsPage({
       {agents.length === 0 ? (
         <SuperadminState
           icon={Inbox}
-          title="No agents found"
-          description="Visit activity will appear once agents are registered."
+          title={t('superadmin.visits.emptyTitle')}
+          description={t('superadmin.visits.emptyDesc')}
         />
       ) : (
         <>
@@ -147,11 +155,11 @@ export default async function SuperadminVisitsPage({
             <table className="table table-sm table-zebra">
               <thead>
                 <tr>
-                  <th>Agent</th>
-                  <th className="hidden sm:table-cell">Sales Code</th>
-                  <th>Status</th>
-                  <th>Visits</th>
-                  <th aria-label="Actions" />
+                  <th>{t('superadmin.visits.thAgent')}</th>
+                  <th className="hidden sm:table-cell">{t('superadmin.visits.thSalesCode')}</th>
+                  <th>{t('superadmin.visits.thStatus')}</th>
+                  <th>{t('superadmin.visits.thVisits')}</th>
+                  <th aria-label={t('superadmin.visits.thActions')} />
                 </tr>
               </thead>
               <tbody>
@@ -181,7 +189,7 @@ export default async function SuperadminVisitsPage({
                           agent.active ? 'badge-success' : 'badge-error'
                         }`}
                       >
-                        {agent.active ? 'Active' : 'Inactive'}
+                        {agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}
                       </span>
                     </td>
                     <td className="font-medium tabular-nums">
@@ -193,8 +201,8 @@ export default async function SuperadminVisitsPage({
                           href={`/superadmin/visits/${encodeURIComponent(
                             agent.email
                           )}`}
-                          aria-label={`View visits for ${agent.agent_name}`}
-                          title="View visits"
+                          aria-label={t('superadmin.visits.viewAria', { name: agent.agent_name })}
+                          title={t('superadmin.visits.viewTitle')}
                           className="btn btn-ghost btn-sm btn-square"
                         >
                           <Eye aria-hidden="true" className="size-4" />

@@ -1,9 +1,8 @@
 {
   "/icon.png/route": "app/icon.png/route.js",
-  "/auth/callback/route": "app/auth/callback/route.js",
-  "/page": "app/page.js",
-  "/login/page": "app/login/page.js",
-  "/auth/route/page": "app/auth/route/page.js",
-  "/superadmin/page": "app/superadmin/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/agent/customers/[customerId]/pre-visit/page": "app/agent/customers/[customerId]/pre-visit/page.js",
+  "/agent/customers/page": "app/agent/customers/page.js",
+  "/agent/pre-visits/new/page": "app/agent/pre-visits/new/page.js",
+  "/superadmin/visits/[agentEmail]/[date]/page": "app/superadmin/visits/[agentEmail]/[date]/page.js",
+  "/agent/customers/[customerId]/page": "app/agent/customers/[customerId]/page.js"
 }

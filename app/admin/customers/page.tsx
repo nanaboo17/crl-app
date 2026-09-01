@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './page.module.css'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function AdminCustomersPage() {
+  const { t } = useI18n()
   const supabase = createClient()
 
   const [customers, setCustomers] = useState<any[]>([])
@@ -141,7 +143,7 @@ export default function AdminCustomersPage() {
   if (loading) {
     return (
       <main className={styles.page}>
-        <p>Loading customers...</p>
+        <p>{t('admin.customers.loading')}</p>
       </main>
     )
   }
@@ -150,69 +152,69 @@ export default function AdminCustomersPage() {
     <main className={styles.page}>
       <header className={styles.header}>
         <Link href="/admin" className={styles.backButton}>
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
-          <p className={styles.eyebrow}>ADMIN</p>
-          <h1>Customers</h1>
-          <p>Search and filter customer assignments.</p>
+          <p className={styles.eyebrow}>{t('admin.customers.eyebrow')}</p>
+          <h1>{t('admin.customers.title')}</h1>
+          <p>{t('admin.customers.subtitle')}</p>
         </div>
       </header>
 
       <section className={styles.filterCard}>
         <label>
-          Search
+          {t('admin.customers.search')}
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, customer ID, agent, area..."
+            placeholder={t('admin.customers.searchPlaceholder')}
           />
         </label>
 
         <div className={styles.filterGrid}>
           <label>
-            Payment
+            {t('admin.customers.payment')}
             <select
               value={paymentFilter}
               onChange={(e) =>
                 setPaymentFilter(e.target.value)
               }
             >
-              <option value="all">All</option>
-              <option value="paid">Paid</option>
-              <option value="unpaid">Unpaid</option>
+              <option value="all">{t('admin.customers.all')}</option>
+              <option value="paid">{t('admin.customers.paid')}</option>
+              <option value="unpaid">{t('admin.customers.unpaid')}</option>
             </select>
           </label>
 
           <label>
-            Visit
+            {t('admin.customers.visit')}
             <select
               value={visitFilter}
               onChange={(e) =>
                 setVisitFilter(e.target.value)
               }
             >
-              <option value="all">All</option>
-              <option value="visited">Visited</option>
+              <option value="all">{t('admin.customers.all')}</option>
+              <option value="visited">{t('admin.customers.visited')}</option>
               <option value="not-visited">
-                Need Visit
+                {t('admin.customers.needVisit')}
               </option>
             </select>
           </label>
 
           <label>
-            Assignment
+            {t('admin.customers.assignment')}
             <select
               value={assignmentFilter}
               onChange={(e) =>
                 setAssignmentFilter(e.target.value)
               }
             >
-              <option value="all">All</option>
-              <option value="assigned">Assigned</option>
+              <option value="all">{t('admin.customers.all')}</option>
+              <option value="assigned">{t('admin.customers.assigned')}</option>
               <option value="unassigned">
-                Unassigned
+                {t('admin.customers.unassigned')}
               </option>
             </select>
           </label>
@@ -220,7 +222,7 @@ export default function AdminCustomersPage() {
       </section>
 
       <section className={styles.resultHeader}>
-        <span>Results</span>
+        <span>{t('admin.customers.results')}</span>
         <strong>{filteredCustomers.length}</strong>
       </section>
 
@@ -243,7 +245,7 @@ export default function AdminCustomersPage() {
               <div className={styles.cardTop}>
                 <div>
                   <span className={styles.priority}>
-                    Priority {customer.priority_rank ?? '-'}
+                    {t('admin.customers.priority', { rank: customer.priority_rank ?? '-' })}
                   </span>
 
                   <h2>{customer.customer_name}</h2>
@@ -255,7 +257,7 @@ export default function AdminCustomersPage() {
 
               <div className={styles.infoGrid}>
                 <div>
-                  <span>Area</span>
+                  <span>{t('admin.customers.area')}</span>
                   <strong>
                     {customer.sub_district ||
                       customer.district ||
@@ -265,7 +267,7 @@ export default function AdminCustomersPage() {
                 </div>
 
                 <div>
-                  <span>Invoice</span>
+                  <span>{t('admin.customers.invoice')}</span>
                   <strong>
                     Rp
                     {Number(
@@ -275,18 +277,18 @@ export default function AdminCustomersPage() {
                 </div>
 
                 <div>
-                  <span>Payment</span>
+                  <span>{t('admin.customers.payment')}</span>
                   <strong>
                     {customer.payment_status
                       ? customer.payment_status.toUpperCase()
-                      : 'NOT SET'}
+                      : t('admin.customers.notSet')}
                   </strong>
                 </div>
 
                 <div>
-                  <span>Visit</span>
+                  <span>{t('admin.customers.visit')}</span>
                   <strong>
-                    {customer.visit_status || 'Not Visited'}
+                    {customer.visit_status || t('admin.customers.notVisited')}
                   </strong>
                 </div>
               </div>
@@ -295,14 +297,14 @@ export default function AdminCustomersPage() {
                 <span>
                   {customer.agent_email
                     ? customer.agent_email
-                    : 'Not Assigned'}
+                    : t('admin.customers.notAssigned')}
                 </span>
               </div>
             </Link>
           ))
         ) : (
           <div className={styles.emptyState}>
-            No customers match the current filters.
+            {t('admin.customers.empty')}
           </div>
         )}
       </section>

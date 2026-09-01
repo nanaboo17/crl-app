@@ -3,14 +3,22 @@ import { redirect } from 'next/navigation'
 import {
   Building2,
   ClipboardList,
+  LayoutDashboard,
   MapPin,
+  ShieldCheck,
   Users,
 } from 'lucide-react'
 import { createClient } from '../../lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function SuperadminPage() {
   const supabase = await createClient()
+  const locale = await getLocale()
+  const tl = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const {
     data: { user },
@@ -39,30 +47,47 @@ export default async function SuperadminPage() {
       supabase.from('visits').select('*', { count: 'exact', head: true }),
     ])
 
+  const manageLabel = {
+    agents: tl('superadmin.bc.agents'),
+    customers: tl('superadmin.bc.customers'),
+    preVisits: tl('superadmin.bc.preVisits'),
+    visits: tl('superadmin.bc.visits'),
+  }
+  const manageKey = {
+    agents: 'superadmin.dashboard.manageAgents',
+    customers: 'superadmin.dashboard.manageCustomers',
+    preVisits: 'superadmin.dashboard.managePreVisits',
+    visits: 'superadmin.dashboard.manageVisits',
+  }
+
   const stats = [
     {
       href: '/superadmin/agents',
-      label: 'Agents',
+      label: tl('superadmin.dashboard.statAgents'),
       count: agentsResult.count ?? 0,
       icon: Users,
+      manageKey: manageKey.agents,
     },
     {
       href: '/superadmin/customers',
-      label: 'Customers',
+      label: tl('superadmin.dashboard.statCustomers'),
       count: customersResult.count ?? 0,
       icon: Building2,
+      manageKey: manageKey.customers,
     },
     {
       href: '/superadmin/pre-visits',
-      label: 'Pre-Visits',
+      label: tl('superadmin.dashboard.statPreVisits'),
       count: preVisitsResult.count ?? 0,
       icon: ClipboardList,
+      manageKey: manageKey.preVisits,
     },
     {
       href: '/superadmin/visits',
-      label: 'Visits',
+      label: tl('superadmin.dashboard.statVisits'),
       count: visitsResult.count ?? 0,
       icon: MapPin,
+      manageKey: manageKey.visits,
     },
   ]
 
@@ -72,19 +97,19 @@ export default async function SuperadminPage() {
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
       <SuperadminPageHeader
         breadcrumbs={[
-          { label: 'Superadmin', href: '/superadmin' },
-          { label: 'Dashboard' },
+          { label: tl('superadmin.bc.superadmin'), href: '/superadmin', icon: ShieldCheck },
+          { label: tl('superadmin.dashboard.breadcrumbDashboard'), icon: LayoutDashboard },
         ]}
-        title="Dashboard"
-        description={`Welcome back, ${firstName}. Here is what is happening across CRL field operations.`}
+        title={tl('superadmin.dashboard.title')}
+        description={tl('superadmin.dashboard.welcomeBack', { name: firstName })}
       />
 
       {/* Each stat links into its management section */}
       <section
-        aria-label="Statistics"
+        aria-label={tl('superadmin.dashboard.statisticsAria')}
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
-        {stats.map(({ href, label, count, icon: Icon }) => (
+        {stats.map(({ href, label, count, icon: Icon, manageKey: mk }) => (
           <Link
             key={href}
             href={href}
@@ -95,7 +120,9 @@ export default async function SuperadminPage() {
             </div>
             <div className="dui-stat-title">{label}</div>
             <div className="dui-stat-value text-3xl">{count}</div>
-            <div className="dui-stat-desc">Manage {label.toLowerCase()} →</div>
+            <div className="dui-stat-desc">
+              manageLabel: tl('superadmin.bc.agents') →
+            </div>
           </Link>
         ))}
       </section>

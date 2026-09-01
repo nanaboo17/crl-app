@@ -8,7 +8,7 @@
 
 @plugin "daisyui" {
   prefix: "dui-";
-  themes: crl --default;
+  themes: crl --default, crl-dark;
 }
 
 @plugin "daisyui/theme" {
@@ -42,6 +42,51 @@
   --color-warning-content: #221a04;
   --color-error: #e5484d;
   --color-error-content: #ffffff;
+
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "crl-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(18% 0.025 345);
+  --color-base-200: oklch(22% 0.028 345);
+  --color-base-300: oklch(27% 0.03 345);
+  --color-base-content: oklch(94% 0.015 345);
+
+  --color-primary: #ec008c;
+  --color-primary-content: #ffffff;
+
+  --color-secondary: #ff5cb8;
+  --color-secondary-content: #1a0512;
+
+  --color-accent: #ffca09;
+  --color-accent-content: #221a04;
+
+  --color-neutral: #2a1422;
+  --color-neutral-content: #ffffff;
+
+  --color-info: #38bdf8;
+  --color-info-content: #00131f;
+  --color-success: #34d399;
+  --color-success-content: #00160c;
+  --color-warning: #fbbf24;
+  --color-warning-content: #221a04;
+  --color-error: #f87171;
+  --color-error-content: #2a0609;
 
   --radius-selector: 1rem;
   --radius-field: 0.5rem;
@@ -153,6 +198,9 @@ textarea { min-height: 108px; resize: vertical; }
 .gps-card p { margin: 3px 0 0; }
 .gps-values { display: flex; flex-wrap: wrap; gap: 6px; }
 .gps-values span { padding: 6px 8px; border-radius: 9px; background: white; border: 1px solid var(--line); font-size: 12px; font-variant-numeric: tabular-nums; }
+.map-embed { width: 100%; height: 280px; border: 0; border-radius: 14px; background: #eef0f3; display: block; }
+.map-section-title { font-size: 15px; font-weight: 750; margin: 0 0 4px; }
+.map-hint { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
 .evidence-image { width: 100%; max-height: 520px; object-fit: contain; border-radius: 14px; border: 1px solid var(--line); margin: 16px 0; background: #eef0f3; }
 .inline-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
 

@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { rolePath } from '@/lib/role'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function AuthRoutePage() {
   const router = useRouter()
+  const { t } = useI18n()
 
   const [message, setMessage] = useState(
-    'Checking your CRL account…'
+    t('auth.route.checking')
   )
 
   useEffect(() => {
@@ -40,13 +42,13 @@ export default function AuthRoutePage() {
       console.log('AGENT QUERY ERROR:', error)
 
       if (error) {
-        setMessage(`Database error: ${error.message}`)
+        setMessage(t('auth.error.database', { message: error.message }))
         return
       }
 
       if (!data) {
         setMessage(
-          `Email ${user.email} is not registered as a CRL user.`
+          t('auth.error.notRegistered', { email: user.email })
         )
 
         await supabase.auth.signOut()
@@ -55,7 +57,7 @@ export default function AuthRoutePage() {
 
       if (!data.active) {
         setMessage(
-          'Your CRL account exists but is currently inactive.'
+          t('auth.error.inactive')
         )
 
         await supabase.auth.signOut()

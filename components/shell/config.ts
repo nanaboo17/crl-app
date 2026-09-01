@@ -10,93 +10,83 @@ import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
   href: string
-  label: string
+  /** Translation key for the nav label. */
+  labelKey: string
   icon: LucideIcon
   exact?: boolean
 }
 
-export type NavGroup = { label: string; items: NavItem[] }
+export type NavGroup = { labelKey: string; items: NavItem[] }
+
+export type Role = 'superadmin' | 'admin' | 'agent'
 
 export type ShellConfig = {
-  role: string
+  role: Role
   home: string
   brandLabel: string
-  navAriaLabel: string
+  navAriaKey: string
   navGroups: NavGroup[]
 }
 
+const overviewGroup = (items: NavItem[]): NavGroup => ({
+  labelKey: 'common.overview',
+  items,
+})
+
+const managementGroup = (items: NavItem[]): NavGroup => ({
+  labelKey: 'common.management',
+  items,
+})
+
 export const superadminConfig: ShellConfig = {
-  role: 'Superadmin',
+  role: 'superadmin',
   home: '/superadmin',
-  brandLabel: 'CRL Admin',
-  navAriaLabel: 'Superadmin navigation',
+  brandLabel: 'CRL',
+  navAriaKey: 'nav.aria.superadmin',
   navGroups: [
-    {
-      label: 'Overview',
-      items: [
-        {
-          href: '/superadmin',
-          label: 'Dashboard',
-          icon: LayoutDashboard,
-          exact: true,
-        },
-      ],
-    },
-    {
-      label: 'Management',
-      items: [
-        { href: '/superadmin/agents', label: 'Agents', icon: Users },
-        { href: '/superadmin/customers', label: 'Customers', icon: Building2 },
-        { href: '/superadmin/pre-visits', label: 'Pre-Visits', icon: ClipboardList },
-        { href: '/superadmin/visits', label: 'Visits', icon: MapPin },
-      ],
-    },
+    overviewGroup([
+      { href: '/superadmin', labelKey: 'common.dashboard', icon: LayoutDashboard, exact: true },
+    ]),
+    managementGroup([
+      { href: '/superadmin/agents', labelKey: 'nav.agents', icon: Users },
+      { href: '/superadmin/customers', labelKey: 'nav.customers', icon: Building2 },
+      { href: '/superadmin/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
+      { href: '/superadmin/visits', labelKey: 'nav.visits', icon: MapPin },
+    ]),
   ],
 }
 
 export const adminConfig: ShellConfig = {
-  role: 'Admin',
+  role: 'admin',
   home: '/admin',
-  brandLabel: 'CRL Admin',
-  navAriaLabel: 'Admin navigation',
+  brandLabel: 'CRL',
+  navAriaKey: 'nav.aria.admin',
   navGroups: [
-    {
-      label: 'Overview',
-      items: [
-        { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-      ],
-    },
-    {
-      label: 'Management',
-      items: [
-        { href: '/admin/customers', label: 'Customers', icon: Building2 },
-        { href: '/admin/visits', label: 'Visits', icon: MapPin },
-        { href: '/admin/pre-visits', label: 'Pre-Visits', icon: ClipboardList },
-      ],
-    },
+    overviewGroup([
+      { href: '/admin', labelKey: 'common.dashboard', icon: LayoutDashboard, exact: true },
+    ]),
+    managementGroup([
+      { href: '/admin/customers', labelKey: 'nav.customers', icon: Building2 },
+      { href: '/admin/visits', labelKey: 'nav.visits', icon: MapPin },
+      { href: '/admin/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
+    ]),
   ],
 }
 
 export const agentConfig: ShellConfig = {
-  role: 'Agent',
+  role: 'agent',
   home: '/agent',
-  brandLabel: 'CRL Agent',
-  navAriaLabel: 'Agent navigation',
+  brandLabel: 'CRL',
+  navAriaKey: 'nav.aria.agent',
   navGroups: [
-    {
-      label: 'Overview',
-      items: [
-        { href: '/agent', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-      ],
-    },
-    {
-      label: 'Management',
-      items: [
-        { href: '/agent/customers', label: 'Customers', icon: Building2 },
-        { href: '/agent/route', label: 'Route', icon: Route },
-        { href: '/agent/pre-visits', label: 'Pre-Visits', icon: ClipboardList },
-        { href: '/agent/visits', label: 'Visits', icon: MapPin },
-      ],
-    },
+    overviewGroup([
+      { href: '/agent', labelKey: 'common.dashboard', icon: LayoutDashboard, exact: true },
+    ]),
+    managementGroup([
+      { href: '/agent/customers', labelKey: 'nav.customers', icon: Building2 },
+      { href: '/agent/route', labelKey: 'nav.route', icon: Route },
+      { href: '/agent/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
+      { href: '/agent/visits', labelKey: 'nav.visits', icon: MapPin },
+    ]),
   ],
 }

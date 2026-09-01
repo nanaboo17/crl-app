@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './page.module.css'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function AgentPreVisitDaysPage() {
+  const { t } = useI18n()
   const params = useParams()
   const supabase = createClient()
 
@@ -75,7 +77,7 @@ export default function AgentPreVisitDaysPage() {
       if (agentError || !agentData) {
         setError(
           agentError?.message ||
-            'Agent not found.'
+            t('admin.preVisitDays.agentNotFound')
         )
 
         setLoading(false)
@@ -225,7 +227,7 @@ export default function AgentPreVisitDaysPage() {
   if (loading) {
     return (
       <main className={styles.page}>
-        Loading pre-visits...
+        {t('admin.preVisitDays.loading')}
       </main>
     )
   }
@@ -239,7 +241,7 @@ export default function AgentPreVisitDaysPage() {
           }
         >
           {error ||
-            'Agent not found.'}
+            t('admin.preVisitDays.agentNotFound')}
         </div>
       </main>
     )
@@ -256,7 +258,7 @@ export default function AgentPreVisitDaysPage() {
             styles.backButton
           }
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
@@ -265,7 +267,7 @@ export default function AgentPreVisitDaysPage() {
               styles.eyebrow
             }
           >
-            PRE-VISIT ACTIVITY
+            {t('admin.preVisitDays.eyebrow')}
           </p>
 
           <h1>
@@ -286,7 +288,7 @@ export default function AgentPreVisitDaysPage() {
         }
       >
         <span>
-          Filtered Pre-Visits
+          {t('admin.preVisitDays.filtered')}
         </span>
 
         <strong>
@@ -307,7 +309,7 @@ export default function AgentPreVisitDaysPage() {
           }
         >
           <label>
-            From
+            {t('admin.preVisitDays.from')}
 
             <input
               type="date"
@@ -321,7 +323,7 @@ export default function AgentPreVisitDaysPage() {
           </label>
 
           <label>
-            To
+            {t('admin.preVisitDays.to')}
 
             <input
               type="date"
@@ -346,7 +348,7 @@ export default function AgentPreVisitDaysPage() {
               clearFilter
             }
           >
-            Clear Date Filter
+            {t('admin.preVisitDays.clearFilter')}
           </button>
         )}
       </section>
@@ -389,8 +391,7 @@ export default function AgentPreVisitDaysPage() {
                   </span>
 
                   <strong>
-                    {stats.total}{' '}
-                    Pre-Visits
+                    {t('admin.preVisitDays.totalLabel', { total: stats.total })}
                   </strong>
                 </div>
 
@@ -404,8 +405,7 @@ export default function AgentPreVisitDaysPage() {
                       styles.readyBadge
                     }
                   >
-                    Ready{' '}
-                    {stats.ready}
+                    {t('admin.preVisitDays.ready', { count: stats.ready })}
                   </span>
 
                   <span
@@ -413,8 +413,7 @@ export default function AgentPreVisitDaysPage() {
                       styles.followBadge
                     }
                   >
-                    Follow-up{' '}
-                    {stats.followUp}
+                    {t('admin.preVisitDays.followUp', { count: stats.followUp })}
                   </span>
 
                   <span
@@ -422,8 +421,7 @@ export default function AgentPreVisitDaysPage() {
                       styles.reviewBadge
                     }
                   >
-                    Review{' '}
-                    {stats.review}
+                    {t('admin.preVisitDays.review', { count: stats.review })}
                   </span>
 
                   <span
@@ -441,8 +439,7 @@ export default function AgentPreVisitDaysPage() {
           <div
             className={styles.empty}
           >
-            No pre-visits found
-            for this date range.
+            {t('admin.preVisitDays.empty')}
           </div>
         )}
       </section>

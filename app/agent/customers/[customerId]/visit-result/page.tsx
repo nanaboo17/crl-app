@@ -1,7 +1,22 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Building2,
+  Camera,
+  CheckCircle2,
+  ClipboardList,
+  MapPin,
+  Phone,
+  Receipt,
+  UserRound,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
-import styles from './page.module.css'
+import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function VisitResultPage({
   params,
@@ -10,10 +25,12 @@ export default async function VisitResultPage({
 }) {
   const { customerId } = await params
 
-  const decodedCustomerId =
-    decodeURIComponent(customerId)
+  const decodedCustomerId = decodeURIComponent(customerId)
 
   const supabase = await createClient()
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const {
     data: { user },
@@ -23,342 +40,248 @@ export default async function VisitResultPage({
     redirect('/login')
   }
 
-  const email =
-    user.email.trim().toLowerCase()
+  const email = user.email.trim().toLowerCase()
 
-  const { data: customer } =
-    await supabase
-      .from('customers')
-      .select(`
-        customer_id,
-        customer_name,
-        phone_number,
-        service_address,
-        agent_email,
-        payment_status,
-        visit_status
-      `)
-      .eq(
-        'customer_id',
-        decodedCustomerId
-      )
-      .eq('agent_email', email)
-      .maybeSingle()
+  const { data: customer } = await supabase
+    .from('customers')
+    .select(`
+      customer_id,
+      customer_name,
+      phone_number,
+      service_address,
+      agent_email,
+      payment_status,
+      visit_status
+    `)
+    .eq('customer_id', decodedCustomerId)
+    .eq('agent_email', email)
+    .maybeSingle()
 
   if (!customer) {
     return (
-      <main className={styles.page}>
-        <div className={styles.errorCard}>
-          Customer not found.
-        </div>
-      </main>
+      <ErrorBlock
+        message={t('agent.visitResult.notFound')}
+        backHref={`/agent/customers/${encodeURIComponent(decodedCustomerId)}`}
+        t={t}
+      />
     )
   }
 
-  const { data: visit, error } =
-    await supabase
-      .from('visits')
-      .select('*')
-      .eq(
-        'customer_id',
-        decodedCustomerId
-      )
-      .eq('agent_email', email)
-      .maybeSingle()
+  const { data: visit, error } = await supabase
+    .from('visits')
+    .select('*')
+    .eq('customer_id', decodedCustomerId)
+    .eq('agent_email', email)
+    .maybeSingle()
 
   if (error || !visit) {
     return (
-      <main className={styles.page}>
-        <Link
-          href={`/agent/customers/${encodeURIComponent(
-            decodedCustomerId
-          )}`}
-          className={styles.backButton}
-        >
-          ← Back
-        </Link>
-
-        <div className={styles.errorCard}>
-          Visit result not found.
-        </div>
-      </main>
+      <ErrorBlock
+        message={t('agent.visitResult.resultNotFound')}
+        backHref={`/agent/customers/${encodeURIComponent(decodedCustomerId)}`}
+        t={t}
+      />
     )
   }
 
   let photoUrl: string | null = null
 
   if (visit.visit_photo_url) {
-    const { data } =
-      await supabase.storage
-        .from('visit-evidence')
-        .createSignedUrl(
-          visit.visit_photo_url,
-          60 * 10
-        )
+    const { data } = await supabase.storage
+      .from('visit-evidence')
+      .createSignedUrl(visit.visit_photo_url, 60 * 10)
 
-    photoUrl =
-      data?.signedUrl ?? null
+    photoUrl = data?.signedUrl ?? null
   }
 
-  function formatDate(
-    value: string | null
-  ) {
+  function formatDate(value: string | null) {
     if (!value) return '-'
-
-    return new Date(
-      value
-    ).toLocaleString('id-ID')
+    return new Date(value).toLocaleString('id-ID')
   }
 
-  function formatPaymentDate(
-    value: string | null
-  ) {
+  function formatPaymentDate(value: string | null) {
     if (!value) return '-'
-
-    return new Date(
-      `${value}T00:00:00`
-    ).toLocaleDateString('id-ID')
+    return new Date(`${value}T00:00:00`).toLocaleDateString('id-ID')
   }
+
+  const backHref = `/agent/customers/${encodeURIComponent(decodedCustomerId)}`
+  const area = customer.service_address || '-'
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <Link
-          href={`/agent/customers/${encodeURIComponent(
-            decodedCustomerId
-          )}`}
-          className={styles.backButton}
-        >
-          ← Back
-        </Link>
+    <div className="mx-auto w-full max-w-4xl space-y-4 p-4 sm:p-6 lg:p-8">
+      <Link href={backHref} className="dui-btn dui-btn-ghost dui-btn-sm gap-1 px-0 w-fit">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        {t('agent.visitResult.backToDetail')}
+      </Link>
 
+      <SuperadminPageHeader
+        breadcrumbs={[
+          { label: t('agent.visitResult.breadcrumbAgent'), href: '/agent', icon: UserRound },
+          { label: t('agent.visitResult.breadcrumbCustomers'), href: '/agent/customers', icon: Building2 },
+          { label: t('agent.visitResult.breadcrumbResult'), icon: BadgeCheck },
+        ]}
+        title={customer.customer_name}
+        description={`${customer.customer_id} · ${area}`}
+      />
+
+      <div className="dui-alert dui-alert-success">
+        <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />
         <div>
-          <p className={styles.eyebrow}>
-            VISIT RESULT
-          </p>
-
-          <h1>
-            {customer.customer_name}
-          </h1>
-
-          <p>
-            {customer.customer_id}
-          </p>
+          <div className="font-bold">{t('agent.visitResult.completed')}</div>
+          <div className="text-sm opacity-80">
+            {visit.visit_status_kunjungan || t('agent.visitResult.recorded')}
+          </div>
         </div>
-      </header>
+      </div>
 
-      <section className={styles.statusCard}>
-        <span>Visit Status</span>
-        <strong>✓ Visited</strong>
-      </section>
+      <InfoCard title={t('agent.visitResult.cardInfo')} icon={ClipboardList}>
+        <InfoGrid
+          t={t}
+          items={[
+            [t('agent.visitResult.visitId'), visit.visit_id],
+            [t('agent.visitResult.visitDate'), formatDate(visit.visit_date)],
+            [t('agent.visitResult.visitStatus'), visit.visit_status_kunjungan],
+            [t('agent.visitResult.conversation'), visit.conversation_result],
+          ]}
+        />
+      </InfoCard>
 
-      <section className={styles.card}>
-        <h2>Visit Information</h2>
+      <InfoCard title={t('agent.visitResult.cardLocation')} icon={MapPin}>
+        <InfoGrid
+          t={t}
+          items={[
+            [t('agent.visitResult.latitude'), visit.latitude],
+            [t('agent.visitResult.longitude'), visit.longitude],
+            [
+              t('agent.visitResult.gpsAccuracy'),
+              visit.gps_accuracy ? t('agent.visitResult.meterUnit', { value: Number(visit.gps_accuracy).toFixed(1) }) : '-',
+            ],
+            [t('agent.visitResult.gpsTime'), formatDate(visit.gps_captured_at)],
+            [
+              t('agent.visitResult.distance'),
+              visit.distance_to_customer_meters !== null
+                ? t('agent.visitResult.meterUnit', { value: Number(visit.distance_to_customer_meters).toFixed(1) })
+                : '-',
+            ],
+            [
+              t('agent.visitResult.locationMatch'),
+              visit.location_match === true ? t('agent.visitResult.matchYes') : visit.location_match === false ? t('agent.visitResult.matchNo') : t('agent.visitResult.matchNa'),
+            ],
+            [t('agent.visitResult.visitAddress'), visit.visit_address],
+          ]}
+        />
 
-        <div className={styles.grid}>
-          <Detail
-            label="Visit ID"
-            value={visit.visit_id}
-          />
-
-          <Detail
-            label="Visit Date"
-            value={formatDate(
-              visit.visit_date
-            )}
-          />
-
-          <Detail
-            label="Status Kunjungan"
-            value={
-              visit.visit_status_kunjungan
-            }
-          />
-
-          <Detail
-            label="Hasil Pembicaraan"
-            value={
-              visit.conversation_result
-            }
-          />
-        </div>
-      </section>
-
-      <section className={styles.card}>
-        <h2>Location Evidence</h2>
-
-        <div className={styles.grid}>
-          <Detail
-            label="Latitude"
-            value={visit.latitude}
-          />
-
-          <Detail
-            label="Longitude"
-            value={visit.longitude}
-          />
-
-          <Detail
-            label="GPS Accuracy"
-            value={
-              visit.gps_accuracy
-                ? `${Number(
-                    visit.gps_accuracy
-                  ).toFixed(1)} meters`
-                : '-'
-            }
-          />
-
-          <Detail
-            label="GPS Captured"
-            value={formatDate(
-              visit.gps_captured_at
-            )}
-          />
-
-          <Detail
-            label="Distance from Customer Location"
-            value={
-              visit.distance_to_customer_meters !==
-              null
-                ? `${Number(
-                    visit.distance_to_customer_meters
-                  ).toFixed(1)} meters`
-                : '-'
-            }
-          />
-
-          <Detail
-            label="Location Match"
-            value={
-              visit.location_match === true
-                ? '✓ Match'
-                : visit.location_match === false
-                  ? 'Outside Range'
-                  : 'Not Available'
-            }
-          />
-
-          <Detail
-            label="Visit Address"
-            value={visit.visit_address}
-            full
-          />
-        </div>
-
-        {visit.latitude &&
-          visit.longitude && (
-            <div className={styles.mapBox}>
-              <iframe
-                title="Visit Location"
-                src={`https://maps.google.com/maps?q=${visit.latitude},${visit.longitude}&z=17&output=embed`}
-                loading="lazy"
-              />
-            </div>
-          )}
-      </section>
-
-      <section className={styles.card}>
-        <h2>Visit Photo</h2>
-
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt="Visit Evidence"
-            className={styles.visitPhoto}
-          />
-        ) : (
-          <p className={styles.noPhoto}>
-            Photo unavailable.
-          </p>
+        {visit.latitude && visit.longitude && (
+          <div className="aspect-video w-full overflow-hidden rounded-box border border-base-300">
+            <iframe
+              title={t('agent.visitResult.mapTitle')}
+              src={`https://maps.google.com/maps?q=${visit.latitude},${visit.longitude}&z=17&output=embed`}
+              loading="lazy"
+              className="h-full w-full border-0"
+            />
+          </div>
         )}
-      </section>
+      </InfoCard>
 
-      <section className={styles.card}>
-        <h2>Customer Response</h2>
+      <InfoCard title={t('agent.visitResult.cardPhoto')} icon={Camera}>
+        {photoUrl ? (
+          <figure className="overflow-hidden rounded-box border border-base-300">
+            <img src={photoUrl} alt={t('agent.visitResult.photoAlt')} className="w-full" />
+            <figcaption className="flex items-center gap-2 bg-success/10 px-4 py-2 text-sm font-semibold text-success">
+              <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+              {t('agent.visitResult.photoStamped')}
+            </figcaption>
+          </figure>
+        ) : (
+          <div className="dui-alert dui-alert-ghost">
+            <span>{t('agent.visitResult.photoUnavailable')}</span>
+          </div>
+        )}
+      </InfoCard>
 
-        <div className={styles.grid}>
-          <Detail
-            label="Offer Disetujui"
-            value={visit.approved_offer}
-            full
-          />
+      <InfoCard title={t('agent.visitResult.cardResponse')} icon={Phone}>
+        <InfoGrid
+          t={t}
+          items={[
+            [t('agent.visitResult.approvedOffer'), visit.approved_offer],
+            [t('agent.visitResult.plannedDate'), formatPaymentDate(visit.planned_payment_date)],
+            [t('agent.visitResult.unpaidReason'), visit.unpaid_reason],
+            [
+              t('agent.visitResult.paymentStatus'),
+              customer.payment_status ? customer.payment_status.toUpperCase() : '-',
+            ],
+            [t('agent.visitResult.updatedPhone'), visit.updated_phone],
+            [t('agent.visitResult.consent'), visit.consent_given ? t('agent.visitResult.consentGiven') : t('agent.visitResult.consentNotGiven')],
+          ]}
+        />
+      </InfoCard>
 
-          <Detail
-            label="Rencana Tanggal Pembayaran"
-            value={formatPaymentDate(
-              visit.planned_payment_date
-            )}
-          />
-
-          <Detail
-            label="Alasan Belum Bayar"
-            value={visit.unpaid_reason}
-          />
-
-          <Detail
-            label="Payment Status"
-            value={
-              customer.payment_status
-                ? customer.payment_status.toUpperCase()
-                : '-'
-            }
-          />
-
-          <Detail
-            label="Updated Phone"
-            value={visit.updated_phone}
-          />
-
-          <Detail
-            label="Consent"
-            value={
-              visit.consent_given
-                ? '✓ Given'
-                : 'Not Given'
-            }
-          />
-        </div>
-      </section>
-
-      <section className={styles.card}>
-        <h2>Catatan Tambahan</h2>
-
-        <p className={styles.notes}>
-          {visit.additional_notes ||
-            'Tidak ada catatan tambahan.'}
+      <InfoCard title={t('agent.visitResult.cardNotes')} icon={Receipt}>
+        <p className="text-sm whitespace-pre-wrap text-base-content">
+          {visit.additional_notes || t('agent.visitResult.noNotes')}
         </p>
-      </section>
-    </main>
+      </InfoCard>
+    </div>
   )
 }
 
-function Detail({
-  label,
-  value,
-  full = false,
+const CameraIcon = ({ className, 'aria-hidden': ariaHidden }: { className?: string; 'aria-hidden'?: boolean }) => (
+  <svg className={className} aria-hidden={ariaHidden} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+)
+
+function ErrorBlock({ message, backHref, t }: { message: string; backHref: string; t: (key: string, params?: Record<string, string | number>) => string }) {
+  return (
+    <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
+      <Link href={backHref} className="dui-btn dui-btn-ghost dui-btn-sm mb-4">
+        {t('agent.visitResult.back')}
+      </Link>
+      <div className="dui-alert dui-alert-error" role="alert">
+        <span>{message}</span>
+      </div>
+    </div>
+  )
+}
+
+function InfoCard({
+  title,
+  icon: Icon,
+  children,
 }: {
-  label: string
-  value: any
-  full?: boolean
+  title: string
+  icon: typeof MapPin
+  children: React.ReactNode
 }) {
   return (
-    <div
-      className={
-        full
-          ? `${styles.detail} ${styles.full}`
-          : styles.detail
-      }
-    >
-      <span>{label}</span>
+    <section aria-label={title} className="dui-card border border-base-300 bg-base-100 shadow-sm">
+      <div className="dui-card-body">
+        <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-base-content">
+          <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
+          {title}
+        </h2>
+        <div className="mt-1">{children}</div>
+      </div>
+    </section>
+  )
+}
 
-      <strong>
-        {value === null ||
-        value === undefined ||
-        value === ''
-          ? '-'
-          : String(value)}
-      </strong>
-    </div>
+function InfoGrid({ t, items }: { t: (key: string, params?: Record<string, string | number>) => string; items: [string, any][] }) {
+  const addressKey = t('agent.visitResult.visitAddress')
+  const offerKey = t('agent.visitResult.approvedOffer')
+  return (
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+      {items.map(([label, value]) => (
+        <div key={label} className={`${label === addressKey || label === offerKey ? 'sm:col-span-2' : ''}`}>
+          <dt className="text-[11px] font-semibold uppercase tracking-wider text-base-content/50">
+            {label}
+          </dt>
+          <dd className="mt-1 text-sm font-medium break-words text-base-content">
+            {value === null || value === undefined || value === '' ? '-' : String(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }

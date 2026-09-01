@@ -2,6 +2,20 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
+
+const PREVISIT_STATUS_KEYS: Record<string, string> = {
+  'ready for visit': 'superadmin.status.readyForVisit',
+  'need follow-up': 'superadmin.status.needFollowup',
+  'supervisor review': 'superadmin.status.supervisorReview',
+}
+
+function previsitStatusKey(value: string | null | undefined): string | null {
+  if (!value) return null
+  return PREVISIT_STATUS_KEYS[value.toLowerCase()] ?? null
+}
 
 export default async function AdminPreVisitDetailPage({
   params,
@@ -23,6 +37,10 @@ export default async function AdminPreVisitDetailPage({
 
   const decodedPrevisitId =
     decodeURIComponent(previsitId)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -103,7 +121,7 @@ export default async function AdminPreVisitDetailPage({
             styles.errorCard
           }
         >
-          Pre-Visit not found.
+          {t('superadmin.preVisits.detail.notFound')}
         </div>
       </main>
     )
@@ -158,7 +176,7 @@ export default async function AdminPreVisitDetailPage({
             styles.backButton
           }
         >
-          ← Back
+          {t('superadmin.preVisits.detail.back')}
         </Link>
 
         <div>
@@ -167,7 +185,7 @@ export default async function AdminPreVisitDetailPage({
               styles.eyebrow
             }
           >
-            PRE-VISIT DETAIL
+            {t('superadmin.preVisits.detail.eyebrow')}
           </p>
 
           <h1>
@@ -192,11 +210,13 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <span>
-            Pre-Visit Status
+            {t('superadmin.preVisits.detail.preVisitStatus')}
           </span>
 
           <strong>
-            {preVisit.previsit_status}
+            {previsitStatusKey(preVisit.previsit_status)
+              ? t(previsitStatusKey(preVisit.previsit_status)!)
+              : preVisit.previsit_status}
           </strong>
         </div>
 
@@ -206,7 +226,7 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <span>
-            Contact Result
+            {t('superadmin.preVisits.detail.contactResult')}
           </span>
 
           <strong>
@@ -222,7 +242,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Agent
+          {t('superadmin.preVisits.detail.agentSection')}
         </h2>
 
         <div
@@ -231,21 +251,21 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <Detail
-            label="Agent Name"
+            label={t('superadmin.preVisits.detail.agentName')}
             value={
               agent?.agent_name
             }
           />
 
           <Detail
-            label="Sales Code"
+            label={t('superadmin.preVisits.detail.salesCode')}
             value={
               agent?.sales_code
             }
           />
 
           <Detail
-            label="Agent Email"
+            label={t('superadmin.preVisits.detail.agentEmail')}
             value={
               decodedEmail
             }
@@ -260,7 +280,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Customer
+          {t('superadmin.preVisits.detail.customerSection')}
         </h2>
 
         <div
@@ -269,77 +289,77 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <Detail
-            label="Customer ID"
+            label={t('superadmin.preVisits.detail.customerId')}
             value={
               customer?.customer_id
             }
           />
 
           <Detail
-            label="Customer Name"
+            label={t('superadmin.preVisits.detail.customerName')}
             value={
               customer?.customer_name
             }
           />
 
           <Detail
-            label="Main Phone"
+            label={t('superadmin.preVisits.detail.mainPhone')}
             value={
               customer?.phone_number
             }
           />
 
           <Detail
-            label="Alternative Phone 1"
+            label={t('superadmin.preVisits.detail.altPhone1')}
             value={
               customer?.alternative_phone_1
             }
           />
 
           <Detail
-            label="Alternative Phone 2"
+            label={t('superadmin.preVisits.detail.altPhone2')}
             value={
               customer?.alternative_phone_2
             }
           />
 
           <Detail
-            label="Alternative Phone 3"
+            label={t('superadmin.preVisits.detail.altPhone3')}
             value={
               customer?.alternative_phone_3
             }
           />
 
           <Detail
-            label="Region"
+            label={t('superadmin.preVisits.detail.region')}
             value={
               customer?.region
             }
           />
 
           <Detail
-            label="City"
+            label={t('superadmin.preVisits.detail.city')}
             value={
               customer?.city
             }
           />
 
           <Detail
-            label="District"
+            label={t('superadmin.preVisits.detail.district')}
             value={
               customer?.district
             }
           />
 
           <Detail
-            label="Sub-District"
+            label={t('superadmin.preVisits.detail.subDistrict')}
             value={
               customer?.sub_district
             }
           />
 
           <Detail
-            label="Service Address"
+            label={t('superadmin.preVisits.detail.serviceAddress')}
             value={
               customer?.service_address
             }
@@ -354,7 +374,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Contact Confirmation
+          {t('superadmin.preVisits.detail.contactConfirmation')}
         </h2>
 
         <div
@@ -363,23 +383,23 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <Detail
-            label="Contact Attempt"
+            label={t('superadmin.preVisits.detail.contactAttempt')}
             value={formatDateTime(
               preVisit.contact_attempt_date
             )}
           />
 
           <Detail
-            label="Contact Confirmed"
+            label={t('superadmin.preVisits.detail.contactConfirmed')}
             value={
               preVisit.contact_confirmed
-                ? '✓ Yes'
-                : 'No'
+                ? t('superadmin.status.yes')
+                : t('superadmin.status.no')
             }
           />
 
           <Detail
-            label="Contact Result"
+            label={t('superadmin.preVisits.detail.contactResult')}
             value={
               preVisit.contact_result
             }
@@ -394,7 +414,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Address Confirmation
+          {t('superadmin.preVisits.detail.addressConfirmation')}
         </h2>
 
         <div
@@ -403,23 +423,23 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <Detail
-            label="Address Confirmed"
+            label={t('superadmin.preVisits.detail.addressConfirmed')}
             value={
               preVisit.address_confirmed
-                ? '✓ Yes'
-                : 'No'
+                ? t('superadmin.status.yes')
+                : t('superadmin.status.no')
             }
           />
 
           <Detail
-            label="Landmark"
+            label={t('superadmin.preVisits.detail.landmark')}
             value={
               preVisit.landmark
             }
           />
 
           <Detail
-            label="Confirmed Address"
+            label={t('superadmin.preVisits.detail.confirmedAddress')}
             value={
               preVisit.confirmed_address
             }
@@ -434,7 +454,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Appointment
+          {t('superadmin.preVisits.detail.appointmentSection')}
         </h2>
 
         <div
@@ -443,16 +463,16 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <Detail
-            label="Appointment Confirmed"
+            label={t('superadmin.preVisits.detail.appointmentConfirmed')}
             value={
               preVisit.appointment_confirmed
-                ? '✓ Yes'
-                : 'No'
+                ? t('superadmin.status.yes')
+                : t('superadmin.status.no')
             }
           />
 
           <Detail
-            label="Appointment Date"
+            label={t('superadmin.preVisits.detail.appointmentDate')}
             value={formatDateTime(
               preVisit.appointment_date
             )}
@@ -466,7 +486,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Supervisor
+          {t('superadmin.preVisits.detail.supervisorSection')}
         </h2>
 
         <div
@@ -475,16 +495,16 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           <Detail
-            label="Supervisor Approval"
+            label={t('superadmin.preVisits.detail.supervisorApproval')}
             value={
               preVisit.supervisor_approval
-                ? '✓ Approved'
-                : 'Not Approved'
+                ? t('superadmin.status.approved')
+                : t('superadmin.status.notApproved')
             }
           />
 
           <Detail
-            label="Created At"
+            label={t('superadmin.preVisits.detail.createdAt')}
             value={formatDateTime(
               preVisit.created_at
             )}
@@ -498,7 +518,7 @@ export default async function AdminPreVisitDetailPage({
         }
       >
         <h2>
-          Pre-Visit Notes
+          {t('superadmin.preVisits.detail.notesSection')}
         </h2>
 
         <p
@@ -507,7 +527,7 @@ export default async function AdminPreVisitDetailPage({
           }
         >
           {preVisit.previsit_notes ||
-            'No notes.'}
+            t('superadmin.preVisits.detail.noNotes')}
         </p>
       </section>
     </main>

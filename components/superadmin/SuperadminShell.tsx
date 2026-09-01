@@ -63,10 +63,10 @@ export default function SuperadminShell({
   }, [navOpen])
 
   return (
-    <div className="min-h-screen bg-[#f4f6f8]">
+    <div className="min-h-screen bg-base-200">
       <aside
         aria-label={`${config.role} sidebar`}
-        className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-gray-200 bg-white lg:block"
+        className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-base-300 bg-base-100 lg:block"
       >
         <SuperadminSidebar agentName={agentName} config={config} />
       </aside>
@@ -78,7 +78,7 @@ export default function SuperadminShell({
         <div
           aria-hidden="true"
           onClick={() => setNavOpen(false)}
-          className={`absolute inset-0 bg-black/40 motion-safe:transition-opacity ${
+          className={`absolute inset-0 bg-black/50 motion-safe:transition-opacity ${
             navOpen ? 'opacity-100' : 'opacity-0'
           }`}
         />
@@ -87,7 +87,7 @@ export default function SuperadminShell({
           aria-modal="true"
           aria-label="Navigation"
           inert={!navOpen}
-          className={`absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-white shadow-xl motion-safe:transition-transform motion-reduce:transition-none ${
+          className={`absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-base-100 shadow-xl motion-safe:transition-transform motion-reduce:transition-none ${
             navOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -96,7 +96,7 @@ export default function SuperadminShell({
             type="button"
             onClick={() => setNavOpen(false)}
             aria-label="Close navigation"
-            className="absolute right-3 top-3.5 z-10 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+            className="absolute right-3 top-3.5 z-10 rounded-lg p-2 text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
           >
             <X aria-hidden="true" className="h-5 w-5" />
           </button>

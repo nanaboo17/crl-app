@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './page.module.css'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 type Customer = {
   customer_id: string
@@ -26,6 +27,7 @@ type RouteCustomer = Customer & {
 }
 
 export default function AgentRoutePage() {
+  const { t } = useI18n()
   const supabase = createClient()
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -135,7 +137,7 @@ export default function AgentRoutePage() {
 
   function captureLocation() {
     if (!navigator.geolocation) {
-      setError('GPS is not supported on this device.')
+      setError(t('agent.route.gpsNotSupported'))
       return
     }
 
@@ -153,7 +155,7 @@ export default function AgentRoutePage() {
 
       (gpsError) => {
         setError(
-          `Unable to get location: ${gpsError.message}`
+          t('agent.route.gpsFailed', { message: gpsError.message })
         )
 
         setGettingGps(false)
@@ -339,13 +341,10 @@ const excludedCustomers = useMemo(() => {
 
   {excludedCustomers.length > 0 && (
   <section className={styles.warningCard}>
-    <h2>Location Data Warning</h2>
+    <h2>{t('agent.route.warningTitle')}</h2>
 
     <p>
-      These customers were excluded because
-      their saved coordinates are more than
-      {MAX_ROUTE_DISTANCE_KM} km from your
-      current location.
+      {t('agent.route.warningBody', { km: MAX_ROUTE_DISTANCE_KM })}
     </p>
 
     {excludedCustomers.map((customer) => (
@@ -362,11 +361,7 @@ const excludedCustomers = useMemo(() => {
         </span>
 
         <span>
-          {(
-            customer.distanceFromAgent /
-            1000
-          ).toFixed(1)}{' '}
-          km away
+          {t('agent.route.kmAway', { km: (customer.distanceFromAgent / 1000).toFixed(1) })}
         </span>
 
         <span>
@@ -431,7 +426,7 @@ const excludedCustomers = useMemo(() => {
   if (loading) {
     return (
       <main className={styles.page}>
-        Loading visit route...
+        {t('agent.route.loading')}
       </main>
     )
   }
@@ -443,15 +438,15 @@ const excludedCustomers = useMemo(() => {
           href="/agent"
           className={styles.backButton}
         >
-          ← Back
+          {t('agent.route.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            FIELD ROUTE
+            {t('agent.route.eyebrow')}
           </p>
 
-          <h1>Visit Route</h1>
+          <h1>{t('agent.route.title')}</h1>
 
           <p>
             {agentName}
@@ -462,14 +457,14 @@ const excludedCustomers = useMemo(() => {
       <section className={styles.locationCard}>
         <div>
           <span>
-            Current Location
+            {t('agent.route.currentLocation')}
           </span>
 
           {latitude !== null &&
           longitude !== null ? (
             <>
               <strong>
-                ✓ Location Captured
+                {t('agent.route.locationCaptured')}
               </strong>
 
               <small>
@@ -479,15 +474,13 @@ const excludedCustomers = useMemo(() => {
 
               {accuracy !== null && (
                 <small>
-                  Accuracy:{' '}
-                  {accuracy.toFixed(1)} m
+                  {t('agent.route.accuracy', { value: accuracy.toFixed(1) })}
                 </small>
               )}
             </>
           ) : (
             <strong>
-              Capture your location to
-              calculate the route.
+              {t('agent.route.captureHint')}
             </strong>
           )}
         </div>
@@ -500,15 +493,15 @@ const excludedCustomers = useMemo(() => {
             disabled={gettingGps}
           >
             {gettingGps
-              ? 'Getting Location...'
-              : 'Use My Location'}
+              ? t('agent.route.gettingLocation')
+              : t('agent.route.useMyLocation')}
           </button>
         )}
       </section>
 
       <section className={styles.summaryGrid}>
         <div>
-          <span>Need Visit</span>
+          <span>{t('agent.route.needVisit')}</span>
 
           <strong>
             {availableCustomers.length}
@@ -516,7 +509,7 @@ const excludedCustomers = useMemo(() => {
         </div>
 
         <div>
-          <span>Route Stops</span>
+          <span>{t('agent.route.routeStops')}</span>
 
           <strong>
             {route.length}
@@ -536,7 +529,7 @@ const excludedCustomers = useMemo(() => {
           <>
             <section className={styles.mapCard}>
               <iframe
-                title="Current Agent Location"
+                title={t('agent.route.mapTitle')}
                 src={`https://maps.google.com/maps?q=${latitude},${longitude}&z=14&output=embed`}
                 loading="lazy"
               />
@@ -547,7 +540,7 @@ const excludedCustomers = useMemo(() => {
               className={styles.routeButton}
               onClick={openFullRoute}
             >
-              Open Full Route in Google Maps
+              {t('agent.route.openFullRoute')}
             </button>
           </>
         )}
@@ -555,17 +548,17 @@ const excludedCustomers = useMemo(() => {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2>
-            Recommended Route
+            {t('agent.route.recommended')}
           </h2>
 
           <span>
-            Nearest First
+            {t('agent.route.nearestFirst')}
           </span>
         </div>
 
         {latitude === null ? (
           <div className={styles.emptyCard}>
-            Capture your current location first.
+            {t('agent.route.captureFirst')}
           </div>
         ) : route.length > 0 ? (
           <div className={styles.routeList}>
@@ -623,22 +616,17 @@ const excludedCustomers = useMemo(() => {
                     }
                   >
                     <span>
-                      Priority{' '}
-                      {customer.priority_rank ??
-                        '-'}
+                      {t('agent.route.priorityLabel', { value: customer.priority_rank ?? '-' })}
                     </span>
 
                     <span>
                       {customer.payment_status
                         ?.toUpperCase() ||
-                        'NOT SET'}
+                        t('agent.route.notSet')}
                     </span>
 
                     <span>
-                      Churn:{' '}
-                      {customer.days_left_to_churn ??
-                        '-'}{' '}
-                      days
+                      {t('agent.route.churnLabel', { days: customer.days_left_to_churn ?? '-' })}
                     </span>
                   </div>
 
@@ -667,7 +655,7 @@ const excludedCustomers = useMemo(() => {
                         styles.detailButton
                       }
                     >
-                      Customer Detail
+                      {t('agent.route.customerDetail')}
                     </Link>
 
                     <a
@@ -678,7 +666,7 @@ const excludedCustomers = useMemo(() => {
                         styles.navigateButton
                       }
                     >
-                      Navigate
+                      {t('agent.route.navigate')}
                     </a>
                   </div>
                 </div>
@@ -687,8 +675,7 @@ const excludedCustomers = useMemo(() => {
           </div>
         ) : (
           <div className={styles.emptyCard}>
-            No customers with location coordinates
-            need a visit.
+            {t('agent.route.noCustomers')}
           </div>
         )}
       </section>

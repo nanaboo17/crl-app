@@ -2,6 +2,20 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
+
+const PREVISIT_STATUS_KEYS: Record<string, string> = {
+  'ready for visit': 'superadmin.status.readyForVisit',
+  'need follow-up': 'superadmin.status.needFollowup',
+  'supervisor review': 'superadmin.status.supervisorReview',
+}
+
+function previsitStatusKey(value: string | null | undefined): string | null {
+  if (!value) return null
+  return PREVISIT_STATUS_KEYS[value.toLowerCase()] ?? null
+}
 
 export default async function AgentDailyPreVisitsPage({
   params,
@@ -15,6 +29,10 @@ export default async function AgentDailyPreVisitsPage({
 
   const decodedEmail =
     decodeURIComponent(agentEmail)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -57,7 +75,7 @@ export default async function AgentDailyPreVisitsPage({
     return (
       <main className={styles.page}>
         <div className={styles.errorCard}>
-          Agent not found.
+          {t('superadmin.preVisits.daily.notFound')}
         </div>
       </main>
     )
@@ -184,12 +202,12 @@ export default async function AgentDailyPreVisitsPage({
           )}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('superadmin.preVisits.daily.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            DAILY PRE-VISITS
+            {t('superadmin.preVisits.daily.eyebrow')}
           </p>
 
           <h1>
@@ -214,26 +232,26 @@ export default async function AgentDailyPreVisitsPage({
 
       <section className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <span>Total</span>
+          <span>{t('superadmin.preVisits.daily.total')}</span>
           <strong>{total}</strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>Ready</span>
+          <span>{t('superadmin.preVisits.daily.ready')}</span>
           <strong>
             {readyCount}
           </strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>Follow-up</span>
+          <span>{t('superadmin.preVisits.daily.followUp')}</span>
           <strong>
             {followUpCount}
           </strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>Review</span>
+          <span>{t('superadmin.preVisits.daily.review')}</span>
           <strong>
             {reviewCount}
           </strong>
@@ -306,7 +324,7 @@ export default async function AgentDailyPreVisitsPage({
                   >
                     <div>
                       <span>
-                        Contact Result
+                        {t('superadmin.preVisits.daily.contactResult')}
                       </span>
 
                       <strong>
@@ -317,54 +335,55 @@ export default async function AgentDailyPreVisitsPage({
 
                     <div>
                       <span>
-                        Pre-Visit Status
+                        {t('superadmin.preVisits.daily.preVisitStatus')}
                       </span>
 
                       <strong>
-                        {preVisit.previsit_status ||
-                          '-'}
+                        {previsitStatusKey(preVisit.previsit_status)
+                          ? t(previsitStatusKey(preVisit.previsit_status)!)
+                          : preVisit.previsit_status || '-'}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Contact
+                        {t('superadmin.preVisits.daily.contact')}
                       </span>
 
                       <strong>
                         {preVisit.contact_confirmed
-                          ? '✓ Confirmed'
-                          : 'Not Confirmed'}
+                          ? t('superadmin.status.confirmed')
+                          : t('superadmin.status.notConfirmed')}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Address
+                        {t('superadmin.preVisits.daily.address')}
                       </span>
 
                       <strong>
                         {preVisit.address_confirmed
-                          ? '✓ Confirmed'
-                          : 'Not Confirmed'}
+                          ? t('superadmin.status.confirmed')
+                          : t('superadmin.status.notConfirmed')}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Appointment
+                        {t('superadmin.preVisits.daily.appointment')}
                       </span>
 
                       <strong>
                         {preVisit.appointment_confirmed
-                          ? '✓ Confirmed'
-                          : 'Not Confirmed'}
+                          ? t('superadmin.status.confirmed')
+                          : t('superadmin.status.notConfirmed')}
                       </strong>
                     </div>
 
                     <div>
                       <span>
-                        Area
+                        {t('superadmin.preVisits.daily.area')}
                       </span>
 
                       <strong>
@@ -409,7 +428,9 @@ export default async function AgentDailyPreVisitsPage({
                               : styles.pendingBadge
                       }
                     >
-                      {preVisit.previsit_status}
+                      {previsitStatusKey(preVisit.previsit_status)
+                        ? t(previsitStatusKey(preVisit.previsit_status)!)
+                        : preVisit.previsit_status}
                     </span>
                   </div>
                 </Link>
@@ -423,13 +444,11 @@ export default async function AgentDailyPreVisitsPage({
             }
           >
             <h2>
-              No pre-visits
+              {t('superadmin.preVisits.daily.emptyTitle')}
             </h2>
 
             <p>
-              This agent has no
-              pre-visit activity on
-              this date.
+              {t('superadmin.preVisits.daily.emptyDesc')}
             </p>
           </div>
         )}

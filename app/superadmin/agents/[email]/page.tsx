@@ -4,17 +4,19 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 const ROLES = ['agent', 'admin', 'superadmin'] as const
 type Role = (typeof ROLES)[number]
 
-const ROLE_LABELS: Record<Role, string> = {
-  agent: 'Agen',
-  admin: 'Admin',
-  superadmin: 'Superadmin',
+function roleLabelKey(role: Role): string {
+  if (role === 'admin') return 'superadmin.agents.edit.roleAdmin'
+  if (role === 'superadmin') return 'superadmin.agents.edit.roleSuperadmin'
+  return 'superadmin.agents.edit.roleAgent'
 }
 
 export default function EditAgentPage() {
+  const { locale, setLocale, t } = useI18n()
   const params = useParams()
   const router = useRouter()
   const supabase = createClient()
@@ -78,7 +80,7 @@ export default function EditAgentPage() {
           <Link
             href="/superadmin/agents"
             className="dui-btn dui-btn-ghost dui-btn-sm"
-            aria-label="Kembali ke daftar agen"
+            aria-label={t('superadmin.agents.edit.backAria')}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m15 18-6-6 6-6" />
@@ -86,7 +88,7 @@ export default function EditAgentPage() {
           </Link>
           <div className="leading-tight">
             <div className="font-extrabold tracking-tight" translate="no">CRL Field App</div>
-            <div className="text-xs text-base-content/60">Edit Agen</div>
+            <div className="text-xs text-base-content/60">{t('superadmin.agents.edit.subtitle')}</div>
           </div>
         </div>
       </div>
@@ -95,24 +97,24 @@ export default function EditAgentPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-base-content/50">
-              Superadmin
+              {t('superadmin.bc.superadmin')}
             </div>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Edit Agen</h1>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{t('superadmin.agents.edit.title')}</h1>
           </div>
           <span className={`dui-badge dui-badge-lg ${active ? 'dui-badge-success dui-badge-soft' : 'dui-badge-error dui-badge-soft'}`}>
-            {active ? 'Aktif' : 'Nonaktif'}
+            {active ? t('superadmin.status.active') : t('superadmin.status.inactive')}
           </span>
         </div>
 
         <div className="dui-fieldset dui-card dui-card-border mt-6 bg-base-100 shadow-sm">
           <div className="dui-card-body gap-4">
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Email</legend>
+              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.emailLabel')}</legend>
               <input type="email" value={email} disabled className="dui-input w-full dui-input-ghost" />
             </div>
 
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Nama Agen</legend>
+              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.nameLabel')}</legend>
               <input
                 type="text"
                 value={name}
@@ -122,7 +124,7 @@ export default function EditAgentPage() {
             </div>
 
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Sales Code</legend>
+              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.salesCodeLabel')}</legend>
               <input
                 type="text"
                 value={salesCode}
@@ -132,14 +134,14 @@ export default function EditAgentPage() {
             </div>
 
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Peran</legend>
+              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.roleLabel')}</legend>
               <div className="dui-dropdown dui-dropdown-bottom">
                 <div
                   tabIndex={0}
                   role="button"
                   className="dui-btn dui-btn-outline w-full justify-between"
                 >
-                  {ROLE_LABELS[role]}
+                  {t(roleLabelKey(role))}
                   <svg className="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                   </svg>
@@ -155,7 +157,7 @@ export default function EditAgentPage() {
                         className={role === option ? 'dui-menu-active' : ''}
                         onClick={() => setRole(option)}
                       >
-                        {ROLE_LABELS[option]}
+                        {t(roleLabelKey(option))}
                       </button>
                     </li>
                   ))}
@@ -165,8 +167,8 @@ export default function EditAgentPage() {
 
             <label className="flex items-center justify-between gap-3">
               <span>
-                <strong>Akun aktif</strong>
-                <span className="block text-sm text-base-content/60">Izinkan agen masuk dan bekerja.</span>
+                <strong>{t('superadmin.agents.edit.activeLabel')}</strong>
+                <span className="block text-sm text-base-content/60">{t('superadmin.agents.edit.activeDesc')}</span>
               </span>
               <input
                 type="checkbox"
@@ -187,7 +189,7 @@ export default function EditAgentPage() {
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-2">
               <Link href="/superadmin/agents" className="dui-btn dui-btn-outline">
-                Batal
+                {t('superadmin.agents.edit.cancel')}
               </Link>
               <button
                 type="button"
@@ -195,7 +197,7 @@ export default function EditAgentPage() {
                 onClick={saveAgent}
                 disabled={saving}
               >
-                {saving ? 'Menyimpan…' : 'Simpan Perubahan'}
+                {saving ? t('superadmin.agents.edit.saving') : t('superadmin.agents.edit.save')}
               </button>
             </div>
           </div>

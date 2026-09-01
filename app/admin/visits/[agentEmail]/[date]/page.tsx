@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AgentDailyVisitsPage({
   params,
@@ -12,6 +15,10 @@ export default async function AgentDailyVisitsPage({
   }>
 }) {
   const { agentEmail, date } = await params
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const decodedEmail = decodeURIComponent(agentEmail)
 
@@ -55,7 +62,7 @@ export default async function AgentDailyVisitsPage({
     return (
       <main className={styles.page}>
         <div className={styles.errorCard}>
-          Agent not found.
+          {t('admin.visitDaily.agentNotFound')}
         </div>
       </main>
     )
@@ -154,12 +161,12 @@ export default async function AgentDailyVisitsPage({
           )}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            DAILY VISITS
+            {t('admin.visitDaily.eyebrow')}
           </p>
 
           <h1>{agent.agent_name}</h1>
@@ -182,17 +189,17 @@ export default async function AgentDailyVisitsPage({
 
       <section className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <span>Total Visits</span>
+          <span>{t('admin.visitDaily.totalVisits')}</span>
           <strong>{totalVisits}</strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>GPS Match</span>
+          <span>{t('admin.visitDaily.gpsMatch')}</span>
           <strong>{gpsMatchCount}</strong>
         </div>
 
         <div className={styles.statCard}>
-          <span>GPS Mismatch</span>
+          <span>{t('admin.visitDaily.gpsMismatch')}</span>
           <strong>{gpsMismatchCount}</strong>
         </div>
       </section>
@@ -240,7 +247,7 @@ export default async function AgentDailyVisitsPage({
                 <div className={styles.infoGrid}>
                   <div>
                     <span>
-                      Status Kunjungan
+                      {t('admin.visitDaily.statusKunjungan')}
                     </span>
 
                     <strong>
@@ -251,7 +258,7 @@ export default async function AgentDailyVisitsPage({
 
                   <div>
                     <span>
-                      Hasil Pembicaraan
+                      {t('admin.visitDaily.conversationResult')}
                     </span>
 
                     <strong>
@@ -261,7 +268,7 @@ export default async function AgentDailyVisitsPage({
                   </div>
 
                   <div>
-                    <span>Payment</span>
+                    <span>{t('admin.visitDaily.payment')}</span>
 
                     <strong>
                       {customer?.payment_status
@@ -271,7 +278,7 @@ export default async function AgentDailyVisitsPage({
                   </div>
 
                   <div>
-                    <span>Distance</span>
+                    <span>{t('admin.visitDaily.distance')}</span>
 
                     <strong>
                       {visit.distance_to_customer_meters !==
@@ -307,10 +314,10 @@ export default async function AgentDailyVisitsPage({
                     }
                   >
                     {visit.location_match === true
-                      ? '✓ GPS Match'
+                      ? t('admin.visitDaily.gpsMatchBadge')
                       : visit.location_match === false
-                        ? '⚠ GPS Mismatch'
-                        : 'GPS Unknown'}
+                        ? t('admin.visitDaily.gpsMismatchBadge')
+                        : t('admin.visitDaily.gpsUnknown')}
                   </span>
                 </div>
               </Link>
@@ -318,10 +325,10 @@ export default async function AgentDailyVisitsPage({
           })
         ) : (
           <div className={styles.emptyState}>
-            <h2>No visits</h2>
+            <h2>{t('admin.visitDaily.noTitle')}</h2>
 
             <p>
-              This agent has no visits on this date.
+              {t('admin.visitDaily.noDesc')}
             </p>
           </div>
         )}

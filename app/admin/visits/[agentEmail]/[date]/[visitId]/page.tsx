@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AdminVisitDetailPage({
   params,
@@ -13,6 +16,10 @@ export default async function AdminVisitDetailPage({
   }>
 }) {
   const { agentEmail, date, visitId } = await params
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const decodedEmail = decodeURIComponent(agentEmail)
   const decodedVisitId = decodeURIComponent(visitId)
@@ -69,11 +76,11 @@ export default async function AdminVisitDetailPage({
           )}/${date}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div className={styles.errorCard}>
-          Visit not found.
+          {t('admin.visitDetail.notFound')}
         </div>
       </main>
     )
@@ -137,12 +144,12 @@ export default async function AdminVisitDetailPage({
           )}/${date}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('admin.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            VISIT DETAIL
+            {t('admin.visitDetail.eyebrow')}
           </p>
 
           <h1>
@@ -158,14 +165,14 @@ export default async function AdminVisitDetailPage({
 
       <section className={styles.topGrid}>
         <div className={styles.statusCard}>
-          <span>Visit Status</span>
+          <span>{t('admin.visitDetail.visitStatus')}</span>
           <strong>
             {visit.visit_status_kunjungan || '-'}
           </strong>
         </div>
 
         <div className={styles.statusCard}>
-          <span>Payment</span>
+          <span>{t('admin.visitDetail.payment')}</span>
           <strong>
             {customer?.payment_status
               ? customer.payment_status.toUpperCase()
@@ -175,21 +182,21 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Agent</h2>
+        <h2>{t('admin.visitDetail.agent')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Agent Name"
+            label={t('admin.visitDetail.agentName')}
             value={agent?.agent_name}
           />
 
           <Detail
-            label="Sales Code"
+            label={t('admin.visitDetail.salesCode')}
             value={agent?.sales_code}
           />
 
           <Detail
-            label="Agent Email"
+            label={t('admin.visitDetail.agentEmail')}
             value={decodedEmail}
             full
           />
@@ -197,31 +204,31 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Customer</h2>
+        <h2>{t('admin.visitDetail.customer')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Customer ID"
+            label={t('admin.visitDetail.customerId')}
             value={customer?.customer_id}
           />
 
           <Detail
-            label="Customer Name"
+            label={t('admin.visitDetail.customerName')}
             value={customer?.customer_name}
           />
 
           <Detail
-            label="Phone"
+            label={t('admin.visitDetail.phone')}
             value={customer?.phone_number}
           />
 
           <Detail
-            label="Updated Phone"
+            label={t('admin.visitDetail.updatedPhone')}
             value={visit.updated_phone}
           />
 
           <Detail
-            label="Area"
+            label={t('admin.visitDetail.area')}
             value={
               customer?.sub_district ||
               customer?.district ||
@@ -230,7 +237,7 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Customer Address"
+            label={t('admin.visitDetail.customerAddress')}
             value={customer?.service_address}
             full
           />
@@ -238,25 +245,25 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Visit Result</h2>
+        <h2>{t('admin.visitDetail.visitResult')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Visit Date"
+            label={t('admin.visitDetail.visitDate')}
             value={formatDateTime(
               visit.visit_date
             )}
           />
 
           <Detail
-            label="Status Kunjungan"
+            label={t('admin.visitDetail.statusKunjungan')}
             value={
               visit.visit_status_kunjungan
             }
           />
 
           <Detail
-            label="Hasil Pembicaraan"
+            label={t('admin.visitDetail.conversationResult')}
             value={
               visit.conversation_result
             }
@@ -264,69 +271,69 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Offer Disetujui"
+            label={t('admin.visitDetail.approvedOffer')}
             value={visit.approved_offer}
             full
           />
 
           <Detail
-            label="Promise to Pay Date"
+            label={t('admin.visitDetail.promiseToPayDate')}
             value={formatDate(
               visit.planned_payment_date
             )}
           />
 
           <Detail
-            label="Alasan Belum Bayar"
+            label={t('admin.visitDetail.unpaidReason')}
             value={visit.unpaid_reason}
           />
 
           <Detail
-            label="Consent"
+            label={t('admin.visitDetail.consent')}
             value={
               visit.consent_given
-                ? '✓ Given'
-                : 'Not Given'
+                ? t('admin.visitDetail.given')
+                : t('admin.visitDetail.notGiven')
             }
           />
 
           <Detail
-            label="Visit Status Customer"
+            label={t('admin.visitDetail.visitStatusCustomer')}
             value={customer?.visit_status}
           />
         </div>
       </section>
 
       <section className={styles.card}>
-        <h2>GPS Verification</h2>
+        <h2>{t('admin.visitDetail.gpsVerification')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Given Latitude"
+            label={t('admin.visitDetail.givenLatitude')}
             value={
               customer?.given_latitude
             }
           />
 
           <Detail
-            label="Given Longitude"
+            label={t('admin.visitDetail.givenLongitude')}
             value={
               customer?.given_longitude
             }
           />
 
           <Detail
-            label="Visit Latitude"
+            label={t('admin.visitDetail.visitLatitude')}
             value={visit.latitude}
           />
 
           <Detail
-            label="Visit Longitude"
+            label={t('admin.visitDetail.visitLongitude')}
             value={visit.longitude}
           />
 
           <Detail
-            label="Accuracy"
+            label={t('admin.visitDetail.accuracy')}
             value={
               visit.gps_accuracy !== null
                 ? `${Number(
@@ -337,14 +344,14 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Captured At"
+            label={t('admin.visitDetail.capturedAt')}
             value={formatDateTime(
               visit.gps_captured_at
             )}
           />
 
           <Detail
-            label="Distance"
+            label={t('admin.visitDetail.distance')}
             value={
               visit.distance_to_customer_meters !== null
                 ? `${Number(
@@ -355,13 +362,13 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Location Result"
+            label={t('admin.visitDetail.locationResult')}
             value={
               visit.location_match === true
-                ? '✓ Match'
+                ? t('admin.visitDetail.match')
                 : visit.location_match === false
-                  ? '⚠ Outside Range'
-                  : 'Not Available'
+                  ? t('admin.visitDetail.outsideRange')
+                  : t('admin.visitDetail.notAvailable')
             }
           />
         </div>
@@ -370,7 +377,7 @@ export default async function AdminVisitDetailPage({
           visit.longitude && (
             <div className={styles.mapBox}>
               <iframe
-                title="Visit Pinpoint"
+                title={t('admin.visitDetail.mapTitle')}
                 src={`https://maps.google.com/maps?q=${visit.latitude},${visit.longitude}&z=17&output=embed`}
                 loading="lazy"
               />
@@ -379,27 +386,27 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Visit Photo</h2>
+        <h2>{t('admin.visitDetail.visitPhoto')}</h2>
 
         {photoUrl ? (
           <img
             src={photoUrl}
-            alt="Visit Evidence"
+            alt={t('admin.visitDetail.visitEvidenceAlt')}
             className={styles.photo}
           />
         ) : (
           <div className={styles.noPhoto}>
-            Photo unavailable.
+            {t('admin.visitDetail.photoUnavailable')}
           </div>
         )}
       </section>
 
       <section className={styles.card}>
-        <h2>Catatan Tambahan</h2>
+        <h2>{t('admin.visitDetail.additionalNotes')}</h2>
 
         <p className={styles.notes}>
           {visit.additional_notes ||
-            'Tidak ada catatan tambahan.'}
+            t('admin.visitDetail.noAdditionalNotes')}
         </p>
       </section>
     </main>

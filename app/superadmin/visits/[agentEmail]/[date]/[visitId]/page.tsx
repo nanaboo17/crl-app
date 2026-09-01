@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import styles from './page.module.css'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 export default async function AdminVisitDetailPage({
   params,
@@ -16,6 +19,10 @@ export default async function AdminVisitDetailPage({
 
   const decodedEmail = decodeURIComponent(agentEmail)
   const decodedVisitId = decodeURIComponent(visitId)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -69,11 +76,11 @@ export default async function AdminVisitDetailPage({
           )}/${date}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('superadmin.visits.detail.back')}
         </Link>
 
         <div className={styles.errorCard}>
-          Visit not found.
+          {t('superadmin.visits.detail.notFound')}
         </div>
       </main>
     )
@@ -137,12 +144,12 @@ export default async function AdminVisitDetailPage({
           )}/${date}`}
           className={styles.backButton}
         >
-          ← Back
+          {t('superadmin.visits.detail.back')}
         </Link>
 
         <div>
           <p className={styles.eyebrow}>
-            VISIT DETAIL
+            {t('superadmin.visits.detail.eyebrow')}
           </p>
 
           <h1>
@@ -158,14 +165,14 @@ export default async function AdminVisitDetailPage({
 
       <section className={styles.topGrid}>
         <div className={styles.statusCard}>
-          <span>Visit Status</span>
+          <span>{t('superadmin.visits.detail.visitStatus')}</span>
           <strong>
             {visit.visit_status_kunjungan || '-'}
           </strong>
         </div>
 
         <div className={styles.statusCard}>
-          <span>Payment</span>
+          <span>{t('superadmin.visits.detail.payment')}</span>
           <strong>
             {customer?.payment_status
               ? customer.payment_status.toUpperCase()
@@ -175,21 +182,21 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Agent</h2>
+        <h2>{t('superadmin.visits.detail.agentSection')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Agent Name"
+            label={t('superadmin.visits.detail.agentName')}
             value={agent?.agent_name}
           />
 
           <Detail
-            label="Sales Code"
+            label={t('superadmin.visits.detail.salesCode')}
             value={agent?.sales_code}
           />
 
           <Detail
-            label="Agent Email"
+            label={t('superadmin.visits.detail.agentEmail')}
             value={decodedEmail}
             full
           />
@@ -197,31 +204,31 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Customer</h2>
+        <h2>{t('superadmin.visits.detail.customerSection')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Customer ID"
+            label={t('superadmin.visits.detail.customerId')}
             value={customer?.customer_id}
           />
 
           <Detail
-            label="Customer Name"
+            label={t('superadmin.visits.detail.customerName')}
             value={customer?.customer_name}
           />
 
           <Detail
-            label="Phone"
+            label={t('superadmin.visits.detail.phone')}
             value={customer?.phone_number}
           />
 
           <Detail
-            label="Updated Phone"
+            label={t('superadmin.visits.detail.updatedPhone')}
             value={visit.updated_phone}
           />
 
           <Detail
-            label="Area"
+            label={t('superadmin.visits.detail.area')}
             value={
               customer?.sub_district ||
               customer?.district ||
@@ -230,7 +237,7 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Customer Address"
+            label={t('superadmin.visits.detail.customerAddress')}
             value={customer?.service_address}
             full
           />
@@ -238,25 +245,25 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Visit Result</h2>
+        <h2>{t('superadmin.visits.detail.visitResult')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Visit Date"
+            label={t('superadmin.visits.detail.visitDate')}
             value={formatDateTime(
               visit.visit_date
             )}
           />
 
           <Detail
-            label="Status Kunjungan"
+            label={t('superadmin.visits.detail.visitStatusKunjungan')}
             value={
               visit.visit_status_kunjungan
             }
           />
 
           <Detail
-            label="Hasil Pembicaraan"
+            label={t('superadmin.visits.detail.conversationResult')}
             value={
               visit.conversation_result
             }
@@ -264,69 +271,69 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Offer Disetujui"
+            label={t('superadmin.visits.detail.approvedOffer')}
             value={visit.approved_offer}
             full
           />
 
           <Detail
-            label="Promise to Pay Date"
+            label={t('superadmin.visits.detail.promiseToPayDate')}
             value={formatDate(
               visit.planned_payment_date
             )}
           />
 
           <Detail
-            label="Alasan Belum Bayar"
+            label={t('superadmin.visits.detail.unpaidReason')}
             value={visit.unpaid_reason}
           />
 
           <Detail
-            label="Consent"
+            label={t('superadmin.visits.detail.consent')}
             value={
               visit.consent_given
-                ? '✓ Given'
-                : 'Not Given'
+                ? t('superadmin.status.given')
+                : t('superadmin.status.notGiven')
             }
           />
 
           <Detail
-            label="Visit Status Customer"
+            label={t('superadmin.visits.detail.visitStatusCustomer')}
             value={customer?.visit_status}
           />
         </div>
       </section>
 
       <section className={styles.card}>
-        <h2>GPS Verification</h2>
+        <h2>{t('superadmin.visits.detail.gpsVerification')}</h2>
 
         <div className={styles.grid}>
           <Detail
-            label="Given Latitude"
+            label={t('superadmin.visits.detail.givenLatitude')}
             value={
               customer?.given_latitude
             }
           />
 
           <Detail
-            label="Given Longitude"
+            label={t('superadmin.visits.detail.givenLongitude')}
             value={
               customer?.given_longitude
             }
           />
 
           <Detail
-            label="Visit Latitude"
+            label={t('superadmin.visits.detail.visitLatitude')}
             value={visit.latitude}
           />
 
           <Detail
-            label="Visit Longitude"
+            label={t('superadmin.visits.detail.visitLongitude')}
             value={visit.longitude}
           />
 
           <Detail
-            label="Accuracy"
+            label={t('superadmin.visits.detail.accuracy')}
             value={
               visit.gps_accuracy !== null
                 ? `${Number(
@@ -337,14 +344,14 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Captured At"
+            label={t('superadmin.visits.detail.capturedAt')}
             value={formatDateTime(
               visit.gps_captured_at
             )}
           />
 
           <Detail
-            label="Distance"
+            label={t('superadmin.visits.detail.distance')}
             value={
               visit.distance_to_customer_meters !== null
                 ? `${Number(
@@ -355,13 +362,13 @@ export default async function AdminVisitDetailPage({
           />
 
           <Detail
-            label="Location Result"
+            label={t('superadmin.visits.detail.locationResult')}
             value={
               visit.location_match === true
-                ? '✓ Match'
+                ? t('superadmin.status.match')
                 : visit.location_match === false
-                  ? '⚠ Outside Range'
-                  : 'Not Available'
+                  ? t('superadmin.status.outsideRange')
+                  : t('superadmin.status.notAvailable')
             }
           />
         </div>
@@ -370,7 +377,7 @@ export default async function AdminVisitDetailPage({
           visit.longitude && (
             <div className={styles.mapBox}>
               <iframe
-                title="Visit Pinpoint"
+                title={t('superadmin.visits.detail.visitPinpoint')}
                 src={`https://maps.google.com/maps?q=${visit.latitude},${visit.longitude}&z=17&output=embed`}
                 loading="lazy"
               />
@@ -379,27 +386,27 @@ export default async function AdminVisitDetailPage({
       </section>
 
       <section className={styles.card}>
-        <h2>Visit Photo</h2>
+        <h2>{t('superadmin.visits.detail.visitPhoto')}</h2>
 
         {photoUrl ? (
           <img
             src={photoUrl}
-            alt="Visit Evidence"
+            alt={t('superadmin.visits.detail.visitEvidence')}
             className={styles.photo}
           />
         ) : (
           <div className={styles.noPhoto}>
-            Photo unavailable.
+            {t('superadmin.visits.detail.photoUnavailable')}
           </div>
         )}
       </section>
 
       <section className={styles.card}>
-        <h2>Catatan Tambahan</h2>
+        <h2>{t('superadmin.visits.detail.additionalNotes')}</h2>
 
         <p className={styles.notes}>
           {visit.additional_notes ||
-            'Tidak ada catatan tambahan.'}
+            t('superadmin.visits.detail.noNotes')}
         </p>
       </section>
     </main>

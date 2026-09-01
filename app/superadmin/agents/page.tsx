@@ -1,9 +1,12 @@
 import Link from 'next/link'
-import { AlertCircle, Inbox, Pencil } from 'lucide-react'
+import { AlertCircle, Inbox, Pencil, ShieldCheck, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import SuperadminPagination from '@/components/superadmin/SuperadminPagination'
+import { getLocale } from '@/lib/i18n/server'
+import { translate } from '@/lib/i18n'
+import { allMessages } from '@/lib/i18n/messages'
 
 const PAGE_SIZE = 10
 
@@ -14,6 +17,10 @@ export default async function ManageAgentsPage({
 }) {
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
+
+  const locale = await getLocale()
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, allMessages, key, params)
 
   const supabase = await createClient()
 
@@ -31,17 +38,17 @@ export default async function ManageAgentsPage({
       <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
         <SuperadminPageHeader
           breadcrumbs={[
-            { label: 'Superadmin', href: '/superadmin' },
-            { label: 'Agents' },
+            { label: t('superadmin.bc.superadmin'), href: '/superadmin', icon: ShieldCheck },
+            { label: t('superadmin.bc.agents'), icon: Users },
           ]}
-          title="Agents"
-          description="Manage agent accounts and access."
+          title={t('superadmin.agents.title')}
+          description={t('superadmin.agents.description')}
         />
         <SuperadminState
           tone="error"
           icon={AlertCircle}
-          title="Unable to load agents"
-          description="Please try again."
+          title={t('superadmin.agents.errorTitle')}
+          description={t('superadmin.agents.errorDesc')}
         />
       </div>
     )
@@ -51,18 +58,18 @@ export default async function ManageAgentsPage({
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
       <SuperadminPageHeader
         breadcrumbs={[
-          { label: 'Superadmin', href: '/superadmin' },
-          { label: 'Agents' },
+          { label: t('superadmin.bc.superadmin'), href: '/superadmin' },
+          { label: t('superadmin.bc.agents') },
         ]}
-        title="Agents"
-        description="Manage agent accounts and access."
+        title={t('superadmin.agents.title')}
+        description={t('superadmin.agents.description')}
       />
 
       {agents.length === 0 ? (
         <SuperadminState
           icon={Inbox}
-          title="No agents found"
-          description="There are currently no agent records to display."
+          title={t('superadmin.agents.emptyTitle')}
+          description={t('superadmin.agents.emptyDesc')}
         />
       ) : (
         <>
@@ -70,11 +77,11 @@ export default async function ManageAgentsPage({
             <table className="table table-sm table-zebra">
               <thead>
                 <tr>
-                  <th>Agent</th>
-                  <th className="hidden sm:table-cell">Sales Code</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th aria-label="Actions" />
+                  <th>{t('superadmin.agents.thAgent')}</th>
+                  <th className="hidden sm:table-cell">{t('superadmin.agents.thSalesCode')}</th>
+                  <th>{t('superadmin.agents.thRole')}</th>
+                  <th>{t('superadmin.agents.thStatus')}</th>
+                  <th aria-label={t('superadmin.agents.thActions')} />
                 </tr>
               </thead>
               <tbody>
@@ -107,15 +114,15 @@ export default async function ManageAgentsPage({
                           agent.active ? 'badge-success' : 'badge-error'
                         }`}
                       >
-                        {agent.active ? 'Active' : 'Inactive'}
+                        {agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}
                       </span>
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
                         <Link
                           href={`/superadmin/agents/${encodeURIComponent(agent.email)}`}
-                          aria-label={`Edit ${agent.agent_name}`}
-                          title="Edit agent"
+                          aria-label={t('superadmin.agents.editAria', { name: agent.agent_name })}
+                          title={t('superadmin.agents.editTitle')}
                           className="btn btn-ghost btn-sm btn-square"
                         >
                           <Pencil aria-hidden="true" className="size-4" />

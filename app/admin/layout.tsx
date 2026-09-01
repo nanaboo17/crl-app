@@ -1,5 +1,6 @@
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { redirect } from 'next/navigation'
+
 import { createClient } from '@/lib/supabase-server'
 import SuperadminShell from '@/components/superadmin/SuperadminShell'
 
@@ -35,7 +36,11 @@ export default async function AdminLayout({
   }
 
   if (agent.role !== 'admin') {
-    redirect(agent.role === 'superadmin' ? '/superadmin' : '/agent')
+    redirect(
+      agent.role === 'superadmin'
+        ? '/superadmin'
+        : '/agent'
+    )
   }
 
   return (
