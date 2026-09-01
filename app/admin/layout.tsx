@@ -2,7 +2,6 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminShell from '@/components/superadmin/SuperadminShell'
-import { adminConfig } from '@/components/shell/config'
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -47,7 +46,11 @@ export default async function AdminLayout({
           'var(--font-jakarta), Inter, ui-sans-serif, system-ui, sans-serif',
       }}
     >
-      <SuperadminShell agentName={agent.agent_name ?? 'Admin'} email={agent.email} config={adminConfig}>
+      <SuperadminShell
+        agentName={agent.agent_name ?? 'Admin'}
+        email={agent.email}
+        mode="admin"
+      >
         {children}
       </SuperadminShell>
     </div>
