@@ -7,6 +7,7 @@ import SuperadminSidebar from './SuperadminSidebar'
 import SuperadminNavbar from './SuperadminNavbar'
 import {
   adminConfig,
+  agentConfig,
   superadminConfig,
   type ShellConfig,
 } from '@/components/shell/config'
@@ -20,14 +21,20 @@ export default function SuperadminShell({
   agentName: string
   email: string
   children: React.ReactNode
-  mode?: 'admin' | 'superadmin'
+  mode?: 'agent' | 'admin' | 'superadmin'
 }) {
   const pathname = usePathname()
   const [navOpen, setNavOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(false)
-  const config: ShellConfig = mode === 'admin' ? adminConfig : superadminConfig
+
+  const config: ShellConfig =
+    mode === 'agent'
+      ? agentConfig
+      : mode === 'admin'
+        ? adminConfig
+        : superadminConfig
 
   useEffect(() => {
     setNavOpen(false)
@@ -58,7 +65,7 @@ export default function SuperadminShell({
   return (
     <div className="min-h-screen bg-[#f4f6f8]">
       <aside
-        aria-label="Superadmin sidebar"
+        aria-label={`${config.role} sidebar`}
         className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-gray-200 bg-white lg:block"
       >
         <SuperadminSidebar agentName={agentName} config={config} />
