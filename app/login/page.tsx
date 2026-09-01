@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase-browser'
 
 export default function LoginPage() {
@@ -25,16 +26,18 @@ export default function LoginPage() {
     <div className="auth-layout">
       <aside className="auth-context" aria-label="CRL workspace introduction">
         <div className="auth-brand">
-          <div className="brand-mark" aria-hidden="true" translate="no">CRL</div>
+          <Image
+            src="/logo/logo2.png"
+            alt="CRL logo"
+            width={66}
+            height={44}
+            priority
+            className="h-11 w-auto flex-shrink-0 object-contain"
+          />
           <div>
             <div className="auth-brand-name" translate="no">Indosat HiFi</div>
             <div className="auth-brand-subtitle">Field operations</div>
           </div>
-        </div>
-        <div className="auth-context-content">
-          <div className="auth-eyebrow">Customer visit management</div>
-          <h1 className="auth-title">Every visit, clear from start to finish.</h1>
-          <p>Plan routes, capture updates, and keep every customer visit moving with one shared workspace.</p>
         </div>
         <div className="auth-context-footer">
           <span className="auth-status-dot" aria-hidden="true" />

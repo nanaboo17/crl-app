@@ -1,10 +1,5 @@
 import Link from 'next/link'
-import {
-  AlertCircle,
-  Inbox,
-  Pencil,
-  UserPlus,
-} from 'lucide-react'
+import { AlertCircle, Inbox, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
@@ -61,12 +56,6 @@ export default async function ManageAgentsPage({
         ]}
         title="Agents"
         description="Manage agent accounts and access."
-        actions={
-          <Link href="/superadmin/agents/new" className="btn btn-primary btn-sm">
-            <UserPlus aria-hidden="true" className="size-4" />
-            Add Agent
-          </Link>
-        }
       />
 
       {agents.length === 0 ? (

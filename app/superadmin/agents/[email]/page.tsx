@@ -15,6 +15,7 @@ export default function EditAgentPage() {
   const [salesCode, setSalesCode] = useState('')
   const [role, setRole] = useState('agent')
   const [active, setActive] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
     async function loadAgent() {
@@ -22,13 +23,17 @@ export default function EditAgentPage() {
         .from('agents')
         .select('*')
         .eq('email', email)
-        .single()
+        .maybeSingle()
 
       if (data) {
         setName(data.agent_name)
         setSalesCode(data.sales_code ?? '')
         setRole(data.role)
         setActive(data.active)
+      } else {
+        // Unknown email (e.g. a stale or mistyped link) — never show an
+        // empty edit form that looks editable.
+        setNotFound(true)
       }
     }
 
@@ -49,7 +54,35 @@ export default function EditAgentPage() {
     router.push('/superadmin/agents')
   }
 
-return (
+  if (notFound) {
+    return (
+      <main className="mobile-page">
+        <div className="edit-header">
+          <button
+            type="button"
+            className="back-button"
+            onClick={() => router.push('/superadmin/agents')}
+          >
+            ← Back
+          </button>
+
+          <div>
+            <p className="eyebrow">SUPERADMIN</p>
+            <h1>Agent not found</h1>
+          </div>
+        </div>
+
+        <div className="card">
+          <p className="muted">
+            No agent is registered with the email{' '}
+            <strong className="truncate">{email}</strong>.
+          </p>
+        </div>
+      </main>
+    )
+  }
+
+  return (
   <main className="mobile-page">
     <div className="edit-header">
       <button
