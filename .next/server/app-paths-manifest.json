@@ -1,1 +1,9 @@
-{}
+{
+  "/icon.png/route": "app/icon.png/route.js",
+  "/auth/callback/route": "app/auth/callback/route.js",
+  "/page": "app/page.js",
+  "/login/page": "app/login/page.js",
+  "/auth/route/page": "app/auth/route/page.js",
+  "/superadmin/page": "app/superadmin/page.js",
+  "/admin/page": "app/admin/page.js"
+}

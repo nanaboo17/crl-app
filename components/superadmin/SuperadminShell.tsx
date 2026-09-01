@@ -5,15 +5,18 @@ import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import SuperadminSidebar from './SuperadminSidebar'
 import SuperadminNavbar from './SuperadminNavbar'
+import { superadminConfig, type ShellConfig } from '@/components/shell/config'
 
 export default function SuperadminShell({
   agentName,
   email,
   children,
+  config = superadminConfig,
 }: {
   agentName: string
   email: string
   children: React.ReactNode
+  config?: ShellConfig
 }) {
   const pathname = usePathname()
   const [navOpen, setNavOpen] = useState(false)
@@ -57,7 +60,7 @@ export default function SuperadminShell({
         aria-label="Superadmin sidebar"
         className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-gray-200 bg-white lg:block"
       >
-        <SuperadminSidebar agentName={agentName} />
+        <SuperadminSidebar agentName={agentName} config={config} />
       </aside>
 
       {/* Mobile navigation drawer */}
@@ -94,6 +97,7 @@ export default function SuperadminShell({
           <SuperadminSidebar
             agentName={agentName}
             onNavigate={() => setNavOpen(false)}
+            config={config}
           />
         </div>
       </div>
@@ -106,6 +110,7 @@ export default function SuperadminShell({
           navigationOpen={navOpen}
           onOpenNavigation={() => setNavOpen(true)}
           menuButtonRef={menuButtonRef}
+          config={config}
         />
         <main className="flex-1">{children}</main>
       </div>

@@ -7,23 +7,69 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-  themes: light --default;
+  prefix: "dui-";
+  themes: crl --default;
+}
+
+@plugin "daisyui/theme" {
+  name: "crl";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(98% 0.012 345);
+  --color-base-200: oklch(95% 0.02 345);
+  --color-base-300: oklch(91% 0.028 345);
+  --color-base-content: oklch(18% 0.03 345);
+
+  --color-primary: #ec008c;
+  --color-primary-content: #ffffff;
+
+  --color-secondary: #b3147f;
+  --color-secondary-content: #ffffff;
+
+  --color-accent: #ffca09;
+  --color-accent-content: #221a04;
+
+  --color-neutral: #2a1422;
+  --color-neutral-content: #ffffff;
+
+  --color-info: #0090d4;
+  --color-info-content: #ffffff;
+  --color-success: #14b866;
+  --color-success-content: #ffffff;
+  --color-warning: #ffb200;
+  --color-warning-content: #221a04;
+  --color-error: #e5484d;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+
+  --depth: 1;
+  --noise: 0;
 }
 
 /* Original app styles (agent/admin/login pages). Keep verbatim. */
 @layer legacy {
 
 :root {
-  --bg: #f4f6f8;
+  --bg: #fdf5fa;
   --surface: #ffffff;
-  --surface-soft: #f8fafc;
-  --text: #111827;
-  --muted: #667085;
-  --line: #e4e7ec;
-  --primary: #111827;
-  --danger: #b42318;
-  --danger-soft: #fff1f0;
-  --success-soft: #ecfdf3;
+  --surface-soft: #fbeef6;
+  --text: #24101d;
+  --muted: #8a5b78;
+  --line: #f0dce6;
+  --primary: #ec008c;
+  --danger: #c0392b;
+  --danger-soft: #fdeaea;
+  --success-soft: #e8faf0;
   --radius: 18px;
 }
 
@@ -144,8 +190,8 @@ textarea { min-height: 108px; resize: vertical; }
   flex-direction: column;
   padding: 36px 40px;
   overflow: hidden;
-  color: #211e20;
-  background: #f5f8ff;
+  color: #24101d;
+  background: #fbeef6;
 }
 .auth-context::after {
   position: absolute;
@@ -153,7 +199,7 @@ textarea { min-height: 108px; resize: vertical; }
   bottom: -72px;
   width: 206px;
   height: 206px;
-  border: 34px solid #0d6efd;
+  border: 34px solid #ec008c;
   border-radius: 50%;
   content: '';
   opacity: .1;
@@ -170,7 +216,7 @@ textarea { min-height: 108px; resize: vertical; }
   flex: 0 0 46px;
   place-items: center;
   border-radius: 12px;
-  background: #211e20;
+  background: #24101d;
   color: #ffffff;
   font-size: 14px;
   font-weight: 900;
@@ -226,8 +272,8 @@ textarea { min-height: 108px; resize: vertical; }
   height: 8px;
   flex: 0 0 8px;
   border-radius: 50%;
-  background: #198754;
-  box-shadow: 0 0 0 4px rgba(25, 135, 84, .12);
+  background: #14b866;
+  box-shadow: 0 0 0 4px rgba(20, 184, 102, .12);
 }
 .auth-card {
   width: 100%;
@@ -240,7 +286,7 @@ textarea { min-height: 108px; resize: vertical; }
 }
 .auth-card h2 {
   margin: 10px 0 10px;
-  color: #211e20;
+  color: #24101d;
   font-size: 32px;
   letter-spacing: -.045em;
   line-height: 1.12;
@@ -255,10 +301,10 @@ textarea { min-height: 108px; resize: vertical; }
 .auth-card > .btn {
   min-height: 54px;
   margin-top: 30px;
-  border: 1px solid #d7dce4;
+  border: 1px solid #f0dce6;
   border-radius: 8px;
   background: #ffffff;
-  color: #211e20;
+  color: #24101d;
   box-shadow: 0 2px 3px rgba(33, 30, 32, .04);
   font-size: 15px;
   font-weight: 800;
@@ -266,12 +312,12 @@ textarea { min-height: 108px; resize: vertical; }
   transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 .auth-card > .btn:hover:not(:disabled) {
-  border-color: #0d6efd;
-  box-shadow: 0 6px 14px rgba(13, 110, 253, .13);
+  border-color: #ec008c;
+  box-shadow: 0 6px 14px rgba(236, 0, 140, .13);
   transform: translateY(-1px);
 }
 .auth-card > .btn:focus-visible {
-  outline: 3px solid rgba(13, 110, 253, .28);
+  outline: 3px solid rgba(236, 0, 140, .28);
   outline-offset: 3px;
 }
 .google-icon {

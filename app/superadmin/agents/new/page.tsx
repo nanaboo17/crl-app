@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 
 const ROLES = ['agent', 'admin', 'superadmin'] as const
@@ -14,61 +14,95 @@ const ROLE_LABELS: Record<Role, string> = {
   superadmin: 'Superadmin',
 }
 
-export default function EditAgentPage() {
-  const params = useParams()
+type FormErrors = {
+  email?: string
+  agent_name?: string
+  role?: string
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export default function NewAgentPage() {
   const router = useRouter()
-  const supabase = createClient()
 
-  const email = decodeURIComponent(params.email as string)
-
+  const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [salesCode, setSalesCode] = useState('')
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
+
+  const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
 
-  useEffect(() => {
-    async function loadAgent() {
-      const { data } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('email', email)
-        .single()
+  function validate(): FormErrors {
+    const next: FormErrors = {}
 
-      if (data) {
-        setName(data.agent_name)
-        setSalesCode(data.sales_code ?? '')
-        setRole(data.role)
-        setActive(data.active)
-      }
+    if (!email.trim()) {
+      next.email = 'Email wajib diisi.'
+    } else if (!EMAIL_RE.test(email.trim())) {
+      next.email = 'Format email tidak valid.'
     }
 
-    loadAgent()
-  }, [email])
+    if (!name.trim()) {
+      next.agent_name = 'Nama agen wajib diisi.'
+    }
 
-  async function saveAgent() {
-    setSaving(true)
-    setError('')
+    return next
+  }
 
-    const { error: saveError } = await supabase
-      .from('agents')
-      .update({
-        agent_name: name,
-        sales_code: salesCode,
-        role,
-        active,
-      })
-      .eq('email', email)
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
 
-    if (saveError) {
-      setError(saveError.message)
-      setSaving(false)
+    const nextErrors = validate()
+    setErrors(nextErrors)
+    setFormError('')
+
+    if (Object.keys(nextErrors).length > 0) {
       return
     }
 
-    router.push('/superadmin/agents')
-    router.refresh()
+    setSaving(true)
+
+    try {
+      const supabase = createClient()
+      const cleanEmail = email.trim().toLowerCase()
+
+      const { data: existing } = await supabase
+        .from('agents')
+        .select('email')
+        .eq('email', cleanEmail)
+        .maybeSingle()
+
+      if (existing) {
+        setFormError(`Email ${cleanEmail} sudah terdaftar sebagai agen.`)
+        setSaving(false)
+        return
+      }
+
+      const { error } = await supabase.from('agents').insert({
+        email: cleanEmail,
+        agent_name: name.trim(),
+        sales_code: salesCode.trim() || null,
+        role,
+        active,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      router.push('/superadmin/agents')
+      router.refresh()
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal menyimpan agen.',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -86,45 +120,69 @@ export default function EditAgentPage() {
           </Link>
           <div className="leading-tight">
             <div className="font-extrabold tracking-tight" translate="no">CRL Field App</div>
-            <div className="text-xs text-base-content/60">Edit Agen</div>
+            <div className="text-xs text-base-content/60">Tambah Agen</div>
           </div>
         </div>
       </div>
 
       <div className="mx-auto w-full max-w-xl px-4 sm:px-6 pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-base-content/50">
-              Superadmin
-            </div>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Edit Agen</h1>
+        <div>
+          <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-base-content/50">
+            Superadmin
           </div>
-          <span className={`dui-badge dui-badge-lg ${active ? 'dui-badge-success dui-badge-soft' : 'dui-badge-error dui-badge-soft'}`}>
-            {active ? 'Aktif' : 'Nonaktif'}
-          </span>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Tambah Agen</h1>
+          <p className="mt-1 text-sm text-base-content/60">
+            Daftarkan agen baru beserta perannya di aplikasi.
+          </p>
         </div>
 
-        <div className="dui-fieldset dui-card dui-card-border mt-6 bg-base-100 shadow-sm">
+        <form className="dui-fieldset dui-card dui-card-border mt-6 bg-base-100 shadow-sm" onSubmit={submit} noValidate>
           <div className="dui-card-body gap-4">
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Email</legend>
-              <input type="email" value={email} disabled className="dui-input w-full dui-input-ghost" />
+              <legend className="dui-fieldset-legend">
+                Email
+                <span className="text-error">*</span>
+              </legend>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="nama@contoh.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={`dui-input w-full ${errors.email ? 'dui-input-error' : ''}`}
+                aria-invalid={!!errors.email}
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-error">{errors.email}</p>
+              )}
             </div>
 
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Nama Agen</legend>
+              <legend className="dui-fieldset-legend">
+                Nama Agen
+                <span className="text-error">*</span>
+              </legend>
               <input
                 type="text"
+                autoComplete="name"
+                placeholder="Nama lengkap agen"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="dui-input w-full"
+                className={`dui-input w-full ${errors.agent_name ? 'dui-input-error' : ''}`}
+                aria-invalid={!!errors.agent_name}
               />
+              {errors.agent_name && (
+                <p className="mt-1 text-sm text-error">{errors.agent_name}</p>
+              )}
             </div>
 
             <div className="dui-fieldset">
               <legend className="dui-fieldset-legend">Sales Code</legend>
               <input
                 type="text"
+                autoComplete="off"
+                placeholder="Kode penjualan (opsional)"
                 value={salesCode}
                 onChange={(e) => setSalesCode(e.target.value)}
                 className="dui-input w-full"
@@ -132,9 +190,13 @@ export default function EditAgentPage() {
             </div>
 
             <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">Peran</legend>
-              <div className="dui-dropdown dui-dropdown-bottom">
-                <div
+              <legend className="dui-fieldset-legend">
+                Peran
+                <span className="text-error">*</span>
+              </legend>
+              <div className="dui-dropdown">
+                <button
+                  type="button"
                   tabIndex={0}
                   role="button"
                   className="dui-btn dui-btn-outline w-full justify-between"
@@ -143,7 +205,7 @@ export default function EditAgentPage() {
                   <svg className="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                   </svg>
-                </div>
+                </button>
                 <ul
                   tabIndex={-1}
                   className="dui-dropdown-content dui-menu bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm"
@@ -176,30 +238,39 @@ export default function EditAgentPage() {
               />
             </label>
 
-            {error && (
+            {formError && (
               <div className="dui-alert dui-alert-error" role="alert">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>{error}</span>
+                <span>{formError}</span>
               </div>
             )}
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-2">
-              <Link href="/superadmin/agents" className="dui-btn dui-btn-outline">
+              <Link
+                href="/superadmin/agents"
+                className="dui-btn dui-btn-outline"
+              >
                 Batal
               </Link>
               <button
-                type="button"
+                type="submit"
                 className="dui-btn dui-btn-primary"
-                onClick={saveAgent}
                 disabled={saving}
               >
-                {saving ? 'Menyimpan…' : 'Simpan Perubahan'}
+                {saving ? (
+                  <>
+                    <span className="dui-loading dui-loading-spinner dui-loading-sm" />
+                    Menyimpan…
+                  </>
+                ) : (
+                  'Simpan Agen'
+                )}
               </button>
             </div>
           </div>
-        </div>
+        </form>
       </div>
     </main>
   )

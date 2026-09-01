@@ -84,8 +84,7 @@ export default function AssignCustomerPage() {
       setSaving(false)
       return
     }
-
-    router.push('/admin/customers')
+    router.push('/superadmin/customers')
     router.refresh()
   }
 

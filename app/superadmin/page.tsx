@@ -88,14 +88,14 @@ export default async function SuperadminPage() {
           <Link
             key={href}
             href={href}
-            className="stat border border-base-300 bg-base-100 transition-colors hover:border-base-content/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
+            className="dui-stat grid-cols-1 gap-4 border border-base-300 bg-base-100 transition-colors hover:border-base-content/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
           >
-            <div className="stat-figure text-base-content/25">
+            <div className="dui-stat-figure text-base-content/25">
               <Icon aria-hidden="true" className="h-6 w-6" />
             </div>
-            <div className="stat-title">{label}</div>
-            <div className="stat-value text-3xl">{count}</div>
-            <div className="stat-desc">Manage {label.toLowerCase()} →</div>
+            <div className="dui-stat-title">{label}</div>
+            <div className="dui-stat-value text-3xl">{count}</div>
+            <div className="dui-stat-desc">Manage {label.toLowerCase()} →</div>
           </Link>
         ))}
       </section>

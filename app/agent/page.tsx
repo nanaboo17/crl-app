@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Building2, ClipboardList, MapPin, Route } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase-server'
-
-import styles from './page.module.css'
+import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 
 export default async function AgentPage() {
   const supabase = await createClient()
@@ -32,42 +32,31 @@ export default async function AgentPage() {
 
   if (error) {
     return (
-      <main className={styles.page}>
-        <div className="alert alert-error">
-          <div>
-            <h2 className={styles.alertTitle}>Account Error</h2>
-            <p>{error.message}</p>
-          </div>
+      <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+          Kesalahan Akun: {error.message}
         </div>
-      </main>
+      </div>
     )
   }
 
   if (!agent) {
     return (
-      <main className={styles.page}>
-        <div className="alert alert-warning">
-          <div>
-            <h2 className={styles.alertTitle}>Agent Not Found</h2>
-            <p>Your login email is:</p>
-            <strong>{email}</strong>
-            <p>This email was not found in the Agents table.</p>
-          </div>
+      <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          Agen tidak ditemukan. Email masuk Anda: {email}
         </div>
-      </main>
+      </div>
     )
   }
 
   if (!agent.active) {
     return (
-      <main className={styles.page}>
-        <div className="alert alert-error">
-          <div>
-            <h2 className={styles.alertTitle}>Account Inactive</h2>
-            <p>Your CRL account is currently inactive.</p>
-          </div>
+      <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
+          Akun CRL Anda saat ini tidak aktif.
         </div>
-      </main>
+      </div>
     )
   }
 
@@ -75,57 +64,76 @@ export default async function AgentPage() {
     redirect('/auth/route')
   }
 
-  const { count: customerCount } = await supabase
-    .from('customers')
-    .select('*', {
-      count: 'exact',
-      head: true,
-    })
-    .eq('agent_email', email)
+  const [customersResult, preVisitsResult, visitsResult] = await Promise.all([
+    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('agent_email', email),
+    supabase.from('pre_visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
+    supabase.from('visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
+  ])
+
+  const firstName = agent.agent_name?.trim().split(/\s+/)[0] ?? 'Agent'
+
+  const stats = [
+    {
+      href: '/agent/customers',
+      label: 'Customers',
+      count: customersResult.count ?? 0,
+      icon: Building2,
+    },
+    {
+      href: '/agent/route',
+      label: 'Route',
+      count: 0,
+      icon: Route,
+    },
+    {
+      href: '/agent/pre-visits',
+      label: 'Pre-Visits',
+      count: preVisitsResult.count ?? 0,
+      icon: ClipboardList,
+    },
+    {
+      href: '/agent/visits',
+      label: 'Visits',
+      count: visitsResult.count ?? 0,
+      icon: MapPin,
+    },
+  ]
 
   return (
-    <main className={styles.page}>
-      <section className={`hero bg-base-200 ${styles.hero}`}>
-        <div className={`hero-content ${styles.heroContent}`}>
-          <div>
-            <p className={styles.eyebrow}>CRL FIELD APP</p>
-            <h1 className={styles.title}>Hi, {agent.agent_name}</h1>
-            <div className="badge badge-primary badge-outline">
-              {agent.sales_code || 'No Sales Code'}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={`stats shadow ${styles.stats}`}>
-        <div className="stat">
-          <div className="stat-title">My Customers</div>
-          <div className="stat-value">{customerCount ?? 0}</div>
-          <div className="stat-desc">Customers assigned to you</div>
-        </div>
-      </section>
-
-      <ul className={`menu bg-base-100 rounded-box shadow ${styles.menu}`}>
-        <li>
-          <Link href="/agent/customers" className={styles.menuLink}>
-            <div>
-              <strong>My Customers</strong>
-              <span>View customers assigned to you</span>
-            </div>
-            <span className={styles.chevron}>›</span>
+    <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+      <SuperadminPageHeader
+        breadcrumbs={[{ label: 'Agent', href: '/agent' }, { label: 'Dashboard' }]}
+        title="Dashboard"
+        description={`Welcome back, ${firstName}. Here is what is happening across your field operations.`}
+        actions={
+          <Link
+            href="/agent/customers"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-content transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            Pelanggan Saya
           </Link>
-        </li>
+        }
+      />
 
-        <li>
-          <Link href="/agent/route" className={styles.menuLink}>
-            <div>
-              <strong>Visit Route</strong>
-              <span>Plan today's customers from nearest location</span>
+      <section
+        aria-label="Statistics"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {stats.map(({ href, label, count, icon: Icon }) => (
+          <Link
+            key={label}
+            href={href}
+            className="dui-stat grid-cols-1 gap-4 border border-base-300 bg-base-100 transition-colors hover:border-base-content/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
+          >
+            <div className="dui-stat-figure text-base-content/25">
+              <Icon aria-hidden="true" className="h-6 w-6" />
             </div>
-            <span className={styles.chevron}>›</span>
+            <div className="dui-stat-title">{label}</div>
+            <div className="dui-stat-value text-3xl">{count.toLocaleString()}</div>
+            <div className="dui-stat-desc">Manage {label.toLowerCase()} →</div>
           </Link>
-        </li>
-      </ul>
-    </main>
+        ))}
+      </section>
+    </div>
   )
 }

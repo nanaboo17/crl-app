@@ -3,44 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import {
-  Building2,
-  ClipboardList,
-  LayoutDashboard,
-  MapPin,
-  Users,
-} from 'lucide-react'
-
-type NavItem = {
-  href: string
-  label: string
-  icon: typeof LayoutDashboard
-  exact?: boolean
-}
-
-// Only real routes — do not add items without a matching app/superadmin route.
-const navGroups: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Overview',
-    items: [
-      {
-        href: '/superadmin',
-        label: 'Dashboard',
-        icon: LayoutDashboard,
-        exact: true,
-      },
-    ],
-  },
-  {
-    label: 'Management',
-    items: [
-      { href: '/superadmin/agents', label: 'Agents', icon: Users },
-      { href: '/superadmin/customers', label: 'Customers', icon: Building2 },
-      { href: '/superadmin/pre-visits', label: 'Pre-Visits', icon: ClipboardList },
-      { href: '/superadmin/visits', label: 'Visits', icon: MapPin },
-    ],
-  },
-]
+import { superadminConfig, type NavItem, type ShellConfig } from '@/components/shell/config'
 
 function isActive(pathname: string, item: NavItem) {
   if (item.exact) return pathname === item.href
@@ -50,9 +13,11 @@ function isActive(pathname: string, item: NavItem) {
 export default function SuperadminSidebar({
   agentName,
   onNavigate,
+  config = superadminConfig,
 }: {
   agentName: string
   onNavigate?: () => void
+  config?: ShellConfig
 }) {
   const pathname = usePathname()
   const initials = agentName.trim().slice(0, 2).toUpperCase() || 'SA'
@@ -76,10 +41,10 @@ export default function SuperadminSidebar({
 
       {/* Navigation */}
       <nav
-        aria-label="Superadmin navigation"
+        aria-label={config.navAriaLabel}
         className="flex-1 overflow-y-auto px-3 py-4"
       >
-        {navGroups.map((group) => (
+        {config.navGroups.map((group) => (
           <div key={group.label} className="mb-5 last:mb-0">
             <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
               {group.label}
@@ -128,7 +93,7 @@ export default function SuperadminSidebar({
           <p className="truncate text-sm font-semibold text-gray-900">
             {agentName}
           </p>
-          <p className="text-xs text-gray-500">Superadmin</p>
+          <p className="text-xs text-gray-500">{config.role}</p>
         </div>
       </div>
     </div>

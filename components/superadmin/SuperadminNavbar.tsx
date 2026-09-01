@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { LogOut, Menu, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
+import { superadminConfig, type ShellConfig } from '@/components/shell/config'
 
 export default function SuperadminNavbar({
   agentName,
@@ -13,12 +14,14 @@ export default function SuperadminNavbar({
   navigationOpen,
   onOpenNavigation,
   menuButtonRef,
+  config = superadminConfig,
 }: {
   agentName: string
   email: string
   navigationOpen: boolean
   onOpenNavigation: () => void
   menuButtonRef: React.RefObject<HTMLButtonElement | null>
+  config?: ShellConfig
 }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -79,7 +82,7 @@ export default function SuperadminNavbar({
           className="h-[18px] w-auto object-contain"
         />
         <span className="text-base font-semibold tracking-tight text-gray-900">
-          Admin
+          {config.brandLabel}
         </span>
       </span>
 
@@ -113,12 +116,12 @@ export default function SuperadminNavbar({
               </p>
               <p className="truncate text-xs text-gray-500">{email}</p>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                Superadmin
+                {config.role}
               </p>
             </div>
             <div className="pt-1">
               <Link
-                href="/superadmin"
+                href={config.home}
                 role="menuitem"
                 onClick={() => setMenuOpen(false)}
                 className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-gray-900"
