@@ -27,24 +27,6 @@ type RouteCustomer = Customer & {
   sequence: number
 }
 
-const MAX_ROUTE_DISTANCE_KM = 100
-
-function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371000
-  const toRad = (value: number) => (value * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-function formatDistance(meters: number) {
-  if (meters < 1000) return `${Math.round(meters)} m`
-  return `${(meters / 1000).toFixed(1)} km`
-}
-
 export default function AgentRoutePage() {
   const { t } = useI18n()
   const supabase = createClient()
@@ -61,45 +43,30 @@ export default function AgentRoutePage() {
     async function loadData() {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user?.email) {
-        window.location.href = '/login'
-        return
-      }
-
+      if (!user?.email) { window.location.href = '/login'; return }
       const email = user.email.trim().toLowerCase()
-      const { data: agent } = await supabase
-        .from('agents')
-        .select('agent_name, role, active')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (!agent || !agent.active || agent.role !== 'agent') {
-        window.location.href = '/auth/route'
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('customers')
-        .select('customer_id, customer_name, priority_rank, service_address, city, district, sub_district, given_latitude, given_longitude, visit_status, payment_status, days_left_to_churn')
-        .eq('agent_email', email)
-        .order('priority_rank', { ascending: true })
-
-      if (error) setError(error.message)
-      else setCustomers(data ?? [])
+      const { data: agent } = await supabase.from('agents').select('agent_name, role, active').eq('email', email).maybeSingle()
+      if (!agent || !agent.active || agent.role !== 'agent') { window.location.href = '/auth/route'; return }
+      const { data, error } = await supabase.from('customers').select(`customer_id, customer_name, priority_rank, service_address, city, district, sub_district, given_latitude, given_longitude, visit_status, payment_status, days_left_to_churn`).eq('agent_email', email).order('priority_rank', { ascending: true })
+      if (error) setError(error.message); else setCustomers(data ?? [])
       setAgentName(agent.agent_name)
       setLoading(false)
     }
-
     loadData()
   }, [])
 
+  function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371000
+    const toRad = (value: number) => (value * Math.PI) / 180
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
   function captureLocation() {
-    if (!navigator.geolocation) {
-      setError(t('agent.route.gpsNotSupported'))
-      return
-    }
-    setGettingGps(true)
-    setError('')
+    if (!navigator.geolocation) { setError(t('agent.route.gpsNotSupported')); return }
+    setGettingGps(true); setError('')
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLatitude(position.coords.latitude)
@@ -107,23 +74,22 @@ export default function AgentRoutePage() {
         setAccuracy(position.coords.accuracy)
         setGettingGps(false)
       },
-      (gpsError) => {
-        setError(t('agent.route.gpsFailed', { message: gpsError.message }))
-        setGettingGps(false)
-      },
+      (gpsError) => { setError(t('agent.route.gpsFailed', { message: gpsError.message })); setGettingGps(false) },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     )
   }
+
+  const MAX_ROUTE_DISTANCE_KM = 100
 
   const availableCustomers = useMemo(() => {
     if (latitude === null || longitude === null) return []
     return customers.filter((customer) => {
       const visited = customer.visit_status?.trim().toLowerCase() === 'visited'
-      if (visited || customer.given_latitude == null || customer.given_longitude == null) return false
-      const lat = Number(customer.given_latitude)
-      const lng = Number(customer.given_longitude)
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
-      return distanceMeters(latitude, longitude, lat, lng) <= MAX_ROUTE_DISTANCE_KM * 1000
+      if (visited || customer.given_latitude === null || customer.given_longitude === null) return false
+      const customerLat = Number(customer.given_latitude)
+      const customerLng = Number(customer.given_longitude)
+      if (!Number.isFinite(customerLat) || !Number.isFinite(customerLng)) return false
+      return distanceMeters(latitude, longitude, customerLat, customerLng) <= MAX_ROUTE_DISTANCE_KM * 1000
     })
   }, [customers, latitude, longitude])
 
@@ -132,13 +98,10 @@ export default function AgentRoutePage() {
     return customers
       .filter((customer) => {
         const visited = customer.visit_status?.trim().toLowerCase() === 'visited'
-        if (visited || customer.given_latitude == null || customer.given_longitude == null) return false
+        if (visited || customer.given_latitude === null || customer.given_longitude === null) return false
         return distanceMeters(latitude, longitude, Number(customer.given_latitude), Number(customer.given_longitude)) > MAX_ROUTE_DISTANCE_KM * 1000
       })
-      .map((customer) => ({
-        ...customer,
-        distanceFromAgent: distanceMeters(latitude, longitude, Number(customer.given_latitude), Number(customer.given_longitude)),
-      }))
+      .map((customer) => ({ ...customer, distanceFromAgent: distanceMeters(latitude, longitude, Number(customer.given_latitude), Number(customer.given_longitude)) }))
   }, [customers, latitude, longitude])
 
   const route = useMemo<RouteCustomer[]>(() => {
@@ -148,16 +111,12 @@ export default function AgentRoutePage() {
     let currentLat = latitude
     let currentLng = longitude
     let sequence = 1
-
     while (remaining.length > 0) {
       let nearestIndex = 0
       let nearestDistance = Infinity
       remaining.forEach((customer, index) => {
         const distance = distanceMeters(currentLat, currentLng, Number(customer.given_latitude), Number(customer.given_longitude))
-        if (distance < nearestDistance) {
-          nearestDistance = distance
-          nearestIndex = index
-        }
+        if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = index }
       })
       const nearest = remaining.splice(nearestIndex, 1)[0]
       result.push({ ...nearest, sequence, distance_from_previous: nearestDistance })
@@ -168,14 +127,15 @@ export default function AgentRoutePage() {
     return result
   }, [latitude, longitude, availableCustomers])
 
+  function formatDistance(meters: number) {
+    if (meters < 1000) return `${Math.round(meters)} m`
+    return `${(meters / 1000).toFixed(1)} km`
+  }
+
   function openFullRoute() {
     if (latitude === null || longitude === null || route.length === 0) return
     const destination = route[route.length - 1]
-    const waypoints = route
-      .slice(0, -1)
-      .map((customer) => `${customer.given_latitude},${customer.given_longitude}`)
-      .join('|')
-
+    const waypoints = route.slice(0, -1).map((customer) => `${customer.given_latitude},${customer.given_longitude}`).join('|')
     let url = `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${destination.given_latitude},${destination.given_longitude}&travelmode=driving`
     if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -196,27 +156,41 @@ export default function AgentRoutePage() {
 
       <section className={styles.heroGrid}>
         <div className={styles.locationCard}>
-          <div className={styles.cardIcon}><LocateFixed size={20} /></div>
-          <div className={styles.locationCopy}>
-            <span>{t('agent.route.currentLocation')}</span>
-            {latitude !== null && longitude !== null ? (
-              <>
-                <strong>{t('agent.route.locationCaptured')}</strong>
-                <small>{latitude.toFixed(6)}, {longitude.toFixed(6)}</small>
-                {accuracy !== null && <small>{t('agent.route.accuracy', { value: accuracy.toFixed(1) })}</small>}
-              </>
-            ) : (
-              <strong>{t('agent.route.captureHint')}</strong>
-            )}
+          <div className={styles.locationTop}>
+            <div className={styles.cardIcon}><LocateFixed size={21} /></div>
+            <div className={styles.locationCopy}>
+              <div className={styles.locationLabelRow}>
+                <span>{t('agent.route.currentLocation')}</span>
+                <span className={`${styles.locationStatus} ${latitude !== null && longitude !== null ? styles.locationStatusReady : ''}`}>
+                  {latitude !== null && longitude !== null ? t('agent.route.locationCaptured') : t('agent.route.captureHint')}
+                </span>
+              </div>
+              {latitude !== null && longitude !== null ? (
+                <div className={styles.coordinateRow}>
+                  <strong>{latitude.toFixed(6)}, {longitude.toFixed(6)}</strong>
+                  {accuracy !== null && <small>± {accuracy.toFixed(1)} m</small>}
+                </div>
+              ) : (
+                <p className={styles.locationHint}>{t('agent.route.captureHint')}</p>
+              )}
+            </div>
           </div>
+
           <button type="button" className={styles.gpsButton} onClick={captureLocation} disabled={gettingGps}>
+            <LocateFixed size={16} />
             {gettingGps ? t('agent.route.gettingLocation') : t('agent.route.useMyLocation')}
           </button>
         </div>
 
         <div className={styles.summaryGrid}>
-          <div className={styles.summaryCard}><span>{t('agent.route.needVisit')}</span><strong>{availableCustomers.length}</strong></div>
-          <div className={styles.summaryCard}><span>{t('agent.route.routeStops')}</span><strong>{route.length}</strong></div>
+          <div className={styles.summaryCard}>
+            <div className={styles.summaryIcon}><MapPin size={18} /></div>
+            <div><span>{t('agent.route.needVisit')}</span><strong>{availableCustomers.length}</strong></div>
+          </div>
+          <div className={styles.summaryCard}>
+            <div className={styles.summaryIcon}><Route size={18} /></div>
+            <div><span>{t('agent.route.routeStops')}</span><strong>{route.length}</strong></div>
+          </div>
         </div>
       </section>
 
