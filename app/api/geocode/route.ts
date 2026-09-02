@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase-server'
 
 type NominatimResult = {
   lat?: string
@@ -10,6 +11,7 @@ const BASE_URL = process.env.NOMINATIM_BASE_URL || 'https://nominatim.openstreet
 
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q')?.trim()
+  const customerId = request.nextUrl.searchParams.get('customer_id')?.trim()
 
   if (!query) {
     return NextResponse.json({ error: 'Address is required.' }, { status: 400 })
@@ -52,11 +54,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ found: false })
     }
 
+    let persisted = false
+    if (customerId) {
+      const supabase = await createClient()
+      const { error: persistError } = await supabase.rpc('update_customer_geocode', {
+        p_customer_id: customerId,
+        p_latitude: latitude,
+        p_longitude: longitude,
+      })
+
+      if (persistError) {
+        console.error('persist customer geocode:', persistError)
+      } else {
+        persisted = true
+      }
+    }
+
     return NextResponse.json(
       {
         found: true,
         latitude,
         longitude,
+        persisted,
         displayName: first.display_name || query,
         attribution: '© OpenStreetMap contributors',
       },
