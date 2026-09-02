@@ -37,161 +37,18 @@
 .subtitle { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; color: color-mix(in oklab, var(--color-base-content) 58%, transparent); font-size: 13px; }
 .backButton { padding: 9px 12px; border: 1px solid var(--color-base-300); border-radius: 10px; background: var(--color-base-100); color: var(--color-base-content); font-size: 13px; font-weight: 700; text-decoration: none; }
 
-.heroGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(250px, .55fr);
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.locationCard {
-  display: grid;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid var(--color-base-300);
-  border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100)), var(--color-base-100) 46%);
-}
-
-.locationTop {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 13px;
-}
-
-.cardIcon {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: 13px;
-  background: color-mix(in oklab, var(--color-primary) 13%, var(--color-base-100));
-  color: var(--color-primary);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 12%, transparent);
-}
-
+.heroGrid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); gap: 14px; margin-bottom: 18px; }
+.locationCard { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 18px; border: 1px solid var(--color-base-300); border-radius: 18px; background: var(--color-base-100); }
+.cardIcon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100)); color: var(--color-primary); }
 .locationCopy { min-width: 0; }
-
-.locationLabelRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.locationLabelRow > span:first-child,
-.summaryCard span {
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-  font-size: 11px;
-  font-weight: 750;
-}
-
-.locationStatus {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-base-300);
-  border-radius: 999px;
-  background: var(--color-base-100);
-  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
-  font-size: 10px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.locationStatusReady {
-  border-color: color-mix(in oklab, var(--color-success) 38%, var(--color-base-300));
-  background: color-mix(in oklab, var(--color-success) 9%, var(--color-base-100));
-  color: var(--color-success);
-}
-
-.coordinateRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.coordinateRow strong {
-  color: var(--color-base-content);
-  font-size: 16px;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.coordinateRow small {
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.locationHint {
-  margin: 7px 0 0;
-  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.gpsButton {
-  display: inline-flex;
-  width: 100%;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 10px 14px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--color-primary);
-  color: var(--color-primary-content);
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: transform 140ms ease, filter 140ms ease;
-}
-
-.gpsButton:hover { filter: brightness(.97); }
-.gpsButton:active { transform: translateY(1px); }
+.locationCopy span,.summaryCard span { display: block; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); font-size: 11px; font-weight: 700; }
+.locationCopy strong { display: block; margin-top: 3px; font-size: 15px; }
+.locationCopy small { display: block; margin-top: 3px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 11px; overflow-wrap: anywhere; }
+.gpsButton { min-height: 42px; padding: 10px 14px; border: 0; border-radius: 11px; background: var(--color-primary); color: var(--color-primary-content); font-size: 12px; font-weight: 800; cursor: pointer; }
 .gpsButton:disabled { opacity: .6; cursor: wait; }
-
-.summaryGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-.summaryCard {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--color-base-300);
-  border-radius: 18px;
-  background: var(--color-base-100);
-}
-
-.summaryIcon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 11px;
-  background: var(--color-base-200);
-  color: color-mix(in oklab, var(--color-base-content) 66%, transparent);
-}
-
-.summaryCard strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--color-base-content);
-  font-size: 28px;
-  line-height: 1;
-}
+.summaryGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.summaryCard { display: flex; min-width: 0; flex-direction: column; justify-content: center; padding: 18px; border: 1px solid var(--color-base-300); border-radius: 18px; background: var(--color-base-100); }
+.summaryCard strong { margin-top: 5px; font-size: 30px; line-height: 1; }
 
 .mapSection,.section,.warningCard { margin-top: 22px; }
 .sectionHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -238,12 +95,8 @@
   .page { padding: 18px 14px 95px; }
   .header { align-items: center; }
   .backButton { padding: 8px 10px; font-size: 12px; }
-  .locationLabelRow { align-items: flex-start; flex-direction: column; gap: 6px; }
-  .coordinateRow { align-items: flex-start; flex-direction: column; gap: 3px; }
-  .summaryGrid { grid-template-columns: 1fr 1fr; }
-  .summaryCard { grid-template-columns: 1fr; gap: 9px; padding: 14px; }
-  .summaryIcon { width: 34px; height: 34px; }
-  .summaryCard strong { font-size: 24px; }
+  .locationCard { grid-template-columns: auto 1fr; }
+  .gpsButton { grid-column: 1 / -1; width: 100%; }
   .mapCard { height: 250px; }
   .stopCard { grid-template-columns: 30px minmax(0,1fr); gap: 8px; }
   .sequence { width: 30px; height: 30px; margin-top: 12px; font-size: 11px; }
