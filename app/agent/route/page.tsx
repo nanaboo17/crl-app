@@ -27,7 +27,30 @@ type RouteCustomer = Customer & {
   sequence: number
 }
 
+type GeocodeResponse = {
+  found?: boolean
+  latitude?: number
+  longitude?: number
+}
+
 const MAX_ROUTE_DISTANCE_KM = 100
+const NOMINATIM_DELAY_MS = 1100
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function buildCustomerAddress(customer: Customer) {
+  return [
+    customer.service_address,
+    customer.sub_district,
+    customer.district,
+    customer.city,
+    'Indonesia',
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(', ')
+}
 
 function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000
@@ -58,6 +81,56 @@ export default function AgentRoutePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let cancelled = false
+
+    async function geocodeMissingCustomers(rows: Customer[]) {
+      const missing = rows.filter(
+        (customer) =>
+          customer.given_latitude == null || customer.given_longitude == null
+      )
+
+      for (let index = 0; index < missing.length; index += 1) {
+        if (cancelled) return
+
+        const customer = missing[index]
+        const address = buildCustomerAddress(customer)
+
+        if (!address) continue
+
+        try {
+          const response = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`)
+
+          if (response.ok) {
+            const result = (await response.json()) as GeocodeResponse
+
+            if (
+              result.found &&
+              Number.isFinite(result.latitude) &&
+              Number.isFinite(result.longitude)
+            ) {
+              setCustomers((current) =>
+                current.map((row) =>
+                  row.customer_id === customer.customer_id
+                    ? {
+                        ...row,
+                        given_latitude: Number(result.latitude),
+                        given_longitude: Number(result.longitude),
+                      }
+                    : row
+                )
+              )
+            }
+          }
+        } catch (geocodeError) {
+          console.error('route geocode:', geocodeError)
+        }
+
+        if (index < missing.length - 1) {
+          await sleep(NOMINATIM_DELAY_MS)
+        }
+      }
+    }
+
     async function loadData() {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -84,13 +157,23 @@ export default function AgentRoutePage() {
         .eq('agent_email', email)
         .order('priority_rank', { ascending: true })
 
-      if (error) setError(error.message)
-      else setCustomers(data ?? [])
+      if (error) {
+        setError(error.message)
+      } else {
+        const rows = (data ?? []) as Customer[]
+        setCustomers(rows)
+        void geocodeMissingCustomers(rows)
+      }
+
       setAgentName(agent.agent_name)
       setLoading(false)
     }
 
-    loadData()
+    void loadData()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   function captureLocation() {
@@ -153,7 +236,12 @@ export default function AgentRoutePage() {
       let nearestIndex = 0
       let nearestDistance = Infinity
       remaining.forEach((customer, index) => {
-        const distance = distanceMeters(currentLat, currentLng, Number(customer.given_latitude), Number(customer.given_longitude))
+        const distance = distanceMeters(
+          currentLat,
+          currentLng,
+          Number(customer.given_latitude),
+          Number(customer.given_longitude)
+        )
         if (distance < nearestDistance) {
           nearestDistance = distance
           nearestIndex = index
@@ -165,6 +253,7 @@ export default function AgentRoutePage() {
       currentLng = Number(nearest.given_longitude)
       sequence += 1
     }
+
     return result
   }, [latitude, longitude, availableCustomers])
 
@@ -181,7 +270,13 @@ export default function AgentRoutePage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  if (loading) return <main className={styles.page}><div className={styles.loadingCard}>{t('agent.route.loading')}</div></main>
+  if (loading) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.loadingCard}>{t('agent.route.loading')}</div>
+      </main>
+    )
+  }
 
   return (
     <main className={styles.page}>
