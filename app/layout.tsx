@@ -1,4 +1,5 @@
 import './globals.css'
+import './theme-overrides.css'
 import AppProviders from '@/components/providers/AppProviders'
 import { getLocale } from '@/lib/i18n/server'
 import { getTheme } from '@/lib/theme-server'
@@ -13,14 +14,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const [locale, theme] = await Promise.all([getLocale(), getTheme()])
 
   return (
-    <html lang={locale} data-theme={DATA_THEME[theme]}>
-      <head>
-        <link
-          href="https://cdn.jsdelivr.net/npm/daisyui@5"
-          rel="stylesheet"
-          type="text/css"
-        />
-      </head>
+    <html lang={locale} data-theme={DATA_THEME[theme]} suppressHydrationWarning>
       <body>
         <AppProviders initialLocale={locale} initialTheme={theme}>
           {children}
