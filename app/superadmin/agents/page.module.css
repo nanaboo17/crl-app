@@ -6,6 +6,25 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
 
+.addButton {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.7rem;
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  font-size: 0.875rem;
+  font-weight: 750;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+.addButton:hover { filter: brightness(0.96); }
+.addButton:active { transform: translateY(1px); }
+.addButton:focus-visible { outline: 2px solid var(--color-base-content); outline-offset: 2px; }
+
 .tableScroll {
   width: 100%;
   overflow-x: auto;
