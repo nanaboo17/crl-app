@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase-browser'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import type { AppRole } from '@/lib/types'
 import { useI18n } from '@/components/providers/i18n-provider'
+import styles from './page.module.css'
 
 type CustomerRow = {
   customer_id: string
@@ -42,6 +43,8 @@ type AgentRow = {
   active: boolean
 }
 
+const PAGE_SIZE = 10
+
 const PRIORITY_STYLES: Record<number, { badge: string; ring: string }> = {
   1: { badge: 'dui-badge-error dui-badge-soft', ring: 'border-error/30' },
   2: { badge: 'dui-badge-warning dui-badge-soft', ring: 'border-warning/30' },
@@ -51,7 +54,7 @@ const PRIORITY_STYLES: Record<number, { badge: string; ring: string }> = {
 }
 
 function badgeClass(priority: number | null) {
-  return (priority ? PRIORITY_STYLES[priority] : PRIORITY_STYLES[5]).badge
+  return PRIORITY_STYLES[priority ?? 5]?.badge ?? PRIORITY_STYLES[5].badge
 }
 
 function initials(name: string) {
@@ -89,6 +92,7 @@ export default function AgentCustomersPage() {
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [sort, setSort] = useState('priority')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     async function loadData() {
@@ -151,6 +155,10 @@ export default function AgentCustomersPage() {
     loadData()
   }, [supabase])
 
+  useEffect(() => {
+    setPage(1)
+  }, [search, paymentFilter, priorityFilter, sort])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
 
@@ -187,16 +195,22 @@ export default function AgentCustomersPage() {
     })
   }, [customers, search, paymentFilter, priorityFilter, sort])
 
-  const pending = filtered.filter((c) => (c.visit_status ?? '').trim().toLowerCase() !== 'visited')
-  const visited = filtered.filter((c) => (c.visit_status ?? '').trim().toLowerCase() === 'visited')
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageStart = (safePage - 1) * PAGE_SIZE
+  const pageCustomers = filtered.slice(pageStart, pageStart + PAGE_SIZE)
+
+  const allPending = filtered.filter((c) => (c.visit_status ?? '').trim().toLowerCase() !== 'visited')
+  const allVisited = filtered.filter((c) => (c.visit_status ?? '').trim().toLowerCase() === 'visited')
+  const pending = pageCustomers.filter((c) => (c.visit_status ?? '').trim().toLowerCase() !== 'visited')
+  const visited = pageCustomers.filter((c) => (c.visit_status ?? '').trim().toLowerCase() === 'visited')
 
   const hasActiveFilter = search !== '' || paymentFilter !== 'all' || priorityFilter !== 'all'
-  const firstName = agent?.agent_name?.trim().split(/\s+/)[0] ?? ''
 
   const stats = [
     { label: t('agent.customers.statTotal'), value: customers.length, icon: Users, current: false },
-    { label: t('agent.customers.statPending'), value: pending.length, icon: MapPin, current: true },
-    { label: t('agent.customers.statVisited'), value: visited.length, icon: ClipboardList, current: false },
+    { label: t('agent.customers.statPending'), value: allPending.length, icon: MapPin, current: true },
+    { label: t('agent.customers.statVisited'), value: allVisited.length, icon: ClipboardList, current: false },
   ]
 
   return (
@@ -262,14 +276,8 @@ export default function AgentCustomersPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="dui-fieldset">
-              <div className="dui-fieldset-label">
-                <span>{t('agent.customers.payment')}</span>
-              </div>
-              <select
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value)}
-                className="dui-select w-full"
-              >
+              <div className="dui-fieldset-label"><span>{t('agent.customers.payment')}</span></div>
+              <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="dui-select w-full">
                 <option value="all">{t('agent.customers.all')}</option>
                 <option value="paid">{t('agent.customers.paid')}</option>
                 <option value="unpaid">{t('agent.customers.unpaid')}</option>
@@ -277,14 +285,8 @@ export default function AgentCustomersPage() {
             </div>
 
             <div className="dui-fieldset">
-              <div className="dui-fieldset-label">
-                <span>{t('agent.customers.priority')}</span>
-              </div>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="dui-select w-full"
-              >
+              <div className="dui-fieldset-label"><span>{t('agent.customers.priority')}</span></div>
+              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="dui-select w-full">
                 <option value="all">{t('agent.customers.all')}</option>
                 <option value="1">{t('agent.customers.priority1')}</option>
                 <option value="2">{t('agent.customers.priority2')}</option>
@@ -295,14 +297,8 @@ export default function AgentCustomersPage() {
             </div>
 
             <div className="dui-fieldset">
-              <div className="dui-fieldset-label">
-                <span>{t('agent.customers.sort')}</span>
-              </div>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="dui-select w-full"
-              >
+              <div className="dui-fieldset-label"><span>{t('agent.customers.sort')}</span></div>
+              <select value={sort} onChange={(e) => setSort(e.target.value)} className="dui-select w-full">
                 <option value="priority">{t('agent.customers.sortPriority')}</option>
                 <option value="churn">{t('agent.customers.sortChurn')}</option>
                 <option value="name">{t('agent.customers.sortName')}</option>
@@ -338,20 +334,45 @@ export default function AgentCustomersPage() {
         <CustomerSkeleton t={t} />
       ) : (
         <>
-          <CustomerSection
-            t={t}
-            title={t('agent.customers.sectionNeedsVisit')}
-            count={pending.length}
-            customers={pending}
-            visited={false}
-          />
-          <CustomerSection
-            t={t}
-            title={t('agent.customers.sectionVisited')}
-            count={visited.length}
-            customers={visited}
-            visited
-          />
+          <CustomerSection t={t} title={t('agent.customers.sectionNeedsVisit')} count={pending.length} customers={pending} visited={false} />
+          <CustomerSection t={t} title={t('agent.customers.sectionVisited')} count={visited.length} customers={visited} visited />
+
+          {filtered.length > 0 && (
+            <nav className={styles.pagination} aria-label="Customer pagination">
+              <p className={styles.paginationInfo}>
+                Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div className={styles.paginationControls}>
+                <button
+                  type="button"
+                  className={styles.navButton}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={safePage === 1}
+                >
+                  Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                  <button
+                    key={pageNumber}
+                    type="button"
+                    className={`${styles.pageButton} ${pageNumber === safePage ? styles.activePage : ''}`}
+                    onClick={() => setPage(pageNumber)}
+                    aria-current={pageNumber === safePage ? 'page' : undefined}
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={styles.navButton}
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={safePage === totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
+          )}
         </>
       )}
     </div>
@@ -382,10 +403,7 @@ function CustomerSection({
         <ul className="dui-list w-full rounded-box border border-base-300 bg-base-100 shadow-sm">
           {customers.map((customer) => (
             <li key={customer.customer_id}>
-              <Link
-                href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`}
-                className="dui-list-row dui-list-col-grow hover:bg-base-200 transition-colors"
-              >
+              <Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`} className="dui-list-row dui-list-col-grow hover:bg-base-200 transition-colors">
                 <CustomerCardBody t={t} customer={customer} visited={visited} />
               </Link>
             </li>
@@ -395,9 +413,7 @@ function CustomerSection({
         <div className="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-10 text-center">
           <p className="font-semibold text-base-content">{t('agent.customers.emptyTitle')}</p>
           <p className="mt-1 text-sm text-base-content/60">
-            {visited
-              ? t('agent.customers.emptyVisited')
-              : t('agent.customers.emptyPending')}
+            {visited ? t('agent.customers.emptyVisited') : t('agent.customers.emptyPending')}
           </p>
         </div>
       )}
@@ -407,71 +423,46 @@ function CustomerSection({
 
 function CustomerCardBody({ t, customer, visited }: { t: (key: string, params?: Record<string, string | number>) => string; customer: CustomerRow; visited: boolean }) {
   const priority = customer.priority_rank
-  const area =
-    customer.sub_district || customer.district || customer.city || t('agent.customers.areaUnavailable')
+  const area = customer.sub_district || customer.district || customer.city || t('agent.customers.areaUnavailable')
   const churn = daysClass(customer.days_left_to_churn)
   const payment = paymentBadge(customer.payment_status)
   const color =
     priority === 1 ? t('agent.customers.priorityUrgent1')
-    : priority === 2 ? t('agent.customers.priorityUrgent2')
-    : priority === 3 ? t('agent.customers.priorityMedium')
-    : priority === 4 ? t('agent.customers.priorityLow')
-    : t('agent.customers.priorityLowest')
+      : priority === 2 ? t('agent.customers.priorityUrgent2')
+        : priority === 3 ? t('agent.customers.priorityMedium')
+          : priority === 4 ? t('agent.customers.priorityLow')
+            : t('agent.customers.priorityLowest')
 
   return (
     <div className="flex w-full items-center gap-4 py-1">
-      <div
-        className={`dui-avatar dui-avatar-placeholder ${visited ? 'opacity-70' : ''}`}
-        aria-hidden="true"
-      >
-        <div className="w-12 rounded-full bg-primary/10 text-primary font-black text-sm">
-          {initials(customer.customer_name)}
-        </div>
+      <div className={`dui-avatar dui-avatar-placeholder ${visited ? 'opacity-70' : ''}`} aria-hidden="true">
+        <div className="w-12 rounded-full bg-primary/10 text-primary font-black text-sm">{initials(customer.customer_name)}</div>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="dui-badge dui-badge-sm">P{priority ?? '-'}</span>
-          <span className="truncate font-bold text-base-content">
-            {customer.customer_name}
-          </span>
-          {!visited && (
-            <span
-              className={`dui-badge dui-badge-sm ${priority ? PRIORITY_STYLES[priority].badge : ''}`}
-            >
-              {color}
-            </span>
-          )}
+          <span className="truncate font-bold text-base-content">{customer.customer_name}</span>
+          {!visited && <span className={`dui-badge dui-badge-sm ${badgeClass(priority)}`}>{color}</span>}
         </div>
 
-        <p className="mt-0.5 truncate text-sm text-base-content/60">
-          {customer.customer_id} · {area}
-        </p>
+        <p className="mt-0.5 truncate text-sm text-base-content/60">{customer.customer_id} · {area}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="inline-flex items-center gap-1 font-semibold text-base-content">
             <MapPin className="h-3.5 w-3.5 text-base-content/40" aria-hidden="true" />
             Rp{Number(customer.invoice_amount ?? 0).toLocaleString('id-ID')}
           </span>
-
           <span className={`dui-badge dui-badge-sm ${payment.badge}`}>
             {payment.state === 'paid' ? t('agent.customers.paidStatus') : t('agent.customers.unpaidStatus')}
           </span>
-
           <span className={`dui-badge dui-badge-sm ${churn.badge}`}>
-            {churn.overdue
-              ? t('agent.customers.overdue')
-              : churn.days !== null
-                ? t('agent.customers.daysUnit', { days: churn.days })
-                : '-'}
+            {churn.overdue ? t('agent.customers.overdue') : churn.days !== null ? t('agent.customers.daysUnit', { days: churn.days }) : '-'}
           </span>
         </div>
       </div>
 
-      <ChevronRight
-        className={`h-5 w-5 shrink-0 ${visited ? 'text-base-content/30' : 'text-primary/60'}`}
-        aria-hidden="true"
-      />
+      <ChevronRight className={`h-5 w-5 shrink-0 ${visited ? 'text-base-content/30' : 'text-primary/60'}`} aria-hidden="true" />
     </div>
   )
 }
