@@ -126,6 +126,30 @@ export default function PreVisitForm() {
     return { status: 'Direct Visit', reason: null, direct: true }
   }, [form])
 
+  const customerLat = Number(customer?.given_latitude)
+  const customerLng = Number(customer?.given_longitude)
+  const hasCustomerCoordinates =
+    Number.isFinite(customerLat) &&
+    Number.isFinite(customerLng) &&
+    customer?.given_latitude !== null &&
+    customer?.given_latitude !== undefined &&
+    customer?.given_longitude !== null &&
+    customer?.given_longitude !== undefined
+
+  const customerMapQuery = hasCustomerCoordinates
+    ? `${customerLat},${customerLng}`
+    : customer?.service_address?.trim() || ''
+
+  const customerMapEmbedUrl = customerMapQuery
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(customerMapQuery)}&z=16&output=embed`
+    : ''
+
+  const customerNavigationUrl = hasCustomerCoordinates
+    ? `https://www.google.com/maps/dir/?api=1&destination=${customerLat},${customerLng}&travelmode=driving`
+    : customerMapQuery
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customerMapQuery)}`
+      : ''
+
   function setBoolean(field: keyof FormState, value: boolean) {
     setForm((current) => ({ ...current, [field]: value }))
   }
@@ -408,6 +432,43 @@ export default function PreVisitForm() {
                 <button type="button" className={form.direct_visit === false ? styles.selected : ''} onClick={() => setBoolean('direct_visit', false)}>No</button>
               </div>
             </div>
+
+            {form.direct_visit === true && (
+              <div className={styles.directVisitMap}>
+                <div className={styles.mapHeader}>
+                  <div>
+                    <span>Customer location</span>
+                    <strong>{customer?.service_address || 'Address not available'}</strong>
+                  </div>
+                  {hasCustomerCoordinates && (
+                    <small>{customerLat.toFixed(6)}, {customerLng.toFixed(6)}</small>
+                  )}
+                </div>
+
+                {customerMapEmbedUrl ? (
+                  <iframe
+                    title={`Map for ${customer?.customer_name || 'customer'}`}
+                    src={customerMapEmbedUrl}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className={styles.mapUnavailable}>Customer location is not available.</div>
+                )}
+
+                {customerNavigationUrl && (
+                  <a
+                    href={customerNavigationUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.navigateButton}
+                  >
+                    Open in Google Maps
+                  </a>
+                )}
+              </div>
+            )}
           </section>
         )}
 
