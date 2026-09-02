@@ -23,11 +23,36 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-function readCookieTheme(): Theme {
-  if (typeof document === 'undefined') return 'light'
+function readStoredTheme(): Theme | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return isValidTheme(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function readCookieTheme(): Theme | null {
+  if (typeof document === 'undefined') return null
+
   const match = document.cookie.match(/(?:^|;\s*)crl_theme=([^;]+)/)
   const value = match ? decodeURIComponent(match[1]) : null
-  return isValidTheme(value) ? value : 'light'
+  return isValidTheme(value) ? value : null
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute('data-theme', DATA_THEME[theme])
+  document.documentElement.style.colorScheme = theme
+
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {
+    /* ignore storage failures */
+  }
+
+  document.cookie = `${THEME_COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax`
 }
 
 export function ThemeProvider({
@@ -39,35 +64,37 @@ export function ThemeProvider({
 }) {
   const [theme, setThemeState] = useState<Theme>(initialTheme)
 
-  // Apply to the document and mirror to localStorage + cookie. Skip the
-  // refresh: theme is purely cosmetic and does not change server markup.
+  // Reconcile the browser preference once mounted. localStorage wins, then
+  // cookie, then the server-rendered initial theme.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', DATA_THEME[theme])
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme)
-    } catch {
-      /* ignore */
+    const browserTheme = readStoredTheme() ?? readCookieTheme()
+
+    if (browserTheme && browserTheme !== initialTheme) {
+      setThemeState(browserTheme)
+      applyTheme(browserTheme)
+      return
     }
-    document.cookie = `${THEME_COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax`
+
+    applyTheme(initialTheme)
+  }, [initialTheme])
+
+  // Every explicit theme change updates the DOM immediately and persists it.
+  useEffect(() => {
+    applyTheme(theme)
   }, [theme])
 
-  // Reconcile with the stored preference after mount. Deliberately reads
-  // localStorage only now (not during render) to keep server === client.
-  useEffect(() => {
-    let stored: Theme | null = null
-    try {
-      const value = window.localStorage.getItem(THEME_STORAGE_KEY)
-      if (isValidTheme(value)) stored = value
-    } catch {
-      /* ignore */
-    }
-    if (stored && stored !== readCookieTheme() && stored !== theme) {
-      setThemeState(stored)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const setTheme = (next: Theme) => {
+    applyTheme(next)
+    setThemeState(next)
+  }
 
-  const setTheme = (next: Theme) => setThemeState(next)
-  const toggleTheme = () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark'))
+  const toggleTheme = () => {
+    setThemeState((current) => {
+      const next = current === 'dark' ? 'light' : 'dark'
+      applyTheme(next)
+      return next
+    })
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
