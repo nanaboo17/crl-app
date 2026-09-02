@@ -12,6 +12,7 @@ import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { getLocale } from '@/lib/i18n/server'
 import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
+import styles from './page.module.css'
 
 export default async function SuperadminPage() {
   const supabase = await createClient()
@@ -90,7 +91,7 @@ export default async function SuperadminPage() {
   const firstName = agent.agent_name?.trim().split(/\s+/)[0] ?? 'Superadmin'
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={styles.page}>
       <SuperadminPageHeader
         breadcrumbs={[
           {
@@ -109,22 +110,23 @@ export default async function SuperadminPage() {
 
       <section
         aria-label={tl('superadmin.dashboard.statisticsAria')}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className={styles.statsGrid}
       >
         {stats.map(
           ({ href, label, count, icon: Icon, manageKey, manageLabel }) => (
-            <Link
-              key={href}
-              href={href}
-              className="dui-stat grid-cols-1 gap-4 border border-base-300 bg-base-100 transition-colors hover:border-base-content/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
-            >
-              <div className="dui-stat-figure text-base-content/25">
-                <Icon aria-hidden="true" className="h-6 w-6" />
+            <Link key={href} href={href} className={styles.statCard}>
+              <div className={styles.statTop}>
+                <div>
+                  <div className={styles.statLabel}>{label}</div>
+                  <div className={styles.statValue}>{count}</div>
+                </div>
+                <div className={styles.iconBox}>
+                  <Icon aria-hidden="true" className="h-5 w-5" />
+                </div>
               </div>
-              <div className="dui-stat-title">{label}</div>
-              <div className="dui-stat-value text-3xl">{count}</div>
-              <div className="dui-stat-desc">
-                {tl(manageKey, { name: manageLabel })} →
+
+              <div className={styles.statFooter}>
+                {tl(manageKey, { name: manageLabel })}
               </div>
             </Link>
           )
