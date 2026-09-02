@@ -14,11 +14,10 @@ type FormState = {
   customer_available: boolean | null
   willing_to_reschedule: boolean | null
   reschedule_date: string
-  still_want_to_visit: boolean | null
+  direct_visit: boolean | null
   address_confirmed: boolean | null
   confirmed_address: string
   landmark: string
-  address_safe: boolean | null
   wants_appointment: boolean | null
   appointment_date: string
   contact_result: string
@@ -30,11 +29,10 @@ const initialForm: FormState = {
   customer_available: null,
   willing_to_reschedule: null,
   reschedule_date: '',
-  still_want_to_visit: null,
+  direct_visit: null,
   address_confirmed: null,
   confirmed_address: '',
   landmark: '',
-  address_safe: null,
   wants_appointment: null,
   appointment_date: '',
   contact_result: '',
@@ -75,14 +73,22 @@ export default function PreVisitForm() {
   }, [customerId])
 
   const outcome = useMemo(() => {
-    if (form.phone_contacted === null) return { status: 'Pending', reason: null, direct: false }
+    if (form.phone_contacted === null) {
+      return { status: 'Pending', reason: null, direct: false }
+    }
 
     if (form.phone_contacted) {
-      if (form.customer_available === null) return { status: 'Pending', reason: null, direct: false }
+      if (form.customer_available === null) {
+        return { status: 'Pending', reason: null, direct: false }
+      }
 
       if (!form.customer_available) {
-        if (form.willing_to_reschedule === null) return { status: 'Pending', reason: null, direct: false }
-        if (form.willing_to_reschedule) return { status: 'Rescheduled', reason: null, direct: false }
+        if (form.willing_to_reschedule === null) {
+          return { status: 'Pending', reason: null, direct: false }
+        }
+        if (form.willing_to_reschedule) {
+          return { status: 'Rescheduled', reason: null, direct: false }
+        }
         return {
           status: 'Stopped',
           reason: 'Customer unavailable and not willing to reschedule',
@@ -90,12 +96,8 @@ export default function PreVisitForm() {
         }
       }
 
-      if (form.address_confirmed === null || form.address_safe === null) {
+      if (form.address_confirmed === null) {
         return { status: 'Pending', reason: null, direct: false }
-      }
-
-      if (!form.address_safe) {
-        return { status: 'Stopped', reason: 'Unsafe address', direct: false }
       }
 
       if (form.wants_appointment === null) {
@@ -113,16 +115,12 @@ export default function PreVisitForm() {
       return { status: 'Ready for Visit', reason: null, direct: false }
     }
 
-    if (form.still_want_to_visit === null) return { status: 'Pending', reason: null, direct: false }
-
-    if (!form.still_want_to_visit) {
-      return { status: 'Ended', reason: 'No contact and no direct visit', direct: false }
+    if (form.direct_visit === null) {
+      return { status: 'Pending', reason: null, direct: false }
     }
 
-    if (form.address_safe === null) return { status: 'Pending', reason: null, direct: false }
-
-    if (!form.address_safe) {
-      return { status: 'Stopped', reason: 'Unsafe address for direct visit', direct: false }
+    if (!form.direct_visit) {
+      return { status: 'Ended', reason: 'No contact and no direct visit', direct: false }
     }
 
     return { status: 'Direct Visit', reason: null, direct: true }
@@ -138,27 +136,38 @@ export default function PreVisitForm() {
     setError('')
 
     try {
-      if (form.phone_contacted === null) throw new Error('Please confirm whether the phone was contacted.')
+      if (form.phone_contacted === null) {
+        throw new Error('Please confirm whether the phone was contacted.')
+      }
 
       if (form.phone_contacted) {
-        if (form.customer_available === null) throw new Error('Please confirm whether the customer is available.')
+        if (form.customer_available === null) {
+          throw new Error('Please confirm whether the customer is available.')
+        }
 
         if (!form.customer_available) {
-          if (form.willing_to_reschedule === null) throw new Error('Please confirm whether the customer is willing to reschedule.')
-          if (form.willing_to_reschedule && !form.reschedule_date) throw new Error('Please select the reschedule date and time.')
+          if (form.willing_to_reschedule === null) {
+            throw new Error('Please confirm whether the customer is willing to reschedule.')
+          }
+          if (form.willing_to_reschedule && !form.reschedule_date) {
+            throw new Error('Please select the reschedule date and time.')
+          }
         } else {
-          if (form.address_confirmed === null) throw new Error('Please confirm the customer address.')
-          if (!form.address_confirmed && !form.confirmed_address.trim()) throw new Error('Please enter the corrected address.')
-          if (form.address_safe === null) throw new Error('Please confirm whether the address is safe to visit.')
-
-          if (form.address_safe) {
-            if (form.wants_appointment === null) throw new Error('Please confirm whether the customer wants an appointment.')
-            if (form.wants_appointment && !form.appointment_date) throw new Error('Please select the appointment date and time.')
+          if (form.address_confirmed === null) {
+            throw new Error('Please confirm the customer address.')
+          }
+          if (!form.address_confirmed && !form.confirmed_address.trim()) {
+            throw new Error('Please enter the corrected address.')
+          }
+          if (form.wants_appointment === null) {
+            throw new Error('Please confirm whether the customer wants an appointment.')
+          }
+          if (form.wants_appointment && !form.appointment_date) {
+            throw new Error('Please select the appointment date and time.')
           }
         }
-      } else {
-        if (form.still_want_to_visit === null) throw new Error('Please confirm whether you still want to visit the address.')
-        if (form.still_want_to_visit && form.address_safe === null) throw new Error('Please confirm whether the address is safe to visit.')
+      } else if (form.direct_visit === null) {
+        throw new Error('Please confirm whether to visit directly.')
       }
 
       const p = await getCurrentProfile()
@@ -167,7 +176,6 @@ export default function PreVisitForm() {
       const appointmentConfirmed =
         form.phone_contacted === true &&
         form.customer_available === true &&
-        form.address_safe === true &&
         form.wants_appointment === true
 
       const addressConfirmed = form.address_confirmed === true
@@ -190,8 +198,7 @@ export default function PreVisitForm() {
           form.reschedule_date
             ? new Date(form.reschedule_date).toISOString()
             : null,
-        still_want_to_visit:
-          form.phone_contacted === false ? form.still_want_to_visit : null,
+        still_want_to_visit: form.phone_contacted === false ? form.direct_visit : null,
         address_confirmed: addressConfirmed,
         confirmed_address:
           form.phone_contacted && form.customer_available
@@ -200,9 +207,9 @@ export default function PreVisitForm() {
               : form.confirmed_address.trim() || null
             : customer?.service_address || null,
         landmark: form.landmark.trim() || null,
-        address_safe: form.address_safe,
+        address_safe: null,
         wants_appointment:
-          form.phone_contacted && form.customer_available && form.address_safe
+          form.phone_contacted && form.customer_available
             ? form.wants_appointment
             : null,
         appointment_confirmed: appointmentConfirmed,
@@ -256,7 +263,13 @@ export default function PreVisitForm() {
         </section>
 
         <section className={styles.stepCard}>
-          <div className={styles.stepTitle}><span>1</span><div><h2>Contact Customer</h2><p>Try the registered customer phone number.</p></div></div>
+          <div className={styles.stepTitle}>
+            <span>1</span>
+            <div>
+              <h2>Contact Customer</h2>
+              <p>Try the registered customer phone number.</p>
+            </div>
+          </div>
 
           <div className={styles.question}>
             <label>Was the phone contacted?</label>
@@ -275,7 +288,6 @@ export default function PreVisitForm() {
               <option>Customer Unavailable</option>
               <option>Address Mismatch</option>
               <option>Customer Refused Visit</option>
-              <option>Unsafe / Access Restricted</option>
               <option>Account Not Recognized</option>
             </select>
           </div>
@@ -283,7 +295,13 @@ export default function PreVisitForm() {
 
         {form.phone_contacted === true && (
           <section className={styles.stepCard}>
-            <div className={styles.stepTitle}><span>2</span><div><h2>Customer Availability</h2><p>Confirm whether the customer can continue the pre-visit discussion.</p></div></div>
+            <div className={styles.stepTitle}>
+              <span>2</span>
+              <div>
+                <h2>Customer Availability</h2>
+                <p>Confirm whether the customer can continue the pre-visit discussion.</p>
+              </div>
+            </div>
 
             <div className={styles.question}>
               <label>Is the customer available?</label>
@@ -316,7 +334,13 @@ export default function PreVisitForm() {
 
         {form.phone_contacted === true && form.customer_available === true && (
           <section className={styles.stepCard}>
-            <div className={styles.stepTitle}><span>3</span><div><h2>Address & Safety</h2><p>Validate the installation address before the field visit.</p></div></div>
+            <div className={styles.stepTitle}>
+              <span>3</span>
+              <div>
+                <h2>Address</h2>
+                <p>Validate the installation address before the field visit.</p>
+              </div>
+            </div>
 
             <div className={styles.question}>
               <label>Is the address confirmed?</label>
@@ -337,20 +361,18 @@ export default function PreVisitForm() {
               <label>Landmark / access note</label>
               <textarea value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} placeholder="Nearest landmark or access note" />
             </div>
-
-            <div className={styles.question}>
-              <label>Is the address safe to visit?</label>
-              <div className={styles.choiceGrid}>
-                <button type="button" className={form.address_safe === true ? styles.selected : ''} onClick={() => setBoolean('address_safe', true)}>Yes</button>
-                <button type="button" className={form.address_safe === false ? styles.selected : ''} onClick={() => setBoolean('address_safe', false)}>No</button>
-              </div>
-            </div>
           </section>
         )}
 
-        {form.phone_contacted === true && form.customer_available === true && form.address_safe === true && (
+        {form.phone_contacted === true && form.customer_available === true && (
           <section className={styles.stepCard}>
-            <div className={styles.stepTitle}><span>4</span><div><h2>Appointment</h2><p>Confirm whether the customer agrees to a visit schedule.</p></div></div>
+            <div className={styles.stepTitle}>
+              <span>4</span>
+              <div>
+                <h2>Appointment</h2>
+                <p>Confirm whether the customer agrees to a visit schedule.</p>
+              </div>
+            </div>
 
             <div className={styles.question}>
               <label>Does the customer want to make an appointment?</label>
@@ -371,30 +393,32 @@ export default function PreVisitForm() {
 
         {form.phone_contacted === false && (
           <section className={styles.stepCard}>
-            <div className={styles.stepTitle}><span>2</span><div><h2>Direct Visit Decision</h2><p>The phone could not be contacted.</p></div></div>
-
-            <div className={styles.question}>
-              <label>Do you still want to visit the address?</label>
-              <div className={styles.choiceGrid}>
-                <button type="button" className={form.still_want_to_visit === true ? styles.selected : ''} onClick={() => setBoolean('still_want_to_visit', true)}>Yes</button>
-                <button type="button" className={form.still_want_to_visit === false ? styles.selected : ''} onClick={() => setBoolean('still_want_to_visit', false)}>No</button>
+            <div className={styles.stepTitle}>
+              <span>2</span>
+              <div>
+                <h2>Direct Visit Decision</h2>
+                <p>The phone could not be contacted.</p>
               </div>
             </div>
 
-            {form.still_want_to_visit === true && (
-              <div className={styles.question}>
-                <label>Is the address safe to visit?</label>
-                <div className={styles.choiceGrid}>
-                  <button type="button" className={form.address_safe === true ? styles.selected : ''} onClick={() => setBoolean('address_safe', true)}>Yes</button>
-                  <button type="button" className={form.address_safe === false ? styles.selected : ''} onClick={() => setBoolean('address_safe', false)}>No</button>
-                </div>
+            <div className={styles.question}>
+              <label>Visit directly?</label>
+              <div className={styles.choiceGrid}>
+                <button type="button" className={form.direct_visit === true ? styles.selected : ''} onClick={() => setBoolean('direct_visit', true)}>Yes</button>
+                <button type="button" className={form.direct_visit === false ? styles.selected : ''} onClick={() => setBoolean('direct_visit', false)}>No</button>
               </div>
-            )}
+            </div>
           </section>
         )}
 
         <section className={styles.stepCard}>
-          <div className={styles.stepTitle}><span>✓</span><div><h2>Closure</h2><p>The status is calculated automatically from the answers above.</p></div></div>
+          <div className={styles.stepTitle}>
+            <span>✓</span>
+            <div>
+              <h2>Closure</h2>
+              <p>The status is calculated automatically from the answers above.</p>
+            </div>
+          </div>
 
           <div className={styles.statusBox}>
             <span>Pre-Visit status</span>
