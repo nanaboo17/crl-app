@@ -1,0 +1,219 @@
+.page {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+}
+
+.header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.iconWrap {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+}
+
+.iconWrap svg {
+  width: 21px;
+  height: 21px;
+}
+
+.header h1 {
+  margin: 2px 0 4px;
+  font-size: clamp(24px, 5vw, 32px);
+  line-height: 1.1;
+}
+
+.header p {
+  margin: 0;
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 16px;
+  background: var(--color-base-100);
+}
+
+.summary svg {
+  width: 22px;
+  height: 22px;
+  color: var(--color-primary);
+}
+
+.summary div {
+  display: grid;
+  gap: 2px;
+}
+
+.summary span,
+.meta,
+.visitMain span,
+.state span {
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
+.summary strong {
+  font-size: 22px;
+}
+
+.dayGroup {
+  margin-top: 22px;
+}
+
+.dayTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dayTitle svg {
+  width: 17px;
+  height: 17px;
+}
+
+.dayTitle h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.dayTitle span {
+  min-width: 24px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--color-base-300);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.visitCard {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 16px;
+  background: var(--color-base-100);
+  transition: border-color .15s ease, transform .15s ease;
+}
+
+.visitCard:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 35%, var(--color-base-300));
+  transform: translateY(-1px);
+}
+
+.visitMain {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.visitMain > div {
+  display: grid;
+  gap: 2px;
+}
+
+.visitMain strong {
+  font-size: 15px;
+}
+
+.visitMain span {
+  font-size: 11px;
+}
+
+.result {
+  max-width: 48%;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
+  color: var(--color-primary) !important;
+  font-weight: 750;
+  text-align: right;
+}
+
+.meta {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.summaryText {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-base-200);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.openRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.openRow svg {
+  width: 16px;
+  height: 16px;
+}
+
+.state,
+.error {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 150px;
+  padding: 24px;
+  border: 1px dashed var(--color-base-300);
+  border-radius: 16px;
+  background: var(--color-base-100);
+  text-align: center;
+}
+
+.state svg {
+  width: 28px;
+  height: 28px;
+}
+
+.error {
+  min-height: 80px;
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--color-error) 35%, var(--color-base-300));
+  color: var(--color-error);
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding: 32px 24px 96px;
+  }
+}
