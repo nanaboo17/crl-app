@@ -1,0 +1,108 @@
+.page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.statCard {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 16px;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.statCard:hover {
+  border-color: color-mix(in oklab, var(--color-base-content) 28%, var(--color-base-300));
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.07);
+}
+
+.statCard:focus-visible {
+  outline: 2px solid var(--color-base-content);
+  outline-offset: 3px;
+}
+
+.statTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.statLabel {
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.iconBox {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--color-base-200);
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
+.statValue {
+  margin-top: 4px;
+  font-size: clamp(30px, 4vw, 40px);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.statFooter {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-base-300);
+  color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+@media (max-width: 1024px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 18px 14px 32px;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .statCard {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .statValue {
+    font-size: 32px;
+  }
+}
