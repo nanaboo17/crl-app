@@ -1,0 +1,107 @@
+/* Bridge the legacy CRL styles to the DaisyUI theme tokens.
+   This keeps older agent/admin/login screens in sync with the global theme. */
+
+html,
+body {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+
+[data-theme='crl'] {
+  --bg: var(--color-base-200);
+  --surface: var(--color-base-100);
+  --surface-soft: color-mix(in oklab, var(--color-base-100) 72%, var(--color-primary) 8%);
+  --text: var(--color-base-content);
+  --muted: color-mix(in oklab, var(--color-base-content) 58%, transparent);
+  --line: var(--color-base-300);
+  --primary: var(--color-primary);
+  --danger: var(--color-error);
+  --danger-soft: color-mix(in oklab, var(--color-error) 10%, var(--color-base-100));
+  --success-soft: color-mix(in oklab, var(--color-success) 10%, var(--color-base-100));
+}
+
+[data-theme='crl-dark'] {
+  --bg: var(--color-base-200);
+  --surface: var(--color-base-100);
+  --surface-soft: var(--color-base-200);
+  --text: var(--color-base-content);
+  --muted: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  --line: var(--color-base-300);
+  --primary: var(--color-primary);
+  --danger: var(--color-error);
+  --danger-soft: color-mix(in oklab, var(--color-error) 14%, var(--color-base-100));
+  --success-soft: color-mix(in oklab, var(--color-success) 14%, var(--color-base-100));
+}
+
+/* Legacy controls that still use hard-coded light colors. */
+[data-theme='crl-dark'] .icon-btn,
+[data-theme='crl-dark'] .input,
+[data-theme='crl-dark'] select,
+[data-theme='crl-dark'] textarea,
+[data-theme='crl-dark'] .gps-values span {
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  border-color: var(--color-base-300);
+}
+
+[data-theme='crl-dark'] .btn.secondary,
+[data-theme='crl-dark'] .status-pill,
+[data-theme='crl-dark'] .map-embed,
+[data-theme='crl-dark'] .evidence-image {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  border-color: var(--color-base-300);
+}
+
+[data-theme='crl-dark'] .checkbox-row.consent {
+  background: var(--color-base-200);
+  border-color: var(--color-base-300);
+}
+
+[data-theme='crl-dark'] .error-card,
+[data-theme='crl-dark'] .inline-error {
+  background: color-mix(in oklab, var(--color-error) 12%, var(--color-base-100));
+  border-color: color-mix(in oklab, var(--color-error) 40%, var(--color-base-300));
+  color: var(--color-error);
+}
+
+/* Login screen */
+[data-theme='crl'] .auth-shell,
+[data-theme='crl-dark'] .auth-shell {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+
+[data-theme='crl'] .auth-layout,
+[data-theme='crl-dark'] .auth-layout {
+  background: var(--color-base-100);
+  border-color: var(--color-base-300);
+}
+
+[data-theme='crl'] .auth-context {
+  background: color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100));
+  color: var(--color-base-content);
+}
+
+[data-theme='crl-dark'] .auth-context {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+
+[data-theme='crl'] .auth-brand-subtitle,
+[data-theme='crl'] .auth-context-footer,
+[data-theme='crl'] .auth-eyebrow,
+[data-theme='crl-dark'] .auth-brand-subtitle,
+[data-theme='crl-dark'] .auth-context-footer,
+[data-theme='crl-dark'] .auth-eyebrow {
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+}
+
+/* Native form widgets should match the active theme. */
+[data-theme='crl'] {
+  color-scheme: light;
+}
+
+[data-theme='crl-dark'] {
+  color-scheme: dark;
+}
