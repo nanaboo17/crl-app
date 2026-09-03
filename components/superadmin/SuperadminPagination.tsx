@@ -7,7 +7,7 @@ const PAGE_SIZE = 10
 
 /**
  * Server-side pagination bar: URL-driven (?page=N), pure Links — no client JS.
- * daisyUI `join` button group with a compact page list for many pages.
+ * Uses the project's prefixed daisyUI classes and a compact page list.
  */
 export default async function SuperadminPagination({
   page,
@@ -35,65 +35,71 @@ export default async function SuperadminPagination({
   return (
     <nav
       aria-label={t('pagination.label')}
-      className="flex flex-wrap items-center justify-between gap-3"
+      className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p className="text-sm text-base-content/60">
+      <p className="text-center text-sm text-base-content/60 sm:text-left">
         {t('pagination.showing', { from, to, total })}
       </p>
 
-      <div className="join">
-        {current === 1 ? (
-          <span className="btn btn-sm btn-disabled join-item" aria-disabled="true">
-            {t('pagination.previous')}
-          </span>
-        ) : (
-          <Link
-            href={`${basePath}?page=${current - 1}`}
-            className="btn btn-sm join-item"
-            aria-label={t('pagination.previousPage')}
-          >
-            {t('pagination.previous')}
-          </Link>
-        )}
-
-        {items.map((item, index) =>
-          item === '…' ? (
-            <span key={`ellipsis-${index}`} className="btn btn-sm btn-disabled join-item border-none bg-transparent">
-              …
-            </span>
-          ) : item === current ? (
-            <span
-              key={item}
-              aria-current="page"
-              className="btn btn-sm btn-primary join-item"
-            >
-              {item}
+      <div className="flex max-w-full justify-center overflow-x-auto pb-1 sm:justify-end">
+        <div className="dui-join whitespace-nowrap">
+          {current === 1 ? (
+            <span className="dui-btn dui-btn-sm dui-btn-disabled dui-join-item" aria-disabled="true">
+              {t('pagination.previous')}
             </span>
           ) : (
             <Link
-              key={item}
-              href={`${basePath}?page=${item}`}
-              className="btn btn-sm join-item"
-              aria-label={t('pagination.pageAria', { page: item })}
+              href={`${basePath}?page=${current - 1}`}
+              className="dui-btn dui-btn-sm dui-join-item"
+              aria-label={t('pagination.previousPage')}
             >
-              {item}
+              {t('pagination.previous')}
             </Link>
-          )
-        )}
+          )}
 
-        {current === pages ? (
-          <span className="btn btn-sm btn-disabled join-item" aria-disabled="true">
-            {t('pagination.next')}
-          </span>
-        ) : (
-          <Link
-            href={`${basePath}?page=${current + 1}`}
-            className="btn btn-sm join-item"
-            aria-label={t('pagination.nextPage')}
-          >
-            {t('pagination.next')}
-          </Link>
-        )}
+          {items.map((item, index) =>
+            item === '…' ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="dui-btn dui-btn-sm dui-btn-disabled dui-join-item border-none bg-transparent"
+                aria-hidden="true"
+              >
+                …
+              </span>
+            ) : item === current ? (
+              <span
+                key={item}
+                aria-current="page"
+                className="dui-btn dui-btn-sm dui-btn-primary dui-join-item"
+              >
+                {item}
+              </span>
+            ) : (
+              <Link
+                key={item}
+                href={`${basePath}?page=${item}`}
+                className="dui-btn dui-btn-sm dui-join-item"
+                aria-label={t('pagination.pageAria', { page: item })}
+              >
+                {item}
+              </Link>
+            )
+          )}
+
+          {current === pages ? (
+            <span className="dui-btn dui-btn-sm dui-btn-disabled dui-join-item" aria-disabled="true">
+              {t('pagination.next')}
+            </span>
+          ) : (
+            <Link
+              href={`${basePath}?page=${current + 1}`}
+              className="dui-btn dui-btn-sm dui-join-item"
+              aria-label={t('pagination.nextPage')}
+            >
+              {t('pagination.next')}
+            </Link>
+          )}
+        </div>
       </div>
     </nav>
   )
