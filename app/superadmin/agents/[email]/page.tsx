@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+import { AlertCircle, Save, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
+import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import styles from './page.module.css'
 
 const ROLES = ['agent', 'admin', 'superadmin'] as const
 type Role = (typeof ROLES)[number]
@@ -16,11 +19,11 @@ function roleLabelKey(role: Role): string {
 }
 
 export default function EditAgentPage() {
-  const { locale, setLocale, t } = useI18n()
+  const { locale, t } = useI18n()
+  const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const params = useParams()
   const router = useRouter()
   const supabase = createClient()
-
   const email = decodeURIComponent(params.email as string)
 
   const [name, setName] = useState('')
@@ -28,36 +31,53 @@ export default function EditAgentPage() {
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let cancelled = false
+
     async function loadAgent() {
-      const { data } = await supabase
+      setLoading(true)
+      setError('')
+      const { data, error: loadError } = await supabase
         .from('agents')
-        .select('*')
+        .select('agent_name,sales_code,role,active')
         .eq('email', email)
         .single()
 
-      if (data) {
-        setName(data.agent_name)
-        setSalesCode(data.sales_code ?? '')
-        setRole(data.role)
-        setActive(data.active)
+      if (cancelled) return
+      if (loadError || !data) {
+        setError(loadError?.message || tx('Unable to load this account.', 'Akun ini tidak dapat dimuat.'))
+        setLoading(false)
+        return
       }
+
+      setName(data.agent_name || '')
+      setSalesCode(data.sales_code ?? '')
+      setRole(data.role)
+      setActive(data.active)
+      setLoading(false)
     }
 
-    loadAgent()
+    void loadAgent()
+    return () => { cancelled = true }
   }, [email])
 
   async function saveAgent() {
+    if (!name.trim()) {
+      setError(tx('Agent name is required.', 'Nama agen wajib diisi.'))
+      return
+    }
+
     setSaving(true)
     setError('')
 
     const { error: saveError } = await supabase
       .from('agents')
       .update({
-        agent_name: name,
-        sales_code: salesCode,
+        agent_name: name.trim(),
+        sales_code: salesCode.trim() || null,
         role,
         active,
       })
@@ -74,135 +94,82 @@ export default function EditAgentPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-base-200 pb-12">
-      <div className="dui-navbar bg-base-100 border-b border-base-300">
-        <div className="dui-navbar-start">
-          <Link
-            href="/superadmin/agents"
-            className="dui-btn dui-btn-ghost dui-btn-sm"
-            aria-label={t('superadmin.agents.edit.backAria')}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
-          <div className="leading-tight">
-            <div className="font-extrabold tracking-tight" translate="no">CRL Field App</div>
-            <div className="text-xs text-base-content/60">{t('superadmin.agents.edit.subtitle')}</div>
-          </div>
-        </div>
-      </div>
+    <div className={styles.page}>
+      <SuperadminPageHeader
+        breadcrumbs={[
+          { label: t('superadmin.bc.superadmin'), href: '/superadmin' },
+          { label: t('superadmin.bc.agents'), href: '/superadmin/agents' },
+          { label: name || email },
+        ]}
+        title={t('superadmin.agents.edit.title')}
+        description={tx('Update account ownership, access level, and field identity.', 'Perbarui identitas akun, tingkat akses, dan status pengguna lapangan.')}
+      />
 
-      <div className="mx-auto w-full max-w-xl px-4 sm:px-6 pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <span className={styles.eyebrow}>{tx('TEAM PROFILE', 'PROFIL TIM')}</span>
+          <h2>{loading ? tx('Loading account…', 'Memuat akun…') : name || '—'}</h2>
+          <p>{email}</p>
+        </div>
+        <span className={`${styles.heroBadge} ${active ? styles.heroBadgeActive : styles.heroBadgeInactive}`}>
+          <span aria-hidden="true">●</span>
+          {active ? t('superadmin.status.active') : t('superadmin.status.inactive')}
+        </span>
+      </section>
+
+      <section className={styles.formCard}>
+        <div className={styles.formHead}>
+          <div className={styles.formIcon}><UserRound aria-hidden="true" className="h-5 w-5" /></div>
           <div>
-            <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-base-content/50">
-              {t('superadmin.bc.superadmin')}
-            </div>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{t('superadmin.agents.edit.title')}</h1>
-          </div>
-          <span className={`dui-badge dui-badge-lg ${active ? 'dui-badge-success dui-badge-soft' : 'dui-badge-error dui-badge-soft'}`}>
-            {active ? t('superadmin.status.active') : t('superadmin.status.inactive')}
-          </span>
-        </div>
-
-        <div className="dui-fieldset dui-card dui-card-border mt-6 bg-base-100 shadow-sm">
-          <div className="dui-card-body gap-4">
-            <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.emailLabel')}</legend>
-              <input type="email" value={email} disabled className="dui-input w-full dui-input-ghost" />
-            </div>
-
-            <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.nameLabel')}</legend>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="dui-input w-full"
-              />
-            </div>
-
-            <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.salesCodeLabel')}</legend>
-              <input
-                type="text"
-                value={salesCode}
-                onChange={(e) => setSalesCode(e.target.value)}
-                className="dui-input w-full"
-              />
-            </div>
-
-            <div className="dui-fieldset">
-              <legend className="dui-fieldset-legend">{t('superadmin.agents.edit.roleLabel')}</legend>
-              <div className="dui-dropdown dui-dropdown-bottom">
-                <div
-                  tabIndex={0}
-                  role="button"
-                  className="dui-btn dui-btn-outline w-full justify-between"
-                >
-                  {t(roleLabelKey(role))}
-                  <svg className="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                <ul
-                  tabIndex={-1}
-                  className="dui-dropdown-content dui-menu bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm"
-                >
-                  {ROLES.map((option) => (
-                    <li key={option}>
-                      <button
-                        type="button"
-                        className={role === option ? 'dui-menu-active' : ''}
-                        onClick={() => setRole(option)}
-                      >
-                        {t(roleLabelKey(option))}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <label className="flex items-center justify-between gap-3">
-              <span>
-                <strong>{t('superadmin.agents.edit.activeLabel')}</strong>
-                <span className="block text-sm text-base-content/60">{t('superadmin.agents.edit.activeDesc')}</span>
-              </span>
-              <input
-                type="checkbox"
-                className="dui-toggle dui-toggle-primary"
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-              />
-            </label>
-
-            {error && (
-              <div className="dui-alert dui-alert-error" role="alert">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-2">
-              <Link href="/superadmin/agents" className="dui-btn dui-btn-outline">
-                {t('superadmin.agents.edit.cancel')}
-              </Link>
-              <button
-                type="button"
-                className="dui-btn dui-btn-primary"
-                onClick={saveAgent}
-                disabled={saving}
-              >
-                {saving ? t('superadmin.agents.edit.saving') : t('superadmin.agents.edit.save')}
-              </button>
-            </div>
+            <h3>{tx('Account details', 'Detail akun')}</h3>
+            <p>{tx('Changes are applied to this CRL user account.', 'Perubahan akan diterapkan ke akun pengguna CRL ini.')}</p>
           </div>
         </div>
-      </div>
-    </main>
+
+        <div className={styles.formBody}>
+          <div className={styles.fieldGrid}>
+            <div className={styles.field}>
+              <label htmlFor="agent-email">{t('superadmin.agents.edit.emailLabel')}</label>
+              <input id="agent-email" type="email" value={email} disabled className={styles.input} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="agent-name">{t('superadmin.agents.edit.nameLabel')}</label>
+              <input id="agent-name" type="text" value={name} onChange={(e) => setName(e.target.value)} disabled={loading || saving} className={styles.input} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="sales-code">{t('superadmin.agents.edit.salesCodeLabel')}</label>
+              <input id="sales-code" type="text" value={salesCode} onChange={(e) => setSalesCode(e.target.value)} disabled={loading || saving} className={styles.input} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="agent-role">{t('superadmin.agents.edit.roleLabel')}</label>
+              <select id="agent-role" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={loading || saving} className={styles.select}>
+                {ROLES.map((option) => <option key={option} value={option}>{t(roleLabelKey(option))}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <label className={styles.statusRow}>
+            <span>
+              <strong>{t('superadmin.agents.edit.activeLabel')}</strong>
+              <span>{t('superadmin.agents.edit.activeDesc')}</span>
+            </span>
+            <input type="checkbox" className={styles.toggle} checked={active} disabled={loading || saving} onChange={(e) => setActive(e.target.checked)} />
+          </label>
+
+          {error && <div className={styles.error} role="alert"><AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" /><span>{error}</span></div>}
+
+          <div className={styles.actions}>
+            <Link href="/superadmin/agents" className={styles.cancel}>{t('superadmin.agents.edit.cancel')}</Link>
+            <button type="button" className={styles.save} onClick={saveAgent} disabled={saving || loading}>
+              <Save aria-hidden="true" className="h-4 w-4" />
+              {saving ? t('superadmin.agents.edit.saving') : t('superadmin.agents.edit.save')}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
   )
 }
