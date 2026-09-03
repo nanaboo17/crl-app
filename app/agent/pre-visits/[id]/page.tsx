@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarClock, CheckCircle2, ClipboardList, LocateFixed, MapPin, Navigation, StickyNote } from 'lucide-react'
+import { CalendarClock, CheckCircle2, ClipboardList, LocateFixed, MapPin, Navigation, PhoneCall, StickyNote } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { PreVisit, Customer } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -17,9 +17,7 @@ function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) 
   const toRad = (v: number) => (v * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
@@ -29,7 +27,8 @@ function formatDistance(meters: number) {
 }
 
 export default function PreVisitDetailPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const params = useParams<{ id: string }>()
   const id = decodeURIComponent(params.id)
   const [row, setRow] = useState<PreVisit | null>(null)
@@ -62,10 +61,9 @@ export default function PreVisitDetailPage() {
   const customerLng = customer?.given_longitude ?? null
   const hasCoords = customerLat != null && customerLng != null
   const agentLat = latitude != null ? Number(latitude) : null
-  const distance =
-    agentLat != null && longitude != null && hasCoords
-      ? distanceMeters(agentLat, Number(longitude), Number(customerLat), Number(customerLng))
-      : null
+  const distance = agentLat != null && longitude != null && hasCoords
+    ? distanceMeters(agentLat, Number(longitude), Number(customerLat), Number(customerLng))
+    : null
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -105,64 +103,55 @@ export default function PreVisitDetailPage() {
   }
 
   const canStartVisit = row.previsit_status === 'Ready for Visit' || row.previsit_status === 'Direct Visit'
+  const addressValue = row.confirmed_address || customer?.service_address || '—'
 
   return (
     <main className={styles.page}>
       <PageTop title={t('agent.preVisitDetail.titleDetail')} back />
 
       <section className={styles.heroCard}>
-        <div>
+        <div className={styles.heroCopy}>
+          <span>{tx('PRE-VISIT RECORD', 'CATATAN PRA-KUNJUNGAN')}</span>
           <h1 className={styles.heroName}>{customer?.customer_name || row.customer_id}</h1>
-          <div className={styles.heroMeta}>{row.previsit_id} · {row.customer_id}</div>
+          <p className={styles.heroMeta}>{row.previsit_id} · {row.customer_id}</p>
         </div>
         <span className={styles.status}>{row.previsit_status}</span>
       </section>
 
+      <section className={styles.summaryGrid}>
+        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><PhoneCall /><div><span>{t('agent.preVisitDetail.contactConfirmed')}</span><strong>{row.contact_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div></article>
+        <article className={`${styles.summaryCard} ${styles.toneGreen}`}><MapPin /><div><span>{t('agent.preVisitDetail.addressConfirmed')}</span><strong>{row.address_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div></article>
+        <article className={`${styles.summaryCard} ${styles.toneBlue}`}><CalendarClock /><div><span>{t('agent.preVisitDetail.appointment')}</span><strong>{dateTime(row.appointment_date)}</strong></div></article>
+      </section>
+
       <div className={styles.grid}>
         <section className={styles.detailCard}>
-          <h2 className={styles.sectionTitle}><ClipboardList size={18} /> {t('agent.preVisitDetail.title')}</h2>
+          <div className={styles.sectionTitle}><ClipboardList /><div><span>{tx('CONFIRMATION', 'KONFIRMASI')}</span><h2>{t('agent.preVisitDetail.title')}</h2></div></div>
           <div className={styles.detailGrid}>
-            <div className={styles.detailItem}><span>{t('agent.preVisitDetail.contactConfirmed')}</span><strong>{row.contact_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div>
-            <div className={styles.detailItem}><span>{t('agent.preVisitDetail.addressConfirmed')}</span><strong>{row.address_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div>
-            <div className={styles.detailItem}><span>{t('agent.preVisitDetail.appointment')}</span><strong>{dateTime(row.appointment_date)}</strong></div>
             <div className={styles.detailItem}><span>{t('agent.preVisitDetail.contactResult')}</span><strong>{row.contact_result || '—'}</strong></div>
+            <div className={styles.detailItem}><span>{t('agent.preVisitDetail.appointment')}</span><strong>{dateTime(row.appointment_date)}</strong></div>
           </div>
-          <div className={styles.block}>
-            <span>{t('agent.preVisitDetail.addressLandmark')}</span>
-            <p>{row.confirmed_address || customer?.service_address || '—'}{row.landmark ? ` · ${row.landmark}` : ''}</p>
-          </div>
+          <div className={styles.block}><span>{t('agent.preVisitDetail.addressLandmark')}</span><p>{addressValue}{row.landmark ? ` · ${row.landmark}` : ''}</p></div>
         </section>
 
         <section className={styles.detailCard}>
-          <h2 className={styles.sectionTitle}><StickyNote size={18} /> {t('agent.preVisitDetail.notes')}</h2>
-          <div className={styles.block}>
-            <span>{t('agent.preVisitDetail.notes')}</span>
-            <p>{row.previsit_notes || '—'}</p>
-          </div>
-          <div className={styles.block}>
-            <span>{t('agent.preVisitDetail.appointment')}</span>
-            <p><CalendarClock size={14} style={{ display: 'inline', marginRight: 6 }} />{dateTime(row.appointment_date)}</p>
-          </div>
+          <div className={styles.sectionTitle}><StickyNote /><div><span>{tx('FIELD NOTES', 'CATATAN LAPANGAN')}</span><h2>{t('agent.preVisitDetail.notes')}</h2></div></div>
+          <div className={styles.notesBox}>{row.previsit_notes || '—'}</div>
+          <div className={styles.block}><span>{t('agent.preVisitDetail.appointment')}</span><p><CalendarClock size={14} /> {dateTime(row.appointment_date)}</p></div>
         </section>
       </div>
 
       <section className={styles.routeCard}>
         <div className={styles.routeHeader}>
-          <div>
-            <h2>{t('agent.preVisitDetail.routeTitle')}</h2>
-            <p>{hasCoords ? t('agent.preVisitDetail.routeHint') : t('agent.preVisitDetail.noCoordinates')}</p>
-          </div>
-          <MapPin size={20} />
+          <div><span>{tx('ROUTE CHECK', 'CEK RUTE')}</span><h2>{t('agent.preVisitDetail.routeTitle')}</h2><p>{hasCoords ? t('agent.preVisitDetail.routeHint') : t('agent.preVisitDetail.noCoordinates')}</p></div>
+          <div className={styles.routeIcon}><MapPin /></div>
         </div>
 
         {hasCoords ? (
           <>
-            <div className={styles.map}>
-              <iframe title={t('agent.preVisitDetail.mapTitle')} src={`https://maps.google.com/maps?q=${customerLat},${customerLng}&z=15&output=embed`} loading="lazy" />
-            </div>
-
+            <div className={styles.map}><iframe title={t('agent.preVisitDetail.mapTitle')} src={`https://maps.google.com/maps?q=${customerLat},${customerLng}&z=15&output=embed`} loading="lazy" /></div>
             <div className={styles.locationBar}>
-              <div className={styles.locationIcon}><LocateFixed size={18} /></div>
+              <div className={styles.locationIcon}><LocateFixed /></div>
               <div className={styles.locationCopy}>
                 <span>{t('agent.preVisitDetail.customerLocation')}</span>
                 <strong>{customer?.service_address || row.confirmed_address || '—'}</strong>
@@ -175,24 +164,18 @@ export default function PreVisitDetailPage() {
                   </div>
                 )}
               </div>
-              <button type="button" className={styles.gpsButton} onClick={captureLocation} disabled={gettingGps}>
-                {gettingGps ? t('agent.preVisitDetail.gettingLocation') : t('agent.preVisitDetail.useMyLocation')}
-              </button>
+              <button type="button" className={styles.gpsButton} onClick={captureLocation} disabled={gettingGps}>{gettingGps ? t('agent.preVisitDetail.gettingLocation') : t('agent.preVisitDetail.useMyLocation')}</button>
             </div>
-
             {gpsError && <div className={styles.error}>{gpsError}</div>}
-            <button type="button" className={styles.directionButton} onClick={openDirections}><Navigation size={16} /> {t('agent.preVisitDetail.visitDirectly')}</button>
+            <button type="button" className={styles.directionButton} onClick={openDirections}><Navigation /> {t('agent.preVisitDetail.visitDirectly')}</button>
           </>
-        ) : (
-          <div className={styles.emptyMap}>{t('agent.preVisitDetail.noCoordinates')}</div>
-        )}
+        ) : <div className={styles.emptyMap}>{t('agent.preVisitDetail.noCoordinates')}</div>}
       </section>
 
       {canStartVisit && (
         <section className={styles.actionCard}>
-          <Link className={styles.startButton} href={`/agent/customers/${encodeURIComponent(row.customer_id)}/visit`}>
-            <CheckCircle2 size={17} /> {t('agent.preVisitDetail.startVisit')}
-          </Link>
+          <div><span>{tx('READY TO CONTINUE', 'SIAP MELANJUTKAN')}</span><strong>{tx('Start the customer visit from this pre-visit record.', 'Mulai kunjungan pelanggan dari catatan pra-kunjungan ini.')}</strong></div>
+          <Link className={styles.startButton} href={`/agent/customers/${encodeURIComponent(row.customer_id)}/visit`}><CheckCircle2 /> {t('agent.preVisitDetail.startVisit')}</Link>
         </section>
       )}
     </main>
