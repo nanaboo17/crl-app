@@ -247,7 +247,6 @@ export default function PreVisitForm() {
               : form.confirmed_address.trim() || null
             : customer?.service_address || null,
         landmark: form.landmark.trim() || null,
-        address_safe: null,
         wants_appointment:
           form.phone_contacted && form.customer_available
             ? form.wants_appointment
