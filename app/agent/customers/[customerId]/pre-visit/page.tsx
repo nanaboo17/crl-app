@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import PreVisitForm from '@/app/agent/pre-visits/new/PreVisitForm'
 
 export default async function CustomerPreVisitPage({
   params,
@@ -7,9 +7,5 @@ export default async function CustomerPreVisitPage({
 }) {
   const { customerId } = await params
 
-  redirect(
-    `/agent/pre-visits/new?customer=${encodeURIComponent(
-      decodeURIComponent(customerId)
-    )}`
-  )
+  return <PreVisitForm customerId={decodeURIComponent(customerId)} />
 }
