@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Building2, MapPinned, Plus, RefreshCw, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
+import styles from './TerritoryManager.module.css'
 
 type Agent = { email: string; agent_name: string; sales_code: string | null }
 type Territory = { territory_id: string; territory_code: string; territory_name: string; description: string | null; agent_email: string | null; active: boolean }
@@ -53,11 +54,7 @@ export default function TerritoryManager() {
     e.preventDefault()
     if (!territoryForm.code.trim() || !territoryForm.name.trim()) return
     setSaving(true); setError('')
-    const { error } = await supabase.from('territories').insert({
-      territory_code: territoryForm.code.trim(),
-      territory_name: territoryForm.name.trim(),
-      description: territoryForm.description.trim() || null,
-    })
+    const { error } = await supabase.from('territories').insert({ territory_code: territoryForm.code.trim(), territory_name: territoryForm.name.trim(), description: territoryForm.description.trim() || null })
     if (error) setError(error.message)
     else { setTerritoryForm({ code: '', name: '', description: '' }); await load() }
     setSaving(false)
@@ -84,11 +81,7 @@ export default function TerritoryManager() {
     e.preventDefault()
     if (!homepassForm.territoryId || !homepassForm.customerId) return
     setSaving(true); setError('')
-    const { error } = await supabase.rpc('set_homepass_territory', {
-      p_customer_id: homepassForm.customerId,
-      p_territory_id: homepassForm.territoryId,
-      p_site_id: homepassForm.siteId || null,
-    })
+    const { error } = await supabase.rpc('set_homepass_territory', { p_customer_id: homepassForm.customerId, p_territory_id: homepassForm.territoryId, p_site_id: homepassForm.siteId || null })
     if (error) setError(error.message)
     else { setHomepassForm({ territoryId: homepassForm.territoryId, siteId: homepassForm.siteId, customerId: '' }); await load() }
     setSaving(false)
@@ -101,87 +94,67 @@ export default function TerritoryManager() {
     setSaving(false)
   }
 
-  if (loading) return <div className="dui-skeleton h-40 w-full rounded-box" />
+  if (loading) return <div className={styles.loading} />
 
   return (
-    <div className="space-y-6">
-      {error && <div className="dui-alert dui-alert-error"><span>{error}</span></div>}
+    <div className={styles.manager}>
+      {error && <div className={styles.alert}>{error}</div>}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <form onSubmit={createTerritory} className="dui-card border border-base-300 bg-base-100 shadow-sm">
-          <div className="dui-card-body gap-3">
-            <h2 className="dui-card-title text-base"><MapPinned className="h-5 w-5" /> Create Territory</h2>
-            <input className="dui-input w-full" placeholder="Territory code (T01)" value={territoryForm.code} onChange={(e) => setTerritoryForm({ ...territoryForm, code: e.target.value })} />
-            <input className="dui-input w-full" placeholder="Territory name" value={territoryForm.name} onChange={(e) => setTerritoryForm({ ...territoryForm, name: e.target.value })} />
-            <textarea className="dui-textarea w-full" placeholder="Description (optional)" value={territoryForm.description} onChange={(e) => setTerritoryForm({ ...territoryForm, description: e.target.value })} />
-            <button disabled={saving} className="dui-btn dui-btn-primary"><Plus className="h-4 w-4" /> Add Territory</button>
-          </div>
+      <div className={styles.formGrid}>
+        <form onSubmit={createTerritory} className={styles.formCard}>
+          <div className={styles.formHead}><span className={styles.formHeadIcon}><MapPinned className="h-5 w-5" /></span>Create Territory</div>
+          <label className={styles.field}><span className={styles.label}>Territory code</span><input className={styles.input} placeholder="T01" value={territoryForm.code} onChange={(e) => setTerritoryForm({ ...territoryForm, code: e.target.value })} /></label>
+          <label className={styles.field}><span className={styles.label}>Territory name</span><input className={styles.input} value={territoryForm.name} onChange={(e) => setTerritoryForm({ ...territoryForm, name: e.target.value })} /></label>
+          <label className={styles.field}><span className={styles.label}>Description</span><textarea className={styles.textarea} placeholder="Optional" value={territoryForm.description} onChange={(e) => setTerritoryForm({ ...territoryForm, description: e.target.value })} /></label>
+          <button disabled={saving} className={styles.primaryButton}><Plus className="h-4 w-4" />Add Territory</button>
         </form>
 
-        <form onSubmit={createSite} className="dui-card border border-base-300 bg-base-100 shadow-sm">
-          <div className="dui-card-body gap-3">
-            <h2 className="dui-card-title text-base"><Building2 className="h-5 w-5" /> Add Site to Territory</h2>
-            <select className="dui-select w-full" value={siteForm.territoryId} onChange={(e) => setSiteForm({ ...siteForm, territoryId: e.target.value })}>
-              <option value="">Select territory</option>{territories.map((t) => <option key={t.territory_id} value={t.territory_id}>{t.territory_code} · {t.territory_name}</option>)}
-            </select>
-            <input className="dui-input w-full" placeholder="Site code" value={siteForm.code} onChange={(e) => setSiteForm({ ...siteForm, code: e.target.value })} />
-            <input className="dui-input w-full" placeholder="Site name" value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} />
-            <button disabled={saving} className="dui-btn dui-btn-secondary"><Plus className="h-4 w-4" /> Add Site</button>
-          </div>
+        <form onSubmit={createSite} className={styles.formCard}>
+          <div className={styles.formHead}><span className={styles.formHeadIcon}><Building2 className="h-5 w-5" /></span>Add Site</div>
+          <label className={styles.field}><span className={styles.label}>Territory</span><select className={styles.select} value={siteForm.territoryId} onChange={(e) => setSiteForm({ ...siteForm, territoryId: e.target.value })}><option value="">Select territory</option>{territories.map((t) => <option key={t.territory_id} value={t.territory_id}>{t.territory_code} · {t.territory_name}</option>)}</select></label>
+          <label className={styles.field}><span className={styles.label}>Site code</span><input className={styles.input} value={siteForm.code} onChange={(e) => setSiteForm({ ...siteForm, code: e.target.value })} /></label>
+          <label className={styles.field}><span className={styles.label}>Site name</span><input className={styles.input} value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} /></label>
+          <button disabled={saving} className={styles.secondaryButton}><Plus className="h-4 w-4" />Add Site</button>
         </form>
 
-        <form onSubmit={assignHomepass} className="dui-card border border-base-300 bg-base-100 shadow-sm">
-          <div className="dui-card-body gap-3">
-            <h2 className="dui-card-title text-base"><Building2 className="h-5 w-5" /> Map Homepass</h2>
-            <select className="dui-select w-full" value={homepassForm.territoryId} onChange={(e) => setHomepassForm({ territoryId: e.target.value, siteId: '', customerId: '' })}>
-              <option value="">Select territory</option>{territories.map((t) => <option key={t.territory_id} value={t.territory_id}>{t.territory_code} · {t.territory_name}</option>)}
-            </select>
-            <select className="dui-select w-full" value={homepassForm.siteId} onChange={(e) => setHomepassForm({ ...homepassForm, siteId: e.target.value })}>
-              <option value="">No site / territory level</option>{siteOptions.map((s) => <option key={s.site_id} value={s.site_id}>{s.site_code} · {s.site_name}</option>)}
-            </select>
-            <select className="dui-select w-full" value={homepassForm.customerId} onChange={(e) => setHomepassForm({ ...homepassForm, customerId: e.target.value })}>
-              <option value="">Select homepass/customer</option>{customers.filter((c) => !mappedCustomerIds.has(c.customer_id)).map((c) => <option key={c.customer_id} value={c.customer_id}>{c.customer_id} · {c.customer_name}</option>)}
-            </select>
-            <button disabled={saving} className="dui-btn dui-btn-accent"><Plus className="h-4 w-4" /> Assign Homepass</button>
-          </div>
+        <form onSubmit={assignHomepass} className={styles.formCard}>
+          <div className={styles.formHead}><span className={styles.formHeadIcon}><Building2 className="h-5 w-5" /></span>Map Homepass</div>
+          <label className={styles.field}><span className={styles.label}>Territory</span><select className={styles.select} value={homepassForm.territoryId} onChange={(e) => setHomepassForm({ territoryId: e.target.value, siteId: '', customerId: '' })}><option value="">Select territory</option>{territories.map((t) => <option key={t.territory_id} value={t.territory_id}>{t.territory_code} · {t.territory_name}</option>)}</select></label>
+          <label className={styles.field}><span className={styles.label}>Site</span><select className={styles.select} value={homepassForm.siteId} onChange={(e) => setHomepassForm({ ...homepassForm, siteId: e.target.value })}><option value="">No site / territory level</option>{siteOptions.map((s) => <option key={s.site_id} value={s.site_id}>{s.site_code} · {s.site_name}</option>)}</select></label>
+          <label className={styles.field}><span className={styles.label}>Customer</span><select className={styles.select} value={homepassForm.customerId} onChange={(e) => setHomepassForm({ ...homepassForm, customerId: e.target.value })}><option value="">Select homepass/customer</option>{customers.filter((c) => !mappedCustomerIds.has(c.customer_id)).map((c) => <option key={c.customer_id} value={c.customer_id}>{c.customer_id} · {c.customer_name}</option>)}</select></label>
+          <button disabled={saving} className={styles.accentButton}><Plus className="h-4 w-4" />Assign Homepass</button>
         </form>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold">Territories</h2><p className="text-sm text-base-content/60">Assign one field agent to a territory; all mapped homepasses inherit that agent and AE name.</p></div>
-        <button type="button" onClick={() => void load()} className="dui-btn dui-btn-ghost dui-btn-sm"><RefreshCw className="h-4 w-4" /> Refresh</button>
+      <div className={styles.listHead}>
+        <div><h2>Territories</h2><p>Assign one field agent to a territory; mapped homepasses inherit that agent and AE name.</p></div>
+        <button type="button" onClick={() => void load()} className={styles.refreshButton}><RefreshCw className="h-4 w-4" />Refresh</button>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className={styles.territoryGrid}>
         {territories.map((territory) => {
           const territorySites = sites.filter((s) => s.territory_id === territory.territory_id)
           const territoryHomepasses = homepasses.filter((h) => h.territory_id === territory.territory_id)
           const assignedAgent = agents.find((a) => a.email.toLowerCase() === territory.agent_email?.toLowerCase())
-          return <section key={territory.territory_id} className="dui-card border border-base-300 bg-base-100 shadow-sm">
-            <div className="dui-card-body gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div><div className="dui-badge dui-badge-primary dui-badge-outline">{territory.territory_code}</div><h3 className="mt-2 text-lg font-bold">{territory.territory_name}</h3><p className="text-sm text-base-content/60">{territory.description || 'No description'}</p></div>
-                <div className="text-right text-sm"><strong>{territorySites.length}</strong> sites · <strong>{territoryHomepasses.length}</strong> homepasses</div>
+          return (
+            <section key={territory.territory_id} className={styles.territoryCard}>
+              <div className={styles.cardTop}>
+                <div><span className={styles.codeBadge}>{territory.territory_code}</span><h3 className={styles.territoryName}>{territory.territory_name}</h3><p className={styles.description}>{territory.description || 'No description'}</p></div>
+                <div className={styles.metrics}><strong>{territorySites.length}</strong> sites · <strong>{territoryHomepasses.length}</strong> homepasses</div>
               </div>
 
-              <label className="dui-fieldset"><span className="dui-fieldset-label"><UserRound className="h-4 w-4" /> Assigned agent</span>
-                <select className="dui-select w-full" disabled={saving} value={territory.agent_email || ''} onChange={(e) => void assignAgent(territory.territory_id, e.target.value)}>
-                  <option value="">Unassigned</option>{agents.map((a) => <option key={a.email} value={a.email}>{a.agent_name} · {a.sales_code || a.email}</option>)}
-                </select>
-              </label>
-              {assignedAgent && <p className="text-xs text-base-content/60">AE name synced as <strong>{assignedAgent.agent_name}</strong> for every homepass in this territory.</p>}
+              <label className={styles.field}><span className={styles.label}><UserRound className="inline h-4 w-4" /> Assigned agent</span><select className={styles.select} disabled={saving} value={territory.agent_email || ''} onChange={(e) => void assignAgent(territory.territory_id, e.target.value)}><option value="">Unassigned</option>{agents.map((a) => <option key={a.email} value={a.email}>{a.agent_name} · {a.sales_code || a.email}</option>)}</select></label>
+              {assignedAgent && <p className={styles.agentNote}>AE name synced as <strong>{assignedAgent.agent_name}</strong> for every homepass in this territory.</p>}
 
-              <div><h4 className="mb-2 text-sm font-bold">Sites</h4><div className="flex flex-wrap gap-2">{territorySites.length ? territorySites.map((s) => <span key={s.site_id} className="dui-badge dui-badge-ghost">{s.site_code} · {s.site_name}</span>) : <span className="text-sm text-base-content/50">No sites yet.</span>}</div></div>
+              <div><h4 className={styles.sectionTitle}>Sites</h4><div className={styles.siteList}>{territorySites.length ? territorySites.map((s) => <span key={s.site_id} className={styles.siteBadge}>{s.site_code} · {s.site_name}</span>) : <span className={styles.emptyText}>No sites yet.</span>}</div></div>
 
-              <div><h4 className="mb-2 text-sm font-bold">Homepasses</h4><div className="max-h-64 overflow-auto rounded-box border border-base-200">
-                {territoryHomepasses.length ? territoryHomepasses.map((h) => {
-                  const c = customers.find((row) => row.customer_id === h.customer_id)
-                  const s = sites.find((row) => row.site_id === h.site_id)
-                  return <div key={h.customer_id} className="flex items-center justify-between gap-3 border-b border-base-200 p-3 last:border-0"><div className="min-w-0"><strong className="block truncate text-sm">{c?.customer_name || h.customer_id}</strong><span className="block truncate text-xs text-base-content/55">{h.customer_id}{s ? ` · ${s.site_code}` : ''} · {c?.sub_district || c?.district || c?.city || '-'}</span></div><button type="button" className="dui-btn dui-btn-ghost dui-btn-xs" disabled={saving} onClick={() => void removeHomepass(h.customer_id)}>Remove</button></div>
-                }) : <div className="p-4 text-sm text-base-content/50">No homepasses mapped.</div>}
-              </div></div>
-            </div>
-          </section>
+              <div><h4 className={styles.sectionTitle}>Homepasses</h4><div className={styles.homepassList}>{territoryHomepasses.length ? territoryHomepasses.map((h) => {
+                const c = customers.find((row) => row.customer_id === h.customer_id)
+                const s = sites.find((row) => row.site_id === h.site_id)
+                return <div key={h.customer_id} className={styles.homepassRow}><div className={styles.homepassMain}><strong>{c?.customer_name || h.customer_id}</strong><span>{h.customer_id}{s ? ` · ${s.site_code}` : ''} · {c?.sub_district || c?.district || c?.city || '-'}</span></div><button type="button" className={styles.removeButton} disabled={saving} onClick={() => void removeHomepass(h.customer_id)}>Remove</button></div>
+              }) : <div className={styles.emptyText} style={{ padding: '1rem' }}>No homepasses mapped.</div>}</div></div>
+            </section>
+          )
         })}
       </div>
     </div>
