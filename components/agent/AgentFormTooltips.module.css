@@ -1,0 +1,51 @@
+.tipTarget {
+  position: relative;
+}
+
+.tipTarget::after {
+  content: attr(data-form-tip);
+  position: absolute;
+  z-index: 80;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--color-base-content);
+  color: var(--color-base-100);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.18);
+}
+
+.tipTarget:hover::after,
+.tipTarget:focus::after,
+.tipTarget:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 640px) {
+  .tipTarget::after {
+    left: 0;
+    bottom: auto;
+    top: calc(100% + 8px);
+    width: min(280px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    transform: translateY(-2px);
+  }
+
+  .tipTarget:hover::after,
+  .tipTarget:focus::after,
+  .tipTarget:focus-visible::after {
+    transform: translateY(0);
+  }
+}
