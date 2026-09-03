@@ -18,6 +18,7 @@ import { getLocale } from '@/lib/i18n/server'
 import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import styles from './page.module.css'
+import mode from './dashboard-mode.module.css'
 
 function startOfTodayWib() {
   const now = new Date()
@@ -39,8 +40,7 @@ export default async function SuperadminPage() {
   const supabase = await createClient()
   const locale = await getLocale()
   const isId = locale === 'id'
-  const tl = (key: string, params?: Record<string, string | number>) =>
-    translate(locale, allMessages, key, params)
+  const tl = (key: string, params?: Record<string, string | number>) => translate(locale, allMessages, key, params)
   const tx = (en: string, id: string) => (isId ? id : en)
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -72,7 +72,7 @@ export default async function SuperadminPage() {
     supabase.from('pre_visits').select('*', { count: 'exact', head: true }),
     supabase.from('visits').select('*', { count: 'exact', head: true }),
     supabase.from('agents').select('email,agent_name').eq('active', true).eq('role', 'agent').order('agent_name').limit(5),
-    supabase.from('visits').select('agent_email,visit_date').gte('visit_date', todayStart),
+    supabase.from('visits').select('agent_email,visit_date,location_match').gte('visit_date', todayStart),
     supabase.from('pre_visits').select('agent_email,contact_attempt_date,previsit_status').gte('contact_attempt_date', todayStart),
     supabase.from('agent_attendance').select('agent_email,check_in_status').eq('attendance_date', todayStart.slice(0, 10)),
     supabase.from('visits').select('visit_id,agent_email,customer_id,visit_date').order('visit_date', { ascending: false }).limit(4),
@@ -104,6 +104,8 @@ export default async function SuperadminPage() {
   const pendingReview = todayPreVisits.filter((item) => item.previsit_status === 'Supervisor Review').length
   const lateAttendance = attendance.filter((item) => item.check_in_status === 'late').length
   const attendanceMissing = Math.max(0, activeAgents.length - attendance.length)
+  const checkedInAgents = new Set(attendance.map((item) => item.agent_email)).size
+  const gpsMismatchToday = todayVisits.filter((item) => item.location_match === false).length
 
   const stats = [
     { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), count: agentsResult.count ?? 0, icon: Users, tone: 'purple' },
@@ -143,14 +145,14 @@ export default async function SuperadminPage() {
   const firstName = agent.agent_name?.trim().split(/\s+/)[0] ?? 'Superadmin'
 
   return (
-    <div className={styles.page}>
-      <section className={styles.hero}>
+    <div className={`${styles.page} ${mode.themeRoot}`}>
+      <section className={`${styles.hero} ${mode.themeCard}`}>
         <div className={styles.heroCopy}>
           <div className={styles.heroEyebrow}>{tx('FIELD PERFORMANCE', 'PERFORMA LAPANGAN')}</div>
           <h1>{tx(`Hi, ${firstName}!`, `Hai, ${firstName}!`)} <span aria-hidden="true">👋</span></h1>
           <p>{tx("Here's what's happening in your territory today.", 'Ini yang sedang terjadi di teritori Anda hari ini.')}</p>
 
-          <div className={styles.progressCard}>
+          <div className={`${styles.progressCard} ${mode.themeCard}`}>
             <div className={styles.progressIcon}><ShieldCheck aria-hidden="true" /></div>
             <div className={styles.progressBody}>
               <div className={styles.progressHead}>
@@ -184,9 +186,32 @@ export default async function SuperadminPage() {
         </div>
       </section>
 
-      <section aria-label={tl('superadmin.dashboard.statisticsAria')} className={styles.statsGrid}>
+      <section className={`${mode.fieldOnly} ${mode.fieldGrid}`} aria-label={tx('Live field operations', 'Operasional lapangan langsung')}>
+        <Link href="/superadmin/agents" className={mode.fieldCard}>
+          <span>{tx('Checked-in agents', 'Agen sudah check-in')}</span>
+          <strong>{checkedInAgents}</strong>
+          <small>{tx('of active field agents today', 'dari agen lapangan aktif hari ini')}</small>
+        </Link>
+        <Link href="/superadmin/visits" className={mode.fieldCard}>
+          <span>{tx('Visits today', 'Kunjungan hari ini')}</span>
+          <strong>{todayVisits.length}</strong>
+          <small>{tx('live field activity', 'aktivitas lapangan langsung')}</small>
+        </Link>
+        <Link href="/superadmin/visits" className={mode.fieldCard}>
+          <span>{tx('GPS mismatches', 'GPS tidak sesuai')}</span>
+          <strong>{gpsMismatchToday}</strong>
+          <small>{tx('needs validation', 'perlu validasi')}</small>
+        </Link>
+        <Link href="/superadmin/pre-visits" className={mode.fieldCard}>
+          <span>{tx('Supervisor review', 'Tinjauan supervisor')}</span>
+          <strong>{pendingReview}</strong>
+          <small>{tx('pre-visits waiting today', 'pra-kunjungan menunggu hari ini')}</small>
+        </Link>
+      </section>
+
+      <section aria-label={tl('superadmin.dashboard.statisticsAria')} className={`${styles.statsGrid} ${mode.generalOnly}`}>
         {stats.map(({ href, label, count, icon: Icon, tone }) => (
-          <Link key={href} href={href} className={`${styles.statCard} ${styles[`tone_${tone}`]}`}>
+          <Link key={href} href={href} className={`${styles.statCard} ${styles[`tone_${tone}`]} ${mode.themeCard}`}>
             <div className={styles.statIcon}><Icon aria-hidden="true" /></div>
             <strong>{count.toLocaleString('id-ID')}</strong>
             <span>{label}</span>
@@ -195,11 +220,11 @@ export default async function SuperadminPage() {
         ))}
       </section>
 
-      <section className={styles.block}>
+      <section className={`${styles.block} ${mode.themeCard} ${mode.generalOnly}`}>
         <div className={styles.sectionHead}><h2>{tx('Quick Access', 'Akses Cepat')}</h2></div>
         <div className={styles.quickGrid}>
           {quickAccess.map(({ href, title, icon: Icon, tone }) => (
-            <Link key={href} href={href} className={`${styles.quickCard} ${styles[`tone_${tone}`]}`}>
+            <Link key={href} href={href} className={`${styles.quickCard} ${styles[`tone_${tone}`]} ${mode.themeCard}`}>
               <div className={styles.quickIcon}><Icon aria-hidden="true" /></div>
               <strong>{title}</strong>
               <ChevronRight aria-hidden="true" className={styles.quickArrow} />
@@ -209,7 +234,7 @@ export default async function SuperadminPage() {
       </section>
 
       <section className={styles.lowerGrid}>
-        <div className={styles.panel}>
+        <div className={`${styles.panel} ${mode.themeCard}`}>
           <div className={styles.sectionHead}>
             <h2>{tx('Agent Activity (Today)', 'Aktivitas Agen (Hari Ini)')}</h2>
             <Link href="/superadmin/agents">{tx('View all', 'Lihat semua')}</Link>
@@ -234,7 +259,7 @@ export default async function SuperadminPage() {
         </div>
 
         <div className={styles.sideStack}>
-          <div className={styles.panel}>
+          <div className={`${styles.panel} ${mode.themeCard}`}>
             <div className={styles.sectionHead}><h2>{tx('Pending Tasks', 'Tugas Tertunda')}</h2></div>
             <div className={styles.taskList}>
               <Link href="/superadmin/pre-visits" className={styles.taskRow}><span><ClipboardCheck size={18} />{tx('Pre-Visits to Review', 'Pra-Kunjungan untuk Ditinjau')}</span><strong className={styles.pillOrange}>{pendingReview}</strong></Link>
@@ -243,7 +268,7 @@ export default async function SuperadminPage() {
             </div>
           </div>
 
-          <div className={styles.panel}>
+          <div className={`${styles.panel} ${mode.themeCard}`}>
             <div className={styles.sectionHead}><h2>{tx('Field Notes', 'Catatan Lapangan')}</h2></div>
             <div className={styles.announcement}>
               <span className={styles.announcementIcon}>✦</span>
@@ -253,7 +278,7 @@ export default async function SuperadminPage() {
         </div>
       </section>
 
-      <section className={styles.block}>
+      <section className={`${styles.block} ${mode.themeCard} ${mode.generalOnly}`}>
         <div className={styles.sectionHead}><h2>{tx('Recent Activities', 'Aktivitas Terbaru')}</h2></div>
         <div className={styles.recentWrap}>
           <div className={styles.recentList}>
