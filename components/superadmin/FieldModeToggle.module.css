@@ -1,0 +1,36 @@
+.toggle {
+  border-color: #e8d9bd;
+  background: #fff;
+  color: #5a5366;
+}
+
+.toggle[aria-pressed='true'] {
+  border-color: #bca7ee;
+  background: linear-gradient(90deg, #f1e9ff, #fff5cc);
+  color: #6436c4;
+}
+
+.dot {
+  width: .55rem;
+  height: .55rem;
+  border-radius: 999px;
+  background: #c8c0cf;
+  box-shadow: 0 0 0 3px rgb(200 192 207 / .18);
+}
+
+.dotOn {
+  background: #48a969;
+  box-shadow: 0 0 0 3px rgb(72 169 105 / .18);
+}
+
+:global(html[data-theme='crl-dark']) .toggle {
+  border-color: #51475e;
+  background: #2b2631;
+  color: #e9e3ef;
+}
+
+:global(html[data-theme='crl-dark']) .toggle[aria-pressed='true'] {
+  border-color: #7056a7;
+  background: linear-gradient(90deg, #38294f, #40361f);
+  color: #d7c4ff;
+}
