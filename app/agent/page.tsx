@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Building2, ClipboardList, LayoutDashboard, MapPin, Route, UserRound } from 'lucide-react'
+import { Building2, ClipboardList, Clock3, LayoutDashboard, MapPin, Route, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { getLocale } from '@/lib/i18n/server'
@@ -62,7 +62,15 @@ export default async function AgentPage() {
         breadcrumbs={[{ label: t('agent.dashboard.breadcrumbAgent'), href: '/agent', icon: UserRound }, { label: t('agent.dashboard.breadcrumbDashboard'), icon: LayoutDashboard }]}
         title={t('agent.dashboard.title')}
         description={t('agent.dashboard.description', { name: firstName })}
-        actions={<Link href="/agent/customers" className="dui-btn dui-btn-primary dui-btn-sm">{t('agent.dashboard.myCustomers')}</Link>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link href="/agent/attendance" className="dui-btn dui-btn-outline dui-btn-sm gap-2">
+              <Clock3 className="h-4 w-4" aria-hidden="true" />
+              {tx('Attendance', 'Absensi')}
+            </Link>
+            <Link href="/agent/customers" className="dui-btn dui-btn-primary dui-btn-sm">{t('agent.dashboard.myCustomers')}</Link>
+          </div>
+        }
       />
 
       <section aria-label={t('agent.dashboard.statsAria')} className={styles.statsGrid}>
