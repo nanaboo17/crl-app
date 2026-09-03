@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import SuperadminSidebar from './SuperadminSidebar'
 import SuperadminNavbar from './SuperadminNavbar'
+import GlobalBackButtonFix from '@/components/navigation/GlobalBackButtonFix'
 import {
   adminConfig,
   agentConfig,
@@ -64,6 +65,8 @@ export default function SuperadminShell({
 
   return (
     <div className="min-h-screen bg-base-200">
+      <GlobalBackButtonFix />
+
       <aside
         aria-label={`${config.role} sidebar`}
         className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-base-300 bg-base-100 lg:block"
