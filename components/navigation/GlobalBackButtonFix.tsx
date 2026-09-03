@@ -12,6 +12,10 @@ function isBackControl(text: string) {
   return lower === 'back' || lower === 'kembali' || lower.startsWith('back to ') || lower.startsWith('kembali ke ')
 }
 
+function isInsideBreadcrumb(control: HTMLElement) {
+  return Boolean(control.closest('nav[aria-label="Breadcrumb"], nav[aria-label="breadcrumb"], [data-breadcrumb]'))
+}
+
 export default function GlobalBackButtonFix() {
   const pathname = usePathname()
 
@@ -19,6 +23,8 @@ export default function GlobalBackButtonFix() {
     const apply = () => {
       const controls = document.querySelectorAll<HTMLElement>('a, button')
       controls.forEach((control) => {
+        if (isInsideBreadcrumb(control)) return
+
         const text = normalize(control.textContent)
         if (!isBackControl(text) || control.dataset.crlBackFixed === 'true') return
 
