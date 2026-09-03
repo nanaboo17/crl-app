@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { MapPinned } from 'lucide-react'
 import { useI18n } from '@/components/providers/i18n-provider'
+import styles from './FieldModeToggle.module.css'
 
 const STORAGE_KEY = 'crl_superadmin_field_mode'
 
@@ -54,11 +55,11 @@ export default function FieldModeToggle() {
       aria-pressed={enabled}
       aria-label={title}
       title={title}
-      className="field-mode-toggle hidden min-h-11 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-extrabold shadow-sm transition sm:inline-flex"
+      className={`${styles.toggle} hidden min-h-11 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-extrabold shadow-sm transition sm:inline-flex`}
     >
       <MapPinned aria-hidden="true" className="h-4 w-4" />
       <span>{label}</span>
-      <span aria-hidden="true" className={`field-mode-dot ${enabled ? 'is-on' : ''}`} />
+      <span aria-hidden="true" className={`${styles.dot} ${enabled ? styles.dotOn : ''}`} />
     </button>
   )
 }
