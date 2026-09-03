@@ -24,6 +24,79 @@
     radial-gradient(circle at top right, rgb(255 239 185 / .45), transparent 30%);
 }
 
+.agentContent {
+  min-width: 0;
+}
+
+.agentContent :global(.dui-card),
+.agentContent :global(.dui-stats) {
+  border-color: #eadfc5 !important;
+  border-radius: 24px !important;
+  background: rgb(255 253 246 / .94) !important;
+  box-shadow: 0 14px 30px rgb(85 60 117 / .06) !important;
+}
+
+.agentContent :global(.dui-stat) {
+  padding: 20px !important;
+}
+
+.agentContent :global(.dui-stat-title) {
+  color: #7d7386 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+.agentContent :global(.dui-stat-value) {
+  color: #4b3b57;
+  font-weight: 900;
+  letter-spacing: -.04em;
+}
+
+.agentContent :global(.dui-input),
+.agentContent :global(.dui-select),
+.agentContent :global(.dui-textarea) {
+  border-color: #e8dcc6 !important;
+  border-radius: 14px !important;
+  background: #fffdf8 !important;
+  box-shadow: none !important;
+}
+
+.agentContent :global(.dui-input:focus-within),
+.agentContent :global(.dui-select:focus),
+.agentContent :global(.dui-textarea:focus) {
+  border-color: #a986e8 !important;
+  outline: 2px solid rgb(169 134 232 / .18) !important;
+  outline-offset: 1px;
+}
+
+.agentContent :global(.dui-btn) {
+  border-radius: 14px !important;
+  font-weight: 800 !important;
+}
+
+.agentContent :global(.dui-btn-primary) {
+  border-color: #7651c5 !important;
+  background: linear-gradient(135deg, #7651c5, #946ce2) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgb(118 81 197 / .18);
+}
+
+.agentContent :global(.dui-btn-secondary),
+.agentContent :global(.dui-btn-outline) {
+  border-color: #dfd0f3 !important;
+  background: #f5efff !important;
+  color: #6643ad !important;
+}
+
+.agentContent :global(.dui-alert) {
+  border-radius: 18px !important;
+}
+
+.agentContent :global(.dui-badge) {
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+}
+
 :global(html[data-theme='crl-dark']) .shell {
   background: var(--color-base-200);
 }
@@ -45,4 +118,26 @@
     radial-gradient(circle at top left, rgb(94 58 138 / .18), transparent 34%),
     radial-gradient(circle at top right, rgb(111 91 39 / .12), transparent 30%),
     var(--color-base-200);
+}
+
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-card),
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-stats) {
+  border-color: color-mix(in oklab, var(--color-base-content) 12%, transparent) !important;
+  background: var(--color-base-100) !important;
+  box-shadow: 0 14px 30px rgb(0 0 0 / .12) !important;
+}
+
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-stat-title) {
+  color: color-mix(in oklab, var(--color-base-content) 58%, transparent) !important;
+}
+
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-stat-value) {
+  color: var(--color-base-content);
+}
+
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-input),
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-select),
+:global(html[data-theme='crl-dark']) .agentContent :global(.dui-textarea) {
+  border-color: color-mix(in oklab, var(--color-base-content) 14%, transparent) !important;
+  background: var(--color-base-200) !important;
 }
