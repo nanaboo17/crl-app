@@ -1,0 +1,148 @@
+.navbar {
+  height: 5rem;
+  border-bottom: 1px solid #efe5c8;
+  background: color-mix(in oklab, #fffdf6 95%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.mobileBrand,
+.identityName {
+  color: #5b2eb8;
+}
+
+.identityName {
+  color: #4b4059;
+}
+
+.identityEmail {
+  color: #91879a;
+}
+
+.iconButton {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid #efe5c8;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b3fdb;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05);
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.iconButton:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgb(82 54 133 / .12); }
+.iconButton:focus-visible { outline: 2px solid #6b3fdb; outline-offset: 2px; }
+
+.accountButton {
+  border: 2px solid #fff;
+  background: linear-gradient(145deg, #7b4be8, #a66cff);
+  color: white;
+}
+
+.menu {
+  border: 1px solid #efe5c8;
+  background: #fffdf8;
+}
+
+.menuDivider { border-color: #efe5c8; }
+.menuName { color: #42394d; }
+.menuEmail { color: #887f91; }
+.menuRole { color: #9b91a4; }
+.menuDashboard { color: #5b2eb8; }
+.menuDashboard:hover { background: #f4edff; }
+.menuLogout { color: #cc4f63; }
+.menuLogout:hover { background: #fff0f2; }
+
+.sidebar {
+  background: #fffdf6;
+  color: #3f3652;
+}
+
+.sidebarBorder { border-color: #efe5c8; }
+.logoTile { background: linear-gradient(145deg, #f7e8ff, #fff2c9); }
+.brand { color: #5b2eb8; }
+.roleText { color: #6d6578; }
+.groupLabel { color: #9a8eaa; }
+.navInactive { color: #5a5366; }
+.navInactive:hover { border-color: #efe5c8; background: #fff; color: #4e2b9f; }
+.navActive { border-color: #ead9ff; background: linear-gradient(90deg, #f3ebff, #fff7dc); color: #6233c4; }
+.iconInactive { background: #faf6ed; color: #8d8397; }
+.iconActive { background: #fff; color: #6b3fdb; }
+.userCard { border-color: #efe5c8; background: rgb(255 255 255 / .8); }
+.userName { color: #3c3548; }
+.userRole { color: #8a8195; }
+
+:global(.field-mode-toggle) {
+  border-color: #e8d9bd;
+  background: #fff;
+  color: #5a5366;
+}
+
+:global(.field-mode-toggle[aria-pressed='true']) {
+  border-color: #bca7ee;
+  background: linear-gradient(90deg, #f1e9ff, #fff5cc);
+  color: #6436c4;
+}
+
+:global(.field-mode-dot) {
+  width: .55rem;
+  height: .55rem;
+  border-radius: 999px;
+  background: #c8c0cf;
+  box-shadow: 0 0 0 3px rgb(200 192 207 / .18);
+}
+
+:global(.field-mode-dot.is-on) {
+  background: #48a969;
+  box-shadow: 0 0 0 3px rgb(72 169 105 / .18);
+}
+
+:global(html[data-theme='crl-dark']) .navbar {
+  border-color: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+  background: color-mix(in oklab, var(--color-base-100) 92%, transparent);
+}
+
+:global(html[data-theme='crl-dark']) .mobileBrand,
+:global(html[data-theme='crl-dark']) .brand { color: #c8afff; }
+:global(html[data-theme='crl-dark']) .identityName,
+:global(html[data-theme='crl-dark']) .menuName,
+:global(html[data-theme='crl-dark']) .userName { color: var(--color-base-content); }
+:global(html[data-theme='crl-dark']) .identityEmail,
+:global(html[data-theme='crl-dark']) .menuEmail,
+:global(html[data-theme='crl-dark']) .menuRole,
+:global(html[data-theme='crl-dark']) .roleText,
+:global(html[data-theme='crl-dark']) .groupLabel,
+:global(html[data-theme='crl-dark']) .userRole { color: color-mix(in oklab, var(--color-base-content) 58%, transparent); }
+
+:global(html[data-theme='crl-dark']) .iconButton,
+:global(html[data-theme='crl-dark']) .menu,
+:global(html[data-theme='crl-dark']) .sidebar,
+:global(html[data-theme='crl-dark']) .userCard {
+  border-color: color-mix(in oklab, var(--color-base-content) 13%, transparent);
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+}
+
+:global(html[data-theme='crl-dark']) .sidebar { background: color-mix(in oklab, var(--color-base-100) 96%, #35255e 4%); }
+:global(html[data-theme='crl-dark']) .logoTile { background: linear-gradient(145deg, #342551, #40311f); }
+:global(html[data-theme='crl-dark']) .navInactive { color: color-mix(in oklab, var(--color-base-content) 74%, transparent); }
+:global(html[data-theme='crl-dark']) .navInactive:hover { border-color: #574670; background: #2b2433; color: #d7c7ff; }
+:global(html[data-theme='crl-dark']) .navActive { border-color: #5d497e; background: linear-gradient(90deg, #33264d, #3a321f); color: #d5c1ff; }
+:global(html[data-theme='crl-dark']) .iconInactive { background: #29232f; color: #aaa0b5; }
+:global(html[data-theme='crl-dark']) .iconActive { background: #443361; color: #d4c0ff; }
+:global(html[data-theme='crl-dark']) .menuDashboard { color: #ccb8ff; }
+:global(html[data-theme='crl-dark']) .menuDashboard:hover { background: #33284b; }
+:global(html[data-theme='crl-dark']) .menuLogout:hover { background: #472a31; }
+
+:global(html[data-theme='crl-dark'] .field-mode-toggle) {
+  border-color: #51475e;
+  background: #2b2631;
+  color: #e9e3ef;
+}
+
+:global(html[data-theme='crl-dark'] .field-mode-toggle[aria-pressed='true']) {
+  border-color: #7056a7;
+  background: linear-gradient(90deg, #38294f, #40361f);
+  color: #d7c4ff;
+}
