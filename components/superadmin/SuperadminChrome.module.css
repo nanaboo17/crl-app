@@ -73,19 +73,19 @@
 .userName { color: #3c3548; }
 .userRole { color: #8a8195; }
 
-:global(.field-mode-toggle) {
+.navbar :global(.field-mode-toggle) {
   border-color: #e8d9bd;
   background: #fff;
   color: #5a5366;
 }
 
-:global(.field-mode-toggle[aria-pressed='true']) {
+.navbar :global(.field-mode-toggle[aria-pressed='true']) {
   border-color: #bca7ee;
   background: linear-gradient(90deg, #f1e9ff, #fff5cc);
   color: #6436c4;
 }
 
-:global(.field-mode-dot) {
+.navbar :global(.field-mode-dot) {
   width: .55rem;
   height: .55rem;
   border-radius: 999px;
@@ -93,7 +93,7 @@
   box-shadow: 0 0 0 3px rgb(200 192 207 / .18);
 }
 
-:global(.field-mode-dot.is-on) {
+.navbar :global(.field-mode-dot.is-on) {
   background: #48a969;
   box-shadow: 0 0 0 3px rgb(72 169 105 / .18);
 }
@@ -135,13 +135,13 @@
 :global(html[data-theme='crl-dark']) .menuDashboard:hover { background: #33284b; }
 :global(html[data-theme='crl-dark']) .menuLogout:hover { background: #472a31; }
 
-:global(html[data-theme='crl-dark'] .field-mode-toggle) {
+:global(html[data-theme='crl-dark']) .navbar :global(.field-mode-toggle) {
   border-color: #51475e;
   background: #2b2631;
   color: #e9e3ef;
 }
 
-:global(html[data-theme='crl-dark'] .field-mode-toggle[aria-pressed='true']) {
+:global(html[data-theme='crl-dark']) .navbar :global(.field-mode-toggle[aria-pressed='true']) {
   border-color: #7056a7;
   background: linear-gradient(90deg, #38294f, #40361f);
   color: #d7c4ff;
