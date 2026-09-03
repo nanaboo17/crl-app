@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import styles from './AgentFormTooltips.module.css'
 
 const TOOLTIP_BY_TEXT: Record<string, string> = {
   'Was the phone contacted?': 'Choose Yes only when you successfully reached the customer by phone.',
@@ -73,10 +74,16 @@ export default function AgentFormTooltips() {
       candidates.forEach((element) => {
         const text = normalize(element.textContent)
         const tip = TOOLTIP_BY_TEXT[text]
-        if (!tip) return
-        element.setAttribute('data-tip', tip)
-        element.setAttribute('title', tip)
-        element.classList.add('dui-tooltip', 'dui-tooltip-top')
+        if (!tip || element.dataset.formTooltipApplied === 'true') return
+
+        element.dataset.formTooltipApplied = 'true'
+        element.setAttribute('data-form-tip', tip)
+        element.setAttribute('aria-label', element.getAttribute('aria-label') || `${text}. ${tip}`)
+        element.classList.add(styles.tipTarget)
+
+        if (!element.matches('button, a, input, select, textarea') && !element.hasAttribute('tabindex')) {
+          element.setAttribute('tabindex', '0')
+        }
       })
     }
 
