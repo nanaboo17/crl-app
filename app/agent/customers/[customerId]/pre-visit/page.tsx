@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import PreVisitForm from '@/app/agent/pre-visits/new/PreVisitForm'
+import PreVisitForm from './PreVisitForm'
 import { useI18n } from '@/components/providers/i18n-provider'
 
 function CanonicalPreVisitForm() {
