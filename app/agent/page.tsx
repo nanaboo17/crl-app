@@ -82,11 +82,12 @@ export default async function AgentPage() {
   const phoneValidationsToday = todayVisits.filter((row: any) => Boolean(row.updated_phone)).length
   const paidResults = allVisits.filter((row: any) => row.conversation_result === 'Sudah melakukan pembayaran').length
   const recoveryToday = todayVisits.filter((row: any) => ['Sudah melakukan pembayaran', 'Bersedia bayar / Promise to Pay'].includes(row.conversation_result)).length
-  const onTimeAttendance = attendance.filter((row: any) => (row.check_in_status ?? '').toLowerCase() === 'on time').length
+  const onTimeAttendance = attendance.filter((row: any) => (row.check_in_status ?? '').trim().toLowerCase() === 'on time').length
 
+  const checkedInAttendance = attendance.filter((row: any) => Boolean(row.check_in_at) && Boolean((row.check_in_status ?? '').trim()))
   let onTimeStreak = 0
-  for (const row of attendance) {
-    if ((row.check_in_status ?? '').toLowerCase() !== 'on time') break
+  for (const row of checkedInAttendance) {
+    if ((row.check_in_status ?? '').trim().toLowerCase() !== 'on time') break
     onTimeStreak += 1
   }
 
@@ -104,7 +105,7 @@ export default async function AgentPage() {
   const missions = [
     {
       label: tx('Check in on time', 'Check-in tepat waktu'),
-      progress: todayAttendance && (todayAttendance.check_in_status ?? '').toLowerCase() === 'on time' ? 1 : 0,
+      progress: todayAttendance && (todayAttendance.check_in_status ?? '').trim().toLowerCase() === 'on time' ? 1 : 0,
       target: 1,
       xp: 20,
     },
@@ -168,7 +169,7 @@ export default async function AgentPage() {
         </div>
         <div className={styles.streakBlock}>
           <Flame className="h-6 w-6" aria-hidden="true" />
-          <div><strong>{onTimeStreak}</strong><span>{tx('on-time streak', 'streak tepat waktu')}</span></div>
+          <div><strong>{onTimeStreak}</strong><span>{tx('consecutive on-time check-ins', 'check-in tepat waktu berturut-turut')}</span></div>
         </div>
       </section>
 
