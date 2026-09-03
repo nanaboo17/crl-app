@@ -1,0 +1,48 @@
+.shell {
+  background: #fffaf0;
+}
+
+.sidebarFrame {
+  border-color: #efe5c8;
+  background: #fffdf6;
+  box-shadow: 8px 0 30px rgb(111 72 180 / .04);
+}
+
+.mobileDrawer {
+  background: #fffdf6;
+}
+
+.closeButton {
+  border: 1px solid #efe5c8;
+  background: #fff;
+  color: #6b3fdb;
+}
+
+.content {
+  background:
+    radial-gradient(circle at top left, rgb(245 229 255 / .5), transparent 34%),
+    radial-gradient(circle at top right, rgb(255 239 185 / .45), transparent 30%);
+}
+
+:global(html[data-theme='crl-dark']) .shell {
+  background: var(--color-base-200);
+}
+
+:global(html[data-theme='crl-dark']) .sidebarFrame,
+:global(html[data-theme='crl-dark']) .mobileDrawer {
+  border-color: color-mix(in oklab, var(--color-base-content) 13%, transparent);
+  background: var(--color-base-100);
+}
+
+:global(html[data-theme='crl-dark']) .closeButton {
+  border-color: color-mix(in oklab, var(--color-base-content) 13%, transparent);
+  background: var(--color-base-100);
+  color: #ccb8ff;
+}
+
+:global(html[data-theme='crl-dark']) .content {
+  background:
+    radial-gradient(circle at top left, rgb(94 58 138 / .18), transparent 34%),
+    radial-gradient(circle at top right, rgb(111 91 39 / .12), transparent 30%),
+    var(--color-base-200);
+}
