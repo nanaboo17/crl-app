@@ -12,6 +12,7 @@ import {
   superadminConfig,
   type ShellConfig,
 } from '@/components/shell/config'
+import shellTheme from './SuperadminShellTheme.module.css'
 
 export default function SuperadminShell({
   agentName,
@@ -66,15 +67,13 @@ export default function SuperadminShell({
   }, [navOpen])
 
   return (
-    <div className={`min-h-screen ${playful ? 'bg-[#fffaf0]' : 'bg-base-200'}`}>
+    <div className={`min-h-screen ${playful ? shellTheme.shell : 'bg-base-200'}`}>
       <GlobalBackButtonFix />
 
       <aside
         aria-label={`${config.role} sidebar`}
         className={`fixed inset-y-0 left-0 z-40 hidden w-64 lg:block ${
-          playful
-            ? 'border-r border-[#efe5c8] bg-[#fffdf6] shadow-[8px_0_30px_rgba(111,72,180,0.04)]'
-            : 'border-r border-base-300 bg-base-100'
+          playful ? `${shellTheme.sidebarFrame} border-r` : 'border-r border-base-300 bg-base-100'
         }`}
       >
         <SuperadminSidebar agentName={agentName} config={config} />
@@ -87,9 +86,7 @@ export default function SuperadminShell({
         <div
           aria-hidden="true"
           onClick={() => setNavOpen(false)}
-          className={`absolute inset-0 bg-black/50 motion-safe:transition-opacity ${
-            navOpen ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`absolute inset-0 bg-black/50 motion-safe:transition-opacity ${navOpen ? 'opacity-100' : 'opacity-0'}`}
         />
         <div
           role="dialog"
@@ -97,7 +94,7 @@ export default function SuperadminShell({
           aria-label="Navigation"
           inert={!navOpen}
           className={`absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col shadow-xl motion-safe:transition-transform motion-reduce:transition-none ${
-            playful ? 'bg-[#fffdf6]' : 'bg-base-100'
+            playful ? shellTheme.mobileDrawer : 'bg-base-100'
           } ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
           <button
@@ -107,7 +104,7 @@ export default function SuperadminShell({
             aria-label="Close navigation"
             className={
               playful
-                ? 'absolute right-3 top-3.5 z-10 rounded-full border border-[#efe5c8] bg-white p-2 text-[#6b3fdb] shadow-sm transition hover:bg-[#f7f1ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6b3fdb]'
+                ? `${shellTheme.closeButton} absolute right-3 top-3.5 z-10 rounded-full p-2 shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2`
                 : 'absolute right-3 top-3.5 z-10 rounded-lg p-2 text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content'
             }
           >
@@ -130,7 +127,7 @@ export default function SuperadminShell({
           menuButtonRef={menuButtonRef}
           config={config}
         />
-        <main className={`flex-1 ${playful ? 'bg-[radial-gradient(circle_at_top_left,_rgba(245,229,255,0.5),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(255,239,185,0.45),_transparent_30%)]' : ''}`}>
+        <main className={`flex-1 ${playful ? shellTheme.content : ''}`}>
           {children}
         </main>
       </div>
