@@ -38,7 +38,7 @@ export default function SuperadminShell({
         ? adminConfig
         : superadminConfig
 
-  const playful = mode === 'superadmin'
+  const playful = mode !== 'admin'
 
   useEffect(() => {
     setNavOpen(false)
@@ -127,7 +127,7 @@ export default function SuperadminShell({
           menuButtonRef={menuButtonRef}
           config={config}
         />
-        <main className={`flex-1 ${playful ? shellTheme.content : ''}`}>
+        <main className={`flex-1 ${playful ? shellTheme.content : ''} ${mode === 'agent' ? shellTheme.agentContent : ''}`}>
           {children}
         </main>
       </div>
