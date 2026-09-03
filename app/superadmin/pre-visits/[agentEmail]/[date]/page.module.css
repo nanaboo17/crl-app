@@ -1,229 +1,54 @@
 .page {
   width: 100%;
-  max-width: 760px;
-  min-height: 100vh;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 20px 16px 100px;
-  background: #f8fafc;
-}
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.backButton {
-  flex-shrink: 0;
-  padding-top: 5px;
-  color: #111827;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.eyebrow {
-  margin: 0 0 5px;
-  color: #6b7280;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-}
-
-.header h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 25px;
-}
-
-.header p:last-child {
-  margin: 5px 0 0;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.statsGrid {
+  padding: 24px 20px 48px;
   display: grid;
-  grid-template-columns:
-    repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: 24px;
 }
 
-.statCard {
-  padding: 14px;
-  border-radius: 15px;
-  background: #111827;
-  color: white;
-}
+.statsGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.statCard { min-width: 0; padding: 18px; border: 1px solid var(--color-base-300); border-radius: 16px; background: var(--color-base-100); box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.statTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 12px; font-weight: 700; }
+.statIcon { width: 18px; height: 18px; flex: 0 0 auto; opacity: .5; }
+.statCard strong { display: block; margin-top: 8px; font-size: 32px; line-height: 1; letter-spacing: -.04em; }
 
-.statCard span {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 9px;
-  opacity: 0.7;
-}
+.historyCard { border: 1px solid var(--color-base-300); border-radius: 18px; background: var(--color-base-100); padding: 18px; }
+.sectionHeader { margin-bottom: 14px; }
+.sectionHeader h2 { margin: 0; font-size: 18px; }
+.sectionHeader p { margin: 4px 0 0; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 13px; }
+.list { display: grid; gap: 10px; }
 
-.statCard strong {
-  display: block;
-  font-size: 22px;
-}
+.preVisitCard { display: block; padding: 16px; border: 1px solid var(--color-base-300); border-radius: 14px; background: var(--color-base-100); color: inherit; text-decoration: none; transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
+.preVisitCard:hover { border-color: color-mix(in oklab, var(--color-base-content) 28%, var(--color-base-300)); transform: translateY(-1px); box-shadow: 0 6px 18px rgb(0 0 0 / .05); }
+.cardTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.preVisitId { display: inline-flex; margin-bottom: 7px; padding: 4px 8px; border-radius: 999px; background: var(--color-base-200); color: color-mix(in oklab, var(--color-base-content) 70%, transparent); font-size: 10px; font-weight: 800; }
+.cardTop h2 { margin: 0; font-size: 17px; }
+.cardTop p { margin: 4px 0 0; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); font-size: 12px; }
+.arrow { color: color-mix(in oklab, var(--color-base-content) 36%, transparent); font-size: 26px; line-height: 1; }
+.infoGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-base-300); }
+.infoGrid span { display: block; margin-bottom: 4px; color: color-mix(in oklab, var(--color-base-content) 48%, transparent); font-size: 10px; }
+.infoGrid strong { display: block; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; }
+.footer > span:first-child { color: color-mix(in oklab, var(--color-base-content) 55%, transparent); font-size: 12px; font-weight: 700; }
+.readyBadge, .followBadge, .reviewBadge, .pendingBadge { display: inline-flex; align-items: center; min-height: 28px; padding: 5px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.readyBadge { background: color-mix(in oklab, var(--color-success) 12%, var(--color-base-100)); color: var(--color-success); }
+.followBadge { background: color-mix(in oklab, var(--color-warning) 14%, var(--color-base-100)); color: color-mix(in oklab, var(--color-warning) 72%, var(--color-base-content)); }
+.reviewBadge { background: color-mix(in oklab, var(--color-error) 10%, var(--color-base-100)); color: var(--color-error); }
+.pendingBadge { background: var(--color-base-200); color: color-mix(in oklab, var(--color-base-content) 58%, transparent); }
+.emptyState { padding: 34px 20px; border: 1px dashed var(--color-base-300); border-radius: 14px; text-align: center; }
+.emptyState h2 { margin: 0 0 8px; font-size: 17px; }
+.emptyState p { margin: 0; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); font-size: 13px; }
+.errorCard { padding: 14px; border: 1px solid color-mix(in oklab, var(--color-error) 28%, var(--color-base-300)); border-radius: 12px; background: color-mix(in oklab, var(--color-error) 7%, var(--color-base-100)); color: var(--color-error); }
 
-.list {
-  display: grid;
-  gap: 14px;
+@media (max-width: 900px) { .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .infoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .page { padding: 16px 12px 36px; gap: 18px; }
+  .statsGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .statCard { padding: 14px; }
+  .statCard strong { font-size: 28px; }
+  .historyCard { padding: 14px; border-radius: 16px; }
+  .preVisitCard { padding: 14px; }
+  .infoGrid { grid-template-columns: 1fr 1fr; gap: 12px; }
 }
-
-.preVisitCard {
-  display: block;
-  padding: 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: white;
-  color: inherit;
-  text-decoration: none;
-}
-
-.cardTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.preVisitId {
-  display: inline-block;
-  margin-bottom: 7px;
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #374151;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.cardTop h2 {
-  margin: 0;
-  color: #111827;
-  font-size: 17px;
-}
-
-.cardTop p {
-  margin: 5px 0 0;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.arrow {
-  color: #9ca3af;
-  font-size: 28px;
-  line-height: 1;
-}
-
-.infoGrid {
-  display: grid;
-  grid-template-columns:
-    1fr 1fr;
-  gap: 14px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
-}
-
-.infoGrid span {
-  display: block;
-  margin-bottom: 4px;
-  color: #9ca3af;
-  font-size: 10px;
-}
-
-.infoGrid strong {
-  display: block;
-  color: #374151;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.footer > span:first-child {
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.readyBadge,
-.followBadge,
-.reviewBadge,
-.pendingBadge {
-  padding: 6px 9px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.readyBadge {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.followBadge {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.reviewBadge {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.pendingBadge {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.emptyState {
-  padding: 34px 20px;
-  border: 1px dashed #d1d5db;
-  border-radius: 18px;
-  background: white;
-  text-align: center;
-}
-
-.emptyState h2 {
-  margin: 0 0 8px;
-  color: #111827;
-  font-size: 17px;
-}
-
-.emptyState p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.errorCard {
-  padding: 14px;
-  border: 1px solid #fecaca;
-  border-radius: 12px;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-@media (max-width: 520px) {
-  .statsGrid {
-    grid-template-columns:
-      1fr 1fr;
-  }
-
-  .infoGrid {
-    grid-template-columns: 1fr;
-  }
-}
+@media (max-width: 420px) { .statsGrid { grid-template-columns: 1fr; } .infoGrid { grid-template-columns: 1fr; } .footer { align-items: flex-start; flex-direction: column; } }
