@@ -65,7 +65,7 @@ export default function AgentFormTooltips() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const isPreVisit = pathname === '/agent/pre-visits/new'
+    const isPreVisit = /^\/agent\/customers\/[^/]+\/pre-visit$/.test(pathname)
     const isVisit = /^\/agent\/customers\/[^/]+\/visit$/.test(pathname)
     if (!isPreVisit && !isVisit) return
 
