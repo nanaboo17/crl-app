@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CalendarDays, Clock3, MapPin, Route, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
+import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import styles from './page.module.css'
 import { getLocale } from '@/lib/i18n/server'
 
@@ -35,6 +37,7 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
 
   const startDate = `${date}T00:00:00+07:00`
   const endDate = `${date}T23:59:59.999+07:00`
+  const dayLabel = new Date(`${date}T00:00:00`).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
 
   const [visitResult, attendanceResult] = await Promise.all([
     supabase.from('visits').select('visit_id,customer_id,visit_date,visit_status_kunjungan,conversation_result,distance_to_customer_meters,location_match').eq('agent_email', decodedEmail).gte('visit_date', startDate).lte('visit_date', endDate).order('visit_date', { ascending: true }),
@@ -71,26 +74,55 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
 
   const gpsMatchCount = visits.filter(v => v.location_match === true).length
   const gpsMismatchCount = visits.filter(v => v.location_match === false).length
+  const workDuration = attendance?.worked_minutes
+    ? `${Math.floor(attendance.worked_minutes / 60)}h ${attendance.worked_minutes % 60}m`
+    : attendance?.check_in_at
+      ? durationLabel(attendance.check_in_at, attendance.check_out_at ?? new Date().toISOString())
+      : '-'
+
+  const summaries = [
+    { label: tx('Total Visits', 'Total Kunjungan'), value: visits.length, icon: Route, tone: 'purple' },
+    { label: 'GPS Match', value: gpsMatchCount, icon: MapPin, tone: 'green' },
+    { label: 'GPS Mismatch', value: gpsMismatchCount, icon: ShieldCheck, tone: 'yellow' },
+    { label: tx('Work Duration', 'Durasi Kerja'), value: workDuration, icon: Clock3, tone: 'blue' },
+  ]
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <Link href={`/superadmin/visits/${encodeURIComponent(decodedEmail)}`} className={styles.backButton}>{tx('Back', 'Kembali')}</Link>
-        <div><p className={styles.eyebrow}>{tx('VISIT MONITORING', 'MONITORING KUNJUNGAN')}</p><h1>{agent.agent_name}</h1><p>{new Date(`${date}T00:00:00`).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</p></div>
-      </header>
+      <SuperadminPageHeader
+        breadcrumbs={[
+          { label: 'Superadmin', href: '/superadmin' },
+          { label: tx('Visits', 'Kunjungan'), href: '/superadmin/visits', icon: MapPin },
+          { label: agent.agent_name, href: `/superadmin/visits/${encodeURIComponent(decodedEmail)}` },
+          { label: dayLabel, icon: CalendarDays },
+        ]}
+        title={agent.agent_name}
+        description={`${dayLabel} · ${agent.sales_code || decodedEmail}`}
+      />
+
+      <section className={styles.hero}>
+        <div>
+          <span>{tx('DAILY FIELD RUN', 'AKTIVITAS LAPANGAN HARIAN')}</span>
+          <h2>{tx('One day, every checkpoint in view.', 'Satu hari, semua checkpoint dalam satu tampilan.')}</h2>
+          <p>{tx('Review attendance, movement between visits, GPS quality, and submitted outcomes for this field day.', 'Tinjau absensi, perpindahan antar kunjungan, kualitas GPS, dan hasil yang dikirim untuk hari lapangan ini.')}</p>
+        </div>
+        <div className={styles.heroDate}><CalendarDays aria-hidden="true" /><strong>{date}</strong><span>{tx('Jakarta time', 'Waktu Jakarta')}</span></div>
+      </section>
 
       <section className={styles.statsGrid}>
-        <div className={styles.statCard}><span>{tx('Total visits', 'Total kunjungan')}</span><strong>{visits.length}</strong></div>
-        <div className={styles.statCard}><span>GPS Match</span><strong>{gpsMatchCount}</strong></div>
-        <div className={styles.statCard}><span>GPS Mismatch</span><strong>{gpsMismatchCount}</strong></div>
+        {summaries.map(({ label, value, icon: Icon, tone }) => (
+          <article key={label} className={`${styles.statCard} ${styles[`tone_${tone}`]}`}>
+            <div className={styles.statIcon}><Icon aria-hidden="true" /></div><strong>{value}</strong><span>{label}</span>
+          </article>
+        ))}
       </section>
 
       <section className={styles.monitorCard}>
-        <div className={styles.monitorHeader}><div><p className={styles.eyebrow}>{tx('FIELD TIMELINE', 'TIMELINE LAPANGAN')}</p><h2>{tx('Attendance & Checkpoints', 'Absensi & Checkpoint')}</h2></div>{attendance?.check_in_status && <span className={`${styles.statusBadge} ${attendance.check_in_status === 'late' ? styles.late : styles.onTime}`}>{attendance.check_in_status === 'late' ? 'Late' : 'On time'}</span>}</div>
+        <div className={styles.monitorHeader}><div><p className={styles.eyebrow}>{tx('FIELD TIMELINE', 'TIMELINE LAPANGAN')}</p><h2>{tx('Attendance & Checkpoints', 'Absensi & Checkpoint')}</h2></div>{attendance?.check_in_status && <span className={`${styles.statusBadge} ${attendance.check_in_status === 'late' ? styles.late : styles.onTime}`}>{attendance.check_in_status === 'late' ? tx('Late', 'Terlambat') : tx('On time', 'Tepat waktu')}</span>}</div>
         <div className={styles.attendanceSummary}>
           <div><span>Check in</span><strong>{timeLabel(attendance?.check_in_at ?? null)}</strong>{checkInPhoto && <a href={checkInPhoto} target="_blank" rel="noreferrer">{tx('View photo', 'Lihat foto')}</a>}</div>
           <div><span>Check out</span><strong>{timeLabel(attendance?.check_out_at ?? null)}</strong>{checkOutPhoto && <a href={checkOutPhoto} target="_blank" rel="noreferrer">{tx('View photo', 'Lihat foto')}</a>}</div>
-          <div><span>{tx('Work duration', 'Durasi kerja')}</span><strong>{attendance?.worked_minutes ? durationLabel(new Date(0).toISOString(), new Date(attendance.worked_minutes * 60000).toISOString()) : attendance?.check_in_at ? durationLabel(attendance.check_in_at, attendance.check_out_at ?? new Date().toISOString()) : '-'}</strong></div>
+          <div><span>{tx('Work duration', 'Durasi kerja')}</span><strong>{workDuration}</strong></div>
         </div>
 
         <div className={styles.checkpointList}>
@@ -103,6 +135,7 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
         </div>
       </section>
 
+      <section className={styles.sectionHead}><div><span>{tx('SUBMITTED VISITS', 'KUNJUNGAN TERKIRIM')}</span><h2>{tx('Visit results', 'Hasil kunjungan')}</h2></div><p>{visits.length} {tx('records', 'data')}</p></section>
       <section className={styles.list}>
         {[...visits].reverse().map(visit => {
           const customer = customerMap.get(visit.customer_id)
