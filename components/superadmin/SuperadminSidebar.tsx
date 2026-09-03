@@ -24,7 +24,7 @@ export default function SuperadminSidebar({
   const pathname = usePathname()
   const { t } = useI18n()
   const initials = agentName.trim().slice(0, 2).toUpperCase() || 'SA'
-  const playful = config.role === 'superadmin'
+  const playful = config.role !== 'admin'
 
   return (
     <div className={`flex h-full flex-col ${playful ? chrome.sidebar : 'bg-base-100 text-base-content'}`}>
