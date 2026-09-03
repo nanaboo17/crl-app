@@ -1,0 +1,11 @@
+.page {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 640px) {
+  .page { padding: 32px 24px 96px; }
+}
