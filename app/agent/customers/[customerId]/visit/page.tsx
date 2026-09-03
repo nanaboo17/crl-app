@@ -18,6 +18,7 @@ import {
 import { createClient } from '@/lib/supabase-browser'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { useI18n } from '@/components/providers/i18n-provider'
+import styles from './page.module.css'
 
 const LOCATION_LIMIT_METERS = 200
 
@@ -31,7 +32,7 @@ function isValidPhone(value: string) {
 }
 
 function formatVisitTimestamp(iso: string) {
-  return new Intl.DateTimeFormat('id-ID', {
+  const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Jakarta',
     day: '2-digit',
     month: '2-digit',
@@ -40,7 +41,9 @@ function formatVisitTimestamp(iso: string) {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(iso)) + ' WIB'
+  }).formatToParts(new Date(iso))
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}:${get('second')} WIB`
 }
 
 export default function VisitPage() {
@@ -157,6 +160,10 @@ export default function VisitPage() {
     void loadPage()
   }, [customerId, router, t])
 
+  useEffect(() => () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+  }, [photoPreview])
+
   function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
     const R = 6371000
     const toRad = (value: number) => (value * Math.PI) / 180
@@ -200,47 +207,50 @@ export default function VisitPage() {
 
   async function stampImage(file: File, capturedAt: string) {
     if (latitude === null || longitude === null) throw new Error(t('agent.visit.err.gpsBeforePhoto'))
-    return new Promise<Blob>((resolve, reject) => {
-      const image = new Image()
-      const objectUrl = URL.createObjectURL(file)
-      image.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = image.width
-        canvas.height = image.height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          URL.revokeObjectURL(objectUrl)
-          reject(new Error(t('agent.visit.err.cannotProcess')))
-          return
-        }
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
-        const fontSize = Math.max(26, Math.round(canvas.width * 0.028))
-        const padding = Math.max(20, Math.round(canvas.width * 0.02))
-        const lineHeight = fontSize * 1.35
-        const overlayHeight = lineHeight * 4 + padding * 2
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
-        ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight)
-        ctx.fillStyle = '#ffffff'
-        ctx.font = `600 ${fontSize}px Arial`
-        const lines = [
-          `Latitude: ${latitude.toFixed(7)}`,
-          `Longitude: ${longitude.toFixed(7)}`,
-          `Photo time: ${formatVisitTimestamp(capturedAt)}`,
-          `Customer ID: ${customerId}`,
-        ]
-        lines.forEach((line, index) => ctx.fillText(line, padding, canvas.height - overlayHeight + padding + lineHeight * (index + 1)))
-        canvas.toBlob((blob) => {
-          URL.revokeObjectURL(objectUrl)
-          if (!blob) return reject(new Error(t('agent.visit.err.cannotStamp')))
-          resolve(blob)
-        }, 'image/jpeg', 0.88)
-      }
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl)
-        reject(new Error(t('agent.visit.err.cannotLoad')))
-      }
-      image.src = objectUrl
-    })
+
+    let bitmap: ImageBitmap | null = null
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      const canvas = document.createElement('canvas')
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error(t('agent.visit.err.cannotProcess'))
+
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+
+      const shortSide = Math.min(canvas.width, canvas.height)
+      const fontSize = Math.max(22, Math.min(44, Math.round(shortSide * 0.025)))
+      const padding = Math.max(20, Math.round(shortSide * 0.018))
+      const lineHeight = Math.round(fontSize * 1.4)
+      const lines = [
+        `Lat: ${latitude.toFixed(7)}`,
+        `Lng: ${longitude.toFixed(7)}`,
+        `Photo: ${formatVisitTimestamp(capturedAt)}`,
+        `Customer: ${customerId}`,
+      ]
+      const overlayHeight = lineHeight * lines.length + padding * 2
+      const y = Math.max(0, canvas.height - overlayHeight)
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.72)'
+      ctx.fillRect(0, y, canvas.width, overlayHeight)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = `600 ${fontSize}px Arial, sans-serif`
+      ctx.textBaseline = 'top'
+
+      lines.forEach((line, index) => {
+        ctx.fillText(line, padding, y + padding + lineHeight * index, canvas.width - padding * 2)
+      })
+
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(t('agent.visit.err.cannotStamp'))), 'image/jpeg', 0.88)
+      })
+    } catch (err) {
+      if (err instanceof Error) throw err
+      throw new Error(t('agent.visit.err.cannotProcess'))
+    } finally {
+      bitmap?.close()
+    }
   }
 
   async function handlePhoto(selectedFile: File | null) {
@@ -253,11 +263,11 @@ export default function VisitPage() {
     try {
       const capturedAt = new Date().toISOString()
       const stamped = await stampImage(selectedFile, capturedAt)
-      if (photoPreview) URL.revokeObjectURL(photoPreview)
+      const nextPreview = URL.createObjectURL(stamped)
       setPhoto(selectedFile)
       setStampedPhoto(stamped)
       setPhotoCapturedAt(capturedAt)
-      setPhotoPreview(URL.createObjectURL(stamped))
+      setPhotoPreview(nextPreview)
     } catch (err: any) {
       setError(err.message || t('agent.visit.err.cannotProcess'))
     }
@@ -384,7 +394,7 @@ export default function VisitPage() {
         <ReadOnly label={t('agent.visit.fieldCurrentPhone')} value={customer?.phone_number || '-'} />
         {alternativePhones.length > 0 && <div className="grid gap-2 sm:grid-cols-3">{alternativePhones.map((phone: string, index: number) => <ReadOnly key={`${phone}-${index}`} label={`Alternative ${index + 1}`} value={phone} />)}</div>}
         <Field label="Is the registered phone number correct?">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button type="button" className={`dui-btn ${phoneCorrect === true ? 'dui-btn-success' : 'dui-btn-outline'}`} onClick={() => { setPhoneCorrect(true); setUpdatedPhone('') }}><CheckCircle2 className="h-4 w-4" /> Yes, correct</button>
             <button type="button" className={`dui-btn ${phoneCorrect === false ? 'dui-btn-warning' : 'dui-btn-outline'}`} onClick={() => setPhoneCorrect(false)}><AlertTriangle className="h-4 w-4" /> No, update</button>
           </div>
@@ -395,8 +405,16 @@ export default function VisitPage() {
       <StepCard t={t} step="3" title={t('agent.visit.step3')}>
         {!gpsCaptured && <div className="dui-alert dui-alert-warning"><AlertTriangle className="h-5 w-5 shrink-0" /><span>{t('agent.visit.photoGpsWarning')}</span></div>}
         <Field label={t('agent.visit.fieldPhoto')}><input type="file" accept="image/*" capture="environment" disabled={!gpsCaptured} onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)} className="dui-file-input w-full" /></Field>
-        {photoPreview && <figure className="overflow-hidden rounded-box border border-base-300"><img src={photoPreview} alt={t('agent.visit.photoAlt')} className="w-full" /><figcaption className="space-y-1 bg-success/10 px-4 py-2 text-sm font-semibold text-success"><div className="flex items-center gap-2"><Camera className="h-4 w-4" />{t('agent.visit.photoStamped')}</div>{photoCapturedAt && <div className="text-xs font-medium">Photo captured: {formatVisitTimestamp(photoCapturedAt)}</div>}</figcaption></figure>}
-        <label className="flex cursor-pointer items-center gap-3 rounded-box bg-base-200/60 p-3"><input type="checkbox" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} className="dui-checkbox dui-checkbox-primary" /><span className="text-sm">{t('agent.visit.consentLabel')}</span></label>
+        {photoPreview && (
+          <div className={styles.photoPreviewCard}>
+            <div className={styles.photoFrame}><img src={photoPreview} alt={t('agent.visit.photoAlt')} /></div>
+            <div className={styles.photoMeta}>
+              <div className={styles.photoMetaTitle}><Camera className="h-4 w-4 shrink-0" />{t('agent.visit.photoStamped')}</div>
+              {photoCapturedAt && <div className={styles.photoTime}>Photo captured: {formatVisitTimestamp(photoCapturedAt)}</div>}
+            </div>
+          </div>
+        )}
+        <label className="flex cursor-pointer items-start gap-3 rounded-box bg-base-200/60 p-3"><input type="checkbox" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} className="dui-checkbox dui-checkbox-primary mt-0.5 shrink-0" /><span className="min-w-0 text-sm leading-relaxed">{t('agent.visit.consentLabel')}</span></label>
       </StepCard>
 
       <StepCard t={t} step="4" title={t('agent.visit.step4')}>
