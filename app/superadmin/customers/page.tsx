@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { AlertCircle, Eye, Inbox, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
@@ -13,14 +14,36 @@ const PAGE_SIZE = 10
 
 export default async function ManageCustomersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
-  const page = Math.max(1, Number(params.page) || 1)
+  const requestedPage = Math.max(1, Math.floor(Number(params.page) || 1))
   const locale = await getLocale()
   const t = (key: string, values?: Record<string, string | number>) => translate(locale, allMessages, key, values)
   const supabase = await createClient()
 
-  const { data: customers, error, count } = await supabase
+  const { count: totalCount, error: countError } = await supabase
     .from('customers')
-    .select('customer_id, customer_name, phone_number, outstanding_amount, customer_status, agent_email', { count: 'exact' })
+    .select('customer_id', { count: 'exact', head: true })
+
+  if (countError) {
+    console.error('superadmin/customers count:', countError.message)
+    return (
+      <div className={styles.page}>
+        <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} />
+        <SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} />
+      </div>
+    )
+  }
+
+  const total = totalCount ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const page = Math.min(requestedPage, totalPages)
+
+  if (total > 0 && requestedPage !== page) {
+    redirect(`/superadmin/customers?page=${page}`)
+  }
+
+  const { data: customers, error } = await supabase
+    .from('customers')
+    .select('customer_id, customer_name, phone_number, outstanding_amount, customer_status, agent_email')
     .order('customer_name')
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
 
@@ -84,7 +107,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
             ))}
           </div>
 
-          <SuperadminPagination page={page} pageSize={PAGE_SIZE} total={count ?? 0} basePath="/superadmin/customers" />
+          <SuperadminPagination page={page} pageSize={PAGE_SIZE} total={total} basePath="/superadmin/customers" />
         </>
       )}
     </div>
