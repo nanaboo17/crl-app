@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, CheckCircle2, ClipboardList, Clock3, ShieldAlert, UserRound } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ClipboardList, Clock3, ShieldAlert, Sparkles, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import styles from './page.module.css'
@@ -37,14 +37,7 @@ export default async function AgentDailyPreVisitsPage({ params }: { params: Prom
 
   const startDate = `${date}T00:00:00+07:00`
   const endDate = `${date}T23:59:59.999+07:00`
-  const { data: preVisits, error } = await supabase
-    .from('pre_visits')
-    .select('previsit_id,customer_id,contact_attempt_date,contact_confirmed,address_confirmed,appointment_confirmed,appointment_date,contact_result,previsit_status,confirmed_address,landmark,previsit_notes')
-    .eq('agent_email', decodedEmail)
-    .gte('contact_attempt_date', startDate)
-    .lte('contact_attempt_date', endDate)
-    .order('contact_attempt_date', { ascending: false })
-
+  const { data: preVisits, error } = await supabase.from('pre_visits').select('previsit_id,customer_id,contact_attempt_date,contact_confirmed,address_confirmed,appointment_confirmed,appointment_date,contact_result,previsit_status,confirmed_address,landmark,previsit_notes').eq('agent_email', decodedEmail).gte('contact_attempt_date', startDate).lte('contact_attempt_date', endDate).order('contact_attempt_date', { ascending: false })
   if (error) return <main className={styles.page}><div className={styles.errorCard}>{error.message}</div></main>
 
   const customerIds = [...new Set((preVisits ?? []).map((item) => item.customer_id))]
@@ -60,6 +53,12 @@ export default async function AgentDailyPreVisitsPage({ params }: { params: Prom
   const followUpCount = preVisits?.filter((item) => item.previsit_status === 'Need Follow-up').length ?? 0
   const reviewCount = preVisits?.filter((item) => item.previsit_status === 'Supervisor Review').length ?? 0
   const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
+  const summaries = [
+    { label: t('superadmin.preVisits.daily.total'), value: total, icon: ClipboardList, tone: 'purple' },
+    { label: t('superadmin.preVisits.daily.ready'), value: readyCount, icon: CheckCircle2, tone: 'green' },
+    { label: t('superadmin.preVisits.daily.followUp'), value: followUpCount, icon: Clock3, tone: 'yellow' },
+    { label: t('superadmin.preVisits.daily.review'), value: reviewCount, icon: ShieldAlert, tone: 'red' },
+  ]
 
   return (
     <main className={styles.page}>
@@ -74,22 +73,24 @@ export default async function AgentDailyPreVisitsPage({ params }: { params: Prom
         description={`${dateLabel} · ${agent.email}`}
       />
 
+      <section className={styles.hero}>
+        <div><span><Sparkles aria-hidden="true" />{tx('DAILY PRE-VISIT', 'PRA-KUNJUNGAN HARIAN')}</span><h2>{tx('See who is ready before the field visit starts.', 'Lihat siapa yang siap sebelum kunjungan lapangan dimulai.')}</h2><p>{tx('Scan readiness, follow-ups, supervisor review, and each customer preparation record for this day.', 'Pantau kesiapan, tindak lanjut, review supervisor, dan setiap catatan persiapan pelanggan pada hari ini.')}</p></div>
+        <div className={styles.heroDate}><CalendarDays aria-hidden="true" /><strong>{date}</strong><span>{tx('Jakarta time', 'Waktu Jakarta')}</span></div>
+      </section>
+
       <section className={styles.statsGrid}>
-        <div className={styles.statCard}><div className={styles.statTop}><span>{t('superadmin.preVisits.daily.total')}</span><ClipboardList className={styles.statIcon} /></div><strong>{total}</strong></div>
-        <div className={styles.statCard}><div className={styles.statTop}><span>{t('superadmin.preVisits.daily.ready')}</span><CheckCircle2 className={styles.statIcon} /></div><strong>{readyCount}</strong></div>
-        <div className={styles.statCard}><div className={styles.statTop}><span>{t('superadmin.preVisits.daily.followUp')}</span><Clock3 className={styles.statIcon} /></div><strong>{followUpCount}</strong></div>
-        <div className={styles.statCard}><div className={styles.statTop}><span>{t('superadmin.preVisits.daily.review')}</span><ShieldAlert className={styles.statIcon} /></div><strong>{reviewCount}</strong></div>
+        {summaries.map(({ label, value, icon: Icon, tone }) => <article key={label} className={`${styles.statCard} ${styles[`tone_${tone}`]}`}><div className={styles.statIcon}><Icon aria-hidden="true" /></div><strong>{value}</strong><span>{label}</span></article>)}
       </section>
 
       <section className={styles.historyCard}>
-        <div className={styles.sectionHeader}><h2>{tx('Pre-visit records', 'Catatan pra-kunjungan')}</h2><p>{tx('Open a customer record to review the full pre-visit details.', 'Buka catatan pelanggan untuk melihat detail pra-kunjungan lengkap.')}</p></div>
+        <div className={styles.sectionHeader}><div><span>{tx('CUSTOMER PREPARATION', 'PERSIAPAN PELANGGAN')}</span><h2>{tx('Pre-visit records', 'Catatan pra-kunjungan')}</h2></div><p>{tx('Open a customer record to review the full pre-visit details.', 'Buka catatan pelanggan untuk melihat detail pra-kunjungan lengkap.')}</p></div>
         <div className={styles.list}>
           {preVisits && preVisits.length > 0 ? preVisits.map((preVisit) => {
             const customer = customerMap.get(preVisit.customer_id)
             const statusKey = previsitStatusKey(preVisit.previsit_status)
             return (
               <Link key={preVisit.previsit_id} href={`/superadmin/pre-visits/${encodeURIComponent(decodedEmail)}/${date}/${encodeURIComponent(preVisit.previsit_id)}`} className={styles.preVisitCard}>
-                <div className={styles.cardTop}><div><span className={styles.preVisitId}>{preVisit.previsit_id}</span><h2>{customer?.customer_name || preVisit.customer_id}</h2><p>{preVisit.customer_id}</p></div><span className={styles.arrow}>›</span></div>
+                <div className={styles.cardTop}><div><span className={styles.preVisitId}>{preVisit.previsit_id}</span><h2>{customer?.customer_name || preVisit.customer_id}</h2><p>{preVisit.customer_id} · {customer?.sub_district || customer?.district || customer?.city || '-'}</p></div><span className={styles.arrow}>›</span></div>
                 <div className={styles.infoGrid}>
                   <div><span>{t('superadmin.preVisits.daily.contactResult')}</span><strong>{preVisit.contact_result || '-'}</strong></div>
                   <div><span>{t('superadmin.preVisits.daily.preVisitStatus')}</span><strong>{statusKey ? t(statusKey) : preVisit.previsit_status || '-'}</strong></div>
