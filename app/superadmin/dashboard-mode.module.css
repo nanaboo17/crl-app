@@ -1,0 +1,93 @@
+.fieldOnly { display: none; }
+
+:global(html[data-field-mode='on']) .fieldOnly {
+  display: grid;
+}
+
+:global(html[data-field-mode='on']) .generalOnly {
+  display: none !important;
+}
+
+.fieldGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fieldCard {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid rgb(94 67 122 / .1);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fffdf7, #f7f4ff);
+  color: #40364d;
+  text-decoration: none;
+  box-shadow: 0 10px 26px rgb(71 49 100 / .06);
+}
+
+.fieldCard span {
+  color: #756b7f;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.fieldCard strong {
+  font-size: 34px;
+  line-height: 1;
+  color: #59309d;
+}
+
+.fieldCard small {
+  color: #8b8094;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.themeCard {}
+.themeRoot {}
+
+:global(html[data-theme='crl-dark']) .themeRoot {
+  color: var(--color-base-content);
+}
+
+:global(html[data-theme='crl-dark']) .themeCard {
+  border-color: color-mix(in oklab, var(--color-base-content) 13%, transparent) !important;
+  background: color-mix(in oklab, var(--color-base-100) 94%, #3f2e59 6%) !important;
+  color: var(--color-base-content) !important;
+  box-shadow: 0 14px 34px rgb(0 0 0 / .18) !important;
+}
+
+:global(html[data-theme='crl-dark']) .themeCard strong,
+:global(html[data-theme='crl-dark']) .themeCard h1,
+:global(html[data-theme='crl-dark']) .themeCard h2,
+:global(html[data-theme='crl-dark']) .themeCard p,
+:global(html[data-theme='crl-dark']) .themeCard span,
+:global(html[data-theme='crl-dark']) .themeCard small,
+:global(html[data-theme='crl-dark']) .themeCard time {
+  color: inherit;
+}
+
+:global(html[data-theme='crl-dark']) .fieldCard {
+  border-color: color-mix(in oklab, var(--color-base-content) 13%, transparent);
+  background: linear-gradient(180deg, #2c2633, #302844);
+  color: var(--color-base-content);
+  box-shadow: 0 10px 26px rgb(0 0 0 / .18);
+}
+
+:global(html[data-theme='crl-dark']) .fieldCard span,
+:global(html[data-theme='crl-dark']) .fieldCard small {
+  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+}
+
+:global(html[data-theme='crl-dark']) .fieldCard strong {
+  color: #cfb9ff;
+}
+
+@media (max-width: 900px) {
+  .fieldGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .fieldGrid { grid-template-columns: 1fr; }
+}
