@@ -15,7 +15,7 @@ export const agentMessages = defineMessages({
   'agent.dashboard.statRoute': { en: 'Route', id: 'Rute' },
   'agent.dashboard.statPreVisits': { en: 'Pre-Visits', id: 'Pra-Kunjungan' },
   'agent.dashboard.statVisits': { en: 'Visits', id: 'Kunjungan' },
-  'agent.dashboard.manage': { en: 'Manage {name} →', id: 'Kelola {name} →' },
+  'agent.dashboard.manage': { en: 'Manage {name}', id: 'Kelola {name}' },
   'agent.dashboard.accountError': { en: 'Account Error: {message}', id: 'Kesalahan Akun: {message}' },
   'agent.dashboard.agentNotFound': {
     en: 'Agent not found. Your login email: {email}',
@@ -95,7 +95,7 @@ export const agentMessages = defineMessages({
     en: 'Customer not found or not assigned to you.',
     id: 'Pelanggan tidak ditemukan atau tidak ditugaskan kepada Anda.',
   },
-  'agent.customer.back': { en: '← Back', id: '← Kembali' },
+  'agent.customer.back': { en: 'Back', id: 'Kembali' },
   'agent.customer.summaryAria': { en: 'Summary', id: 'Ringkasan' },
   'agent.customer.statPriority': { en: 'Priority', id: 'Prioritas' },
   'agent.customer.priorityUrgent': { en: 'Very urgent', id: 'Sangat mendesak' },
