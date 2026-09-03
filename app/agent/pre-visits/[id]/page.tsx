@@ -190,7 +190,7 @@ export default function PreVisitDetailPage() {
 
       {canStartVisit && (
         <section className={styles.actionCard}>
-          <Link className={styles.startButton} href={`/agent/visits/new?customer=${encodeURIComponent(row.customer_id)}`}>
+          <Link className={styles.startButton} href={`/agent/customers/${encodeURIComponent(row.customer_id)}/visit`}>
             <CheckCircle2 size={17} /> {t('agent.preVisitDetail.startVisit')}
           </Link>
         </section>
