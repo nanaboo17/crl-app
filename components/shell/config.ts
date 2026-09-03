@@ -3,6 +3,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   MapPin,
+  MapPinned,
   Route,
   Users,
 } from 'lucide-react'
@@ -49,6 +50,7 @@ export const superadminConfig: ShellConfig = {
     ]),
     managementGroup([
       { href: '/superadmin/agents', labelKey: 'nav.agents', icon: Users },
+      { href: '/superadmin/territories', labelKey: 'nav.territories', icon: MapPinned },
       { href: '/superadmin/customers', labelKey: 'nav.customers', icon: Building2 },
       { href: '/superadmin/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
       { href: '/superadmin/visits', labelKey: 'nav.visits', icon: MapPin },
@@ -66,6 +68,7 @@ export const adminConfig: ShellConfig = {
       { href: '/admin', labelKey: 'common.dashboard', icon: LayoutDashboard, exact: true },
     ]),
     managementGroup([
+      { href: '/admin/territories', labelKey: 'nav.territories', icon: MapPinned },
       { href: '/admin/customers', labelKey: 'nav.customers', icon: Building2 },
       { href: '/admin/visits', labelKey: 'nav.visits', icon: MapPin },
       { href: '/admin/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
