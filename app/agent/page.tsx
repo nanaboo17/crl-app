@@ -75,11 +75,17 @@ export default async function AgentPage() {
 
       <section aria-label={t('agent.dashboard.statsAria')} className={styles.statsGrid}>
         {stats.map(({ href, label, count, icon: Icon }) => (
-          <Link key={label} href={href} className="dui-stat border border-base-300 bg-base-100 transition-colors hover:border-base-content/30">
-            <div className="dui-stat-figure text-base-content/25"><Icon aria-hidden="true" className="h-6 w-6" /></div>
-            <div className="dui-stat-title">{label}</div>
-            <div className="dui-stat-value text-3xl">{count.toLocaleString()}</div>
-            <div className="dui-stat-desc">{t('agent.dashboard.manage', { name: label.toLowerCase() })}</div>
+          <Link key={label} href={href} className={styles.statCard}>
+            <div className={styles.statTop}>
+              <div>
+                <div className={styles.statLabel}>{label}</div>
+                <div className={styles.statValue}>{count.toLocaleString()}</div>
+              </div>
+              <div className={styles.iconBox}>
+                <Icon aria-hidden="true" className="h-5 w-5" />
+              </div>
+            </div>
+            <div className={styles.statFooter}>{t('agent.dashboard.manage', { name: label.toLowerCase() })}</div>
           </Link>
         ))}
       </section>
