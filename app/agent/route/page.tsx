@@ -62,7 +62,8 @@ function formatDistance(meters: number) {
 }
 
 export default function AgentRoutePage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const supabase = createClient()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [agentName, setAgentName] = useState('')
@@ -217,15 +218,84 @@ export default function AgentRoutePage() {
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}><div><p className={styles.eyebrow}>{t('agent.route.eyebrow')}</p><h1>{t('agent.route.title')}</h1><p className={styles.subtitle}><UserRound size={15} /> {agentName}</p></div><Link href="/agent" className={styles.backButton}>{t('agent.route.back')}</Link></header>
+      <header className={styles.header}>
+        <div><p className={styles.eyebrow}>{t('agent.route.eyebrow')}</p><h1>{t('agent.route.title')}</h1><p className={styles.subtitle}><UserRound size={15} /> {agentName}</p></div>
+        <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Back to agent dashboard', 'Kembali ke dashboard agent')}>
+          <Link href="/agent" className={styles.backButton}>{t('agent.route.back')}</Link>
+        </div>
+      </header>
+
       <section className={styles.heroGrid}>
-        <div className={styles.locationCard}><div className={styles.cardIcon}><LocateFixed size={20} /></div><div className={styles.locationCopy}><span>{t('agent.route.currentLocation')}</span>{latitude !== null && longitude !== null ? <><strong>{t('agent.route.locationCaptured')}</strong><small>{latitude.toFixed(6)}, {longitude.toFixed(6)}</small>{accuracy !== null && <small>{t('agent.route.accuracy', { value: accuracy.toFixed(1) })}</small>}</> : <strong>{t('agent.route.captureHint')}</strong>}</div><button type="button" className={styles.gpsButton} onClick={captureLocation} disabled={gettingGps}>{gettingGps ? t('agent.route.gettingLocation') : t('agent.route.useMyLocation')}</button></div>
-        <div className={styles.summaryGrid}><div className={styles.summaryCard}><span>{t('agent.route.needVisit')}</span><strong>{availableCustomers.length}</strong></div><div className={styles.summaryCard}><span>{t('agent.route.routeStops')}</span><strong>{route.length}</strong></div></div>
+        <div className={styles.locationCard}>
+          <div className="dui-tooltip" data-tip={tx('Uses your phone GPS to calculate nearby route stops', 'Menggunakan GPS ponsel untuk menghitung rute pelanggan terdekat')}>
+            <div className={styles.cardIcon}><LocateFixed size={20} /></div>
+          </div>
+          <div className={styles.locationCopy}><span>{t('agent.route.currentLocation')}</span>{latitude !== null && longitude !== null ? <><strong>{t('agent.route.locationCaptured')}</strong><small>{latitude.toFixed(6)}, {longitude.toFixed(6)}</small>{accuracy !== null && <small>{t('agent.route.accuracy', { value: accuracy.toFixed(1) })}</small>}</> : <strong>{t('agent.route.captureHint')}</strong>}</div>
+          <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Capture your latest high-accuracy GPS position', 'Ambil posisi GPS terbaru dengan akurasi tinggi')}>
+            <button type="button" className={styles.gpsButton} onClick={captureLocation} disabled={gettingGps}>{gettingGps ? t('agent.route.gettingLocation') : t('agent.route.useMyLocation')}</button>
+          </div>
+        </div>
+
+        <div className={styles.summaryGrid}>
+          <div className="dui-tooltip" data-tip={tx(`Customers not yet visited, with coordinates, within ${MAX_ROUTE_DISTANCE_KM} km`, `Pelanggan belum dikunjungi, memiliki koordinat, dalam radius ${MAX_ROUTE_DISTANCE_KM} km`)}>
+            <div className={styles.summaryCard}><span>{t('agent.route.needVisit')}</span><strong>{availableCustomers.length}</strong></div>
+          </div>
+          <div className="dui-tooltip" data-tip={tx('Number of customers included in the recommended route', 'Jumlah pelanggan yang masuk ke rute rekomendasi')}>
+            <div className={styles.summaryCard}><span>{t('agent.route.routeStops')}</span><strong>{route.length}</strong></div>
+          </div>
+        </div>
       </section>
+
       {error && <div className={styles.errorCard}>{error}</div>}
-      {latitude !== null && longitude !== null && <section className={styles.mapSection}><div className={styles.sectionHeader}><div><p className={styles.eyebrow}>{t('agent.route.mapTitle')}</p><h2>{t('agent.route.recommended')}</h2></div>{route.length > 0 && <span className={styles.countBadge}>{route.length}</span>}</div><div className={styles.mapCard}><iframe title={t('agent.route.mapTitle')} src={`https://maps.google.com/maps?q=${latitude},${longitude}&z=14&output=embed`} loading="lazy" /></div>{route.length > 0 && <button type="button" className={styles.routeButton} onClick={openFullRoute}><Navigation size={17} /> {t('agent.route.openFullRoute')}</button>}</section>}
-      <section className={styles.section}><div className={styles.sectionHeader}><div><p className={styles.eyebrow}><Route size={13} /> {t('agent.route.nearestFirst')}</p><h2>{t('agent.route.recommended')}</h2></div><span className={styles.countBadge}>{route.length}</span></div>{latitude === null ? <div className={styles.emptyCard}>{t('agent.route.captureFirst')}</div> : route.length > 0 ? <div className={styles.routeList}>{route.map((customer) => <article key={customer.customer_id} className={styles.stopCard}><div className={styles.sequence}>{customer.sequence}</div><div className={styles.stopContent}><div className={styles.stopHeader}><div><h3>{customer.customer_name}</h3><p>{customer.customer_id}</p></div><strong className={styles.distance}>{formatDistance(customer.distance_from_previous)}</strong></div><div className={styles.stopInfo}><span>{t('agent.route.priorityLabel', { value: customer.priority_rank ?? '-' })}</span><span>{customer.payment_status?.toUpperCase() || t('agent.route.notSet')}</span><span>{t('agent.route.churnLabel', { days: customer.days_left_to_churn ?? '-' })}</span></div><p className={styles.address}><MapPin size={14} /> {customer.service_address || customer.sub_district || customer.district || customer.city || '-'}</p><div className={styles.actions}><Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link><a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a></div></div></article>)}</div> : <div className={styles.emptyCard}>{t('agent.route.captureFirst')}</div>}</section>
-      {excludedCustomers.length > 0 && <section className={styles.warningCard}><h2>{t('agent.route.warningTitle')}</h2><p>{t('agent.route.warningBody', { km: MAX_ROUTE_DISTANCE_KM })}</p><div className={styles.warningList}>{excludedCustomers.map((customer) => <div key={customer.customer_id} className={styles.warningCustomer}><div><strong>{customer.customer_name}</strong><span>{customer.customer_id}</span></div><span>{t('agent.route.kmAway', { km: (customer.distanceFromAgent / 1000).toFixed(1) })}</span></div>)}</div></section>}
+
+      {latitude !== null && longitude !== null && (
+        <section className={styles.mapSection}>
+          <div className={styles.sectionHeader}><div><p className={styles.eyebrow}>{t('agent.route.mapTitle')}</p><h2>{t('agent.route.recommended')}</h2></div>{route.length > 0 && <span className={styles.countBadge}>{route.length}</span>}</div>
+          <div className={styles.mapCard}><iframe title={t('agent.route.mapTitle')} src={`https://maps.google.com/maps?q=${latitude},${longitude}&z=14&output=embed`} loading="lazy" /></div>
+          {route.length > 0 && (
+            <div className="dui-tooltip" data-tip={tx('Open all recommended stops in Google Maps', 'Buka semua titik rute rekomendasi di Google Maps')}>
+              <button type="button" className={styles.routeButton} onClick={openFullRoute}><Navigation size={17} /> {t('agent.route.openFullRoute')}</button>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div><p className={styles.eyebrow}><Route size={13} /> {t('agent.route.nearestFirst')}</p><h2>{t('agent.route.recommended')}</h2></div>
+          <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Stops are ordered from the nearest next customer', 'Urutan titik berdasarkan pelanggan berikutnya yang paling dekat')}><span className={styles.countBadge}>{route.length}</span></div>
+        </div>
+
+        {latitude === null ? <div className={styles.emptyCard}>{t('agent.route.captureFirst')}</div> : route.length > 0 ? (
+          <div className={styles.routeList}>
+            {route.map((customer) => (
+              <article key={customer.customer_id} className={styles.stopCard}>
+                <div className="dui-tooltip" data-tip={tx(`Stop number ${customer.sequence}`, `Urutan kunjungan ${customer.sequence}`)}><div className={styles.sequence}>{customer.sequence}</div></div>
+                <div className={styles.stopContent}>
+                  <div className={styles.stopHeader}>
+                    <div><h3>{customer.customer_name}</h3><p>{customer.customer_id}</p></div>
+                    <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Distance from your previous position or previous stop', 'Jarak dari posisi awal atau titik sebelumnya')}><strong className={styles.distance}>{formatDistance(customer.distance_from_previous)}</strong></div>
+                  </div>
+                  <div className={styles.stopInfo}><span>{t('agent.route.priorityLabel', { value: customer.priority_rank ?? '-' })}</span><span>{customer.payment_status?.toUpperCase() || t('agent.route.notSet')}</span><span>{t('agent.route.churnLabel', { days: customer.days_left_to_churn ?? '-' })}</span></div>
+                  <p className={styles.address}><MapPin size={14} /> {customer.service_address || customer.sub_district || customer.district || customer.city || '-'}</p>
+                  <div className={styles.actions}>
+                    <div className="dui-tooltip" data-tip={tx('Open customer profile, pre-visit and visit actions', 'Buka profil pelanggan, pre-visit, dan aksi kunjungan')}><Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link></div>
+                    <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Open driving navigation to this customer in Google Maps', 'Buka navigasi berkendara ke pelanggan ini di Google Maps')}><a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a></div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <div className={styles.emptyCard}>{t('agent.route.captureFirst')}</div>}
+      </section>
+
+      {excludedCustomers.length > 0 && (
+        <section className={styles.warningCard}>
+          <h2>{t('agent.route.warningTitle')}</h2>
+          <p>{t('agent.route.warningBody', { km: MAX_ROUTE_DISTANCE_KM })}</p>
+          <div className={styles.warningList}>{excludedCustomers.map((customer) => <div key={customer.customer_id} className={styles.warningCustomer}><div><strong>{customer.customer_name}</strong><span>{customer.customer_id}</span></div><div className="dui-tooltip dui-tooltip-left" data-tip={tx(`Outside the ${MAX_ROUTE_DISTANCE_KM} km recommended-route radius`, `Di luar radius rute rekomendasi ${MAX_ROUTE_DISTANCE_KM} km`)}><span>{t('agent.route.kmAway', { km: (customer.distanceFromAgent / 1000).toFixed(1) })}</span></div></div>)}</div>
+        </section>
+      )}
     </main>
   )
 }
