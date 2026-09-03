@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Globe, LogOut, Menu, Moon, Sun, User } from 'lucide-react'
+import { Bell, Globe, LogOut, Menu, Moon, Sun, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { superadminConfig, type ShellConfig } from '@/components/shell/config'
 import { useI18n } from '@/components/providers/i18n-provider'
@@ -30,8 +30,8 @@ export default function SuperadminNavbar({
   const { theme, toggleTheme } = useTheme()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const playful = config.role === 'superadmin'
 
-  // Close the user menu on outside click or Escape.
   useEffect(() => {
     if (!menuOpen) return
 
@@ -61,12 +61,18 @@ export default function SuperadminNavbar({
     router.refresh()
   }
 
-  const iconBtn =
-    'rounded-lg p-2 text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content'
+  const iconBtn = playful
+    ? 'grid h-11 w-11 place-items-center rounded-full border border-[#efe5c8] bg-white text-[#6b3fdb] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6b3fdb]'
+    : 'rounded-lg p-2 text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content'
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 flex-shrink-0 items-center gap-3 border-b border-base-300 bg-base-100 px-4 sm:px-6 lg:px-8">
-      {/* Mobile: open navigation drawer. Desktop: sidebar already visible. */}
+    <header
+      className={`sticky top-0 z-30 flex flex-shrink-0 items-center gap-3 px-4 sm:px-6 lg:px-8 ${
+        playful
+          ? 'h-20 border-b border-[#efe5c8] bg-[#fffdf6]/95 backdrop-blur'
+          : 'h-16 border-b border-base-300 bg-base-100'
+      }`}
+    >
       <button
         ref={menuButtonRef}
         type="button"
@@ -79,35 +85,51 @@ export default function SuperadminNavbar({
         <Menu aria-hidden="true" className="h-5 w-5" />
       </button>
 
-      {/* Brand only on mobile — desktop brand lives in the sidebar */}
       <span className="flex items-center gap-2 lg:hidden">
         <Image
           src="/logo/logo2.png"
           alt="CRL logo"
-          width={27}
-          height={18}
-          className="h-[18px] w-auto object-contain"
+          width={playful ? 36 : 27}
+          height={playful ? 26 : 18}
+          className={playful ? 'h-7 w-auto object-contain' : 'h-[18px] w-auto object-contain'}
         />
-        <span className="text-base font-semibold tracking-tight text-base-content">
+        <span className={`font-semibold tracking-tight ${playful ? 'text-lg text-[#5b2eb8]' : 'text-base text-base-content'}`}>
           {t('nav.brand')}
         </span>
       </span>
 
-      {/* Toggles + user menu */}
-      <div className="ml-auto flex items-center gap-1.5">
-        {/* Language toggle */}
+      {playful ? (
+        <div className="hidden min-w-0 lg:block">
+          <p className="truncate text-sm font-extrabold text-[#4b4059]">{agentName}</p>
+          <p className="truncate text-xs font-medium text-[#91879a]">{email}</p>
+        </div>
+      ) : null}
+
+      <div className="ml-auto flex items-center gap-2">
+        {playful ? (
+          <div className="hidden items-center gap-2 rounded-full border border-[#efe5c8] bg-white px-4 py-2.5 text-sm font-bold text-[#5a5366] shadow-sm sm:flex">
+            <span aria-hidden="true">🌼</span>
+            <span>{locale === 'id' ? 'Mode Lapangan' : 'Field Mode'}</span>
+          </div>
+        ) : null}
+
+        {playful ? (
+          <button type="button" className={iconBtn} aria-label="Notifications" title="Notifications">
+            <Bell aria-hidden="true" className="h-5 w-5" />
+          </button>
+        ) : null}
+
         <button
           type="button"
           onClick={() => setLocale(locale === 'id' ? 'en' : 'id')}
           aria-label={locale === 'id' ? t('header.language.en') : t('header.language.id')}
           title={locale === 'id' ? t('header.language.en') : t('header.language.id')}
-          className={`${iconBtn} flex items-center gap-1.5 font-semibold`}
+          className={playful ? `${iconBtn} relative` : `${iconBtn} flex items-center gap-1.5 font-semibold`}
         >
           <Globe aria-hidden="true" className="h-4 w-4" />
-          <span className="text-xs uppercase">{locale}</span>
+          <span className={playful ? 'absolute -bottom-1 text-[9px] font-black uppercase text-[#6b3fdb]' : 'text-xs uppercase'}>{locale}</span>
         </button>
 
-        {/* Theme toggle */}
         <button
           type="button"
           onClick={toggleTheme}
@@ -122,7 +144,6 @@ export default function SuperadminNavbar({
           )}
         </button>
 
-        {/* User menu */}
         <div ref={menuRef} className="relative">
           <button
             type="button"
@@ -130,11 +151,19 @@ export default function SuperadminNavbar({
             aria-label={t('navbar.accountMenu', { name: agentName })}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="rounded-full p-1 transition-colors hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content"
+            className={
+              playful
+                ? 'rounded-full border-2 border-white bg-gradient-to-br from-[#7b4be8] to-[#a66cff] p-1.5 text-white shadow-md transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6b3fdb]'
+                : 'rounded-full p-1 transition-colors hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content'
+            }
           >
             <span
               aria-hidden="true"
-              className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-content"
+              className={
+                playful
+                  ? 'grid h-9 w-9 place-items-center rounded-full'
+                  : 'grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-content'
+              }
             >
               <User className="h-4 w-4" />
             </span>
@@ -144,14 +173,18 @@ export default function SuperadminNavbar({
             <div
               role="menu"
               aria-label={t('nav.account.label')}
-              className="absolute right-0 mt-2 w-64 rounded-xl border border-base-300 bg-base-100 p-2 shadow-lg"
+              className={`absolute right-0 mt-2 w-64 p-2 shadow-lg ${
+                playful
+                  ? 'rounded-2xl border border-[#efe5c8] bg-[#fffdf8]'
+                  : 'rounded-xl border border-base-300 bg-base-100'
+              }`}
             >
-              <div className="border-b border-base-300 px-3 py-2.5">
-                <p className="truncate text-sm font-semibold text-base-content">
+              <div className={playful ? 'border-b border-[#efe5c8] px-3 py-2.5' : 'border-b border-base-300 px-3 py-2.5'}>
+                <p className={playful ? 'truncate text-sm font-bold text-[#42394d]' : 'truncate text-sm font-semibold text-base-content'}>
                   {agentName}
                 </p>
-                <p className="truncate text-xs text-base-content/60">{email}</p>
-                <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-base-content/50">
+                <p className={playful ? 'truncate text-xs text-[#887f91]' : 'truncate text-xs text-base-content/60'}>{email}</p>
+                <p className={playful ? 'mt-1 text-[11px] font-semibold uppercase tracking-wider text-[#9b91a4]' : 'mt-1 text-[11px] font-semibold uppercase tracking-wider text-base-content/50'}>
                   {t(`navbar.role.${config.role}`)}
                 </p>
               </div>
@@ -160,7 +193,7 @@ export default function SuperadminNavbar({
                   href={config.home}
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-sm font-medium text-base-content/80 transition-colors hover:bg-base-200 hover:text-base-content"
+                  className={playful ? 'block rounded-xl px-3 py-2 text-sm font-semibold text-[#5b2eb8] transition-colors hover:bg-[#f4edff]' : 'block rounded-lg px-3 py-2 text-sm font-medium text-base-content/80 transition-colors hover:bg-base-200 hover:text-base-content'}
                 >
                   {t('common.dashboard')}
                 </Link>
@@ -168,7 +201,7 @@ export default function SuperadminNavbar({
                   type="button"
                   role="menuitem"
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-error transition-colors hover:bg-error/10"
+                  className={playful ? 'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#cc4f63] transition-colors hover:bg-[#fff0f2]' : 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-error transition-colors hover:bg-error/10'}
                 >
                   <LogOut aria-hidden="true" className="h-4 w-4" />
                   {t('common.logout')}
