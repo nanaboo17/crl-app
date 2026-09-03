@@ -78,16 +78,11 @@ export default async function AgentVisitDaysPage({
       <SuperadminPageHeader
         breadcrumbs={[
           { label: tx('Superadmin', 'Superadmin'), href: '/superadmin' },
-          { label: t('superadmin.visits.agentDays.back'), href: '/superadmin/visits', icon: MapPin },
+          { label: tx('Visits', 'Kunjungan'), href: '/superadmin/visits', icon: MapPin },
           { label: agent.agent_name || agent.email, icon: UserRound },
         ]}
         title={agent.agent_name || tx('Agent Visits', 'Kunjungan Agen')}
         description={`${agent.sales_code || tx('No sales code', 'Tanpa sales code')} · ${agent.email}`}
-        actions={
-          <Link href="/superadmin/visits" className="dui-btn dui-btn-outline dui-btn-sm">
-            {t('superadmin.visits.agentDays.back')}
-          </Link>
-        }
       />
 
       <section className={styles.statsGrid} aria-label={tx('Visit summary', 'Ringkasan kunjungan')}>
