@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronRight, History, MapPin } from 'lucide-react'
+import { CalendarDays, ChevronRight, CheckCircle2, History, MapPin, Route } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { Visit } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -45,20 +45,26 @@ export default function VisitsPage() {
     return [...map.entries()]
   }, [pageRows, locale])
 
+  const completed = rows.filter((row) => Boolean(row.visit_result || row.visit_status_kunjungan)).length
+  const recentDays = new Set(rows.filter((row) => row.visit_date).map((row) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(row.visit_date)))).size
+
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.iconWrap}><History aria-hidden="true" /></div>
-        <div>
-          <p className={styles.eyebrow}>{tx('Field activity', 'Aktivitas lapangan')}</p>
-          <h1>{tx('Visit History', 'Riwayat Kunjungan')}</h1>
-          <p>{tx('Review all of your submitted customer visits.', 'Lihat seluruh kunjungan pelanggan yang sudah Anda kirim.')}</p>
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <span>{tx('FIELD HISTORY', 'RIWAYAT LAPANGAN')}</span>
+          <h1>{tx('Every completed visit, easy to review.', 'Setiap kunjungan selesai, mudah ditinjau.')}</h1>
+          <p>{tx('Check your submitted customer visits, results, notes, and activity by day.', 'Lihat kunjungan pelanggan yang sudah dikirim, hasil, catatan, dan aktivitas per hari.')}</p>
         </div>
-      </header>
+        <div className={styles.heroScene} aria-hidden="true">
+          <MapPin /><span className={styles.routeLine} /><span className={styles.dotOne} /><span className={styles.dotTwo} />
+        </div>
+      </section>
 
-      <section className={styles.summary}>
-        <MapPin aria-hidden="true" />
-        <div><span>{tx('Total submitted visits', 'Total kunjungan terkirim')}</span><strong>{rows.length}</strong></div>
+      <section className={styles.summaryGrid}>
+        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{rows.length}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{completed}</strong><span>{tx('Completed records', 'Data selesai')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
       </section>
 
       {loading && <div className={styles.state}>{tx('Loading visit history…', 'Memuat riwayat kunjungan…')}</div>}
