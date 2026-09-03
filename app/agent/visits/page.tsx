@@ -45,7 +45,7 @@ export default function VisitsPage() {
     return [...map.entries()]
   }, [pageRows, locale])
 
-  const completed = rows.filter((row) => Boolean(row.visit_result || row.visit_status_kunjungan)).length
+  const completed = rows.filter((row) => Boolean(row.visit_result)).length
   const recentDays = new Set(rows.filter((row) => row.visit_date).map((row) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(row.visit_date)))).size
 
   return (
