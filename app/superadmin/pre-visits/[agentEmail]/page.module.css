@@ -1,157 +1,94 @@
 .page {
   width: 100%;
-  max-width: 760px;
-  min-height: 100vh;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 20px 16px 100px;
-  background: #f8fafc;
-}
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.backButton {
-  flex-shrink: 0;
-  padding-top: 5px;
-  color: #111827;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.eyebrow {
-  margin: 0 0 5px;
-  color: #6b7280;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-}
-
-.header h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 25px;
-}
-
-.header p:last-child {
-  margin: 5px 0 0;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.summaryCard {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-  padding: 18px;
-  border-radius: 18px;
-  background: #111827;
-  color: white;
-}
-
-.summaryCard span {
-  font-size: 14px;
-}
-
-.summaryCard strong {
-  font-size: 28px;
-}
-
-.list {
+  padding: 24px 20px 48px;
   display: grid;
-  gap: 12px;
+  gap: 24px;
 }
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.statCard {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 16px;
+  background: var(--color-base-100);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.statTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statIcon { width: 18px; height: 18px; flex: 0 0 auto; opacity: .5; }
+.statCard strong { display: block; margin-top: 8px; font-size: 32px; line-height: 1; letter-spacing: -.04em; }
+
+.historyCard {
+  border: 1px solid var(--color-base-300);
+  border-radius: 18px;
+  background: var(--color-base-100);
+  padding: 18px;
+}
+
+.sectionHeader { margin-bottom: 14px; }
+.sectionHeader h2 { margin: 0; font-size: 18px; }
+.sectionHeader p { margin: 4px 0 0; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 13px; }
+.list { display: grid; gap: 10px; }
 
 .dayCard {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: white;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 14px;
   color: inherit;
   text-decoration: none;
+  transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
+.dayCard:hover { border-color: color-mix(in oklab, var(--color-base-content) 28%, var(--color-base-300)); transform: translateY(-1px); box-shadow: 0 6px 18px rgb(0 0 0 / .05); }
+.dateBlock { min-width: 0; }
+.dateLabel { display: block; margin-bottom: 4px; color: color-mix(in oklab, var(--color-base-content) 58%, transparent); font-size: 12px; }
+.dateBlock strong { font-size: 16px; }
+.cardRight { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.readyBadge, .followBadge, .reviewBadge { display: inline-flex; align-items: center; min-height: 28px; padding: 5px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.readyBadge { background: color-mix(in oklab, var(--color-success) 12%, var(--color-base-100)); color: var(--color-success); }
+.followBadge { background: color-mix(in oklab, var(--color-warning) 14%, var(--color-base-100)); color: color-mix(in oklab, var(--color-warning) 72%, var(--color-base-content)); }
+.reviewBadge { background: color-mix(in oklab, var(--color-error) 10%, var(--color-base-100)); color: var(--color-error); }
+.arrow { width: 20px; height: 20px; color: color-mix(in oklab, var(--color-base-content) 36%, transparent); }
+.empty { padding: 32px 18px; border: 1px dashed var(--color-base-300); border-radius: 14px; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); text-align: center; }
+.errorCard { padding: 14px; border: 1px solid color-mix(in oklab, var(--color-error) 28%, var(--color-base-300)); border-radius: 12px; background: color-mix(in oklab, var(--color-error) 7%, var(--color-base-100)); color: var(--color-error); }
 
-.dateLabel {
-  display: block;
-  margin-bottom: 5px;
-  color: #6b7280;
-  font-size: 12px;
+@media (max-width: 900px) { .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .page { padding: 16px 12px 36px; gap: 18px; }
+  .statsGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .statCard { padding: 14px; }
+  .statCard strong { font-size: 28px; }
+  .historyCard { padding: 14px; border-radius: 16px; }
+  .dayCard { align-items: flex-start; padding: 14px; }
+  .cardRight { align-items: flex-end; gap: 6px; }
+  .badges { display: grid; justify-items: end; gap: 6px; }
+  .readyBadge, .followBadge, .reviewBadge { min-height: 24px; padding: 4px 7px; font-size: 10px; }
 }
-
-.dayCard strong {
-  color: #111827;
-  font-size: 17px;
-}
-
-.stats {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-}
-
-.readyBadge,
-.followBadge,
-.reviewBadge {
-  padding: 5px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.readyBadge {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.followBadge {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.reviewBadge {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.arrow {
-  color: #9ca3af;
-  font-size: 26px;
-}
-
-.empty {
-  padding: 30px;
-  border: 1px dashed #d1d5db;
-  border-radius: 18px;
-  background: white;
-  color: #6b7280;
-  text-align: center;
-}
-
-.errorCard {
-  padding: 14px;
-  border: 1px solid #fecaca;
-  border-radius: 12px;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-@media (max-width: 520px) {
-  .dayCard {
-    align-items: flex-start;
-  }
-
-  .stats {
-    max-width: 150px;
-  }
+@media (max-width: 420px) {
+  .statsGrid { grid-template-columns: 1fr; }
+  .dayCard { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .badges { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: flex-start; }
+  .cardRight { display: contents; }
+  .arrow { grid-column: 2; grid-row: 1; align-self: center; }
 }
