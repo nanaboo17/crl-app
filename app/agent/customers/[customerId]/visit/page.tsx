@@ -47,7 +47,7 @@ function formatVisitTimestamp(iso: string) {
 }
 
 export default function VisitPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const params = useParams()
   const router = useRouter()
   const customerId = decodeURIComponent(params.customerId as string)
@@ -226,8 +226,8 @@ export default function VisitPage() {
       const lines = [
         `Lat: ${latitude.toFixed(7)}`,
         `Lng: ${longitude.toFixed(7)}`,
-        `Photo: ${formatVisitTimestamp(capturedAt)}`,
-        `Customer: ${customerId}`,
+        `${locale === 'id' ? 'Foto' : 'Photo'}: ${formatVisitTimestamp(capturedAt)}`,
+        `${locale === 'id' ? 'Pelanggan' : 'Customer'}: ${customerId}`,
       ]
       const overlayHeight = lineHeight * lines.length + padding * 2
       const y = Math.max(0, canvas.height - overlayHeight)
@@ -276,8 +276,8 @@ export default function VisitPage() {
   async function submitVisit() {
     setError('')
     if (latitude === null || longitude === null || !gpsCapturedAt) return setError(t('agent.visit.err.gpsBeforeSubmit'))
-    if (phoneCorrect === null) return setError('Please confirm whether the registered phone number is correct.')
-    if (phoneCorrect === false && !isValidPhone(updatedPhone)) return setError('Enter a valid updated phone number (10–15 digits, starting with 0 or 62).')
+    if (phoneCorrect === null) return setError(locale === 'id' ? 'Mohon konfirmasi apakah nomor telepon terdaftar sudah benar.' : 'Please confirm whether the registered phone number is correct.')
+    if (phoneCorrect === false && !isValidPhone(updatedPhone)) return setError(locale === 'id' ? 'Masukkan nomor telepon terbaru yang valid (10–15 digit, diawali 0 atau 62).' : 'Enter a valid updated phone number (10–15 digits, starting with 0 or 62).')
     if (!visitStatusKunjungan) return setError(t('agent.visit.err.selectVisitStatus'))
     if (!conversationResult) return setError(t('agent.visit.err.selectConversation'))
     if (conversationResult !== 'Tidak bertemu pelanggan' && !approvedOffer) return setError(t('agent.visit.err.selectOffer'))
@@ -390,16 +390,16 @@ export default function VisitPage() {
       </StepCard>
 
       <StepCard t={t} step="2" title={t('agent.visit.step2')}>
-        <div className="flex items-center gap-2 text-sm font-bold"><Phone className="h-4 w-4" /> Registered phone</div>
+        <div className="flex items-center gap-2 text-sm font-bold"><Phone className="h-4 w-4" /> {locale === 'id' ? 'Nomor telepon terdaftar' : 'Registered phone'}</div>
         <ReadOnly label={t('agent.visit.fieldCurrentPhone')} value={customer?.phone_number || '-'} />
-        {alternativePhones.length > 0 && <div className="grid gap-2 sm:grid-cols-3">{alternativePhones.map((phone: string, index: number) => <ReadOnly key={`${phone}-${index}`} label={`Alternative ${index + 1}`} value={phone} />)}</div>}
-        <Field label="Is the registered phone number correct?">
+        {alternativePhones.length > 0 && <div className="grid gap-2 sm:grid-cols-3">{alternativePhones.map((phone: string, index: number) => <ReadOnly key={`${phone}-${index}`} label={locale === 'id' ? `Alternatif ${index + 1}` : `Alternative ${index + 1}`} value={phone} />)}</div>}
+        <Field label={locale === 'id' ? 'Apakah nomor telepon terdaftar sudah benar?' : 'Is the registered phone number correct?'}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button type="button" className={`dui-btn ${phoneCorrect === true ? 'dui-btn-success' : 'dui-btn-outline'}`} onClick={() => { setPhoneCorrect(true); setUpdatedPhone('') }}><CheckCircle2 className="h-4 w-4" /> Yes, correct</button>
-            <button type="button" className={`dui-btn ${phoneCorrect === false ? 'dui-btn-warning' : 'dui-btn-outline'}`} onClick={() => setPhoneCorrect(false)}><AlertTriangle className="h-4 w-4" /> No, update</button>
+            <button type="button" className={`dui-btn ${phoneCorrect === true ? 'dui-btn-success' : 'dui-btn-outline'}`} onClick={() => { setPhoneCorrect(true); setUpdatedPhone('') }}><CheckCircle2 className="h-4 w-4" /> {locale === 'id' ? 'Ya, benar' : 'Yes, correct'}</button>
+            <button type="button" className={`dui-btn ${phoneCorrect === false ? 'dui-btn-warning' : 'dui-btn-outline'}`} onClick={() => setPhoneCorrect(false)}><AlertTriangle className="h-4 w-4" /> {locale === 'id' ? 'Tidak, perbarui' : 'No, update'}</button>
           </div>
         </Field>
-        {phoneCorrect === false && <Field label={t('agent.visit.fieldUpdatedPhone')}><input type="tel" inputMode="tel" value={updatedPhone} onChange={(e) => setUpdatedPhone(e.target.value)} className={`dui-input w-full ${updatedPhone && !isValidPhone(updatedPhone) ? 'dui-input-error' : ''}`} placeholder="08xxxxxxxxxx or 62xxxxxxxxxxx" />{updatedPhone && <div className={`mt-1 text-xs ${isValidPhone(updatedPhone) ? 'text-success' : 'text-error'}`}>{isValidPhone(updatedPhone) ? 'Valid phone number' : 'Use 10–15 digits starting with 0 or 62'}</div>}</Field>}
+        {phoneCorrect === false && <Field label={t('agent.visit.fieldUpdatedPhone')}><input type="tel" inputMode="tel" value={updatedPhone} onChange={(e) => setUpdatedPhone(e.target.value)} className={`dui-input w-full ${updatedPhone && !isValidPhone(updatedPhone) ? 'dui-input-error' : ''}`} placeholder="08xxxxxxxxxx atau 62xxxxxxxxxxx" />{updatedPhone && <div className={`mt-1 text-xs ${isValidPhone(updatedPhone) ? 'text-success' : 'text-error'}`}>{isValidPhone(updatedPhone) ? (locale === 'id' ? 'Nomor telepon valid' : 'Valid phone number') : (locale === 'id' ? 'Gunakan 10–15 digit diawali 0 atau 62' : 'Use 10–15 digits starting with 0 or 62')}</div>}</Field>}
       </StepCard>
 
       <StepCard t={t} step="3" title={t('agent.visit.step3')}>
@@ -410,7 +410,7 @@ export default function VisitPage() {
             <div className={styles.photoFrame}><img src={photoPreview} alt={t('agent.visit.photoAlt')} /></div>
             <div className={styles.photoMeta}>
               <div className={styles.photoMetaTitle}><Camera className="h-4 w-4 shrink-0" />{t('agent.visit.photoStamped')}</div>
-              {photoCapturedAt && <div className={styles.photoTime}>Photo captured: {formatVisitTimestamp(photoCapturedAt)}</div>}
+              {photoCapturedAt && <div className={styles.photoTime}>{locale === 'id' ? 'Foto diambil' : 'Photo captured'}: {formatVisitTimestamp(photoCapturedAt)}</div>}
             </div>
           </div>
         )}
