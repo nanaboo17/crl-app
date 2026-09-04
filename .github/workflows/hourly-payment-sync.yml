@@ -1,0 +1,37 @@
+name: Hourly payment sync
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: hourly-payment-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements-payment-sync.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements-payment-sync.txt
+
+      - name: Sync payment status
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          BIGQUERY_BILLING_PROJECT: ${{ vars.BIGQUERY_BILLING_PROJECT }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PAYMENT_SYNC_BATCH_SIZE: '500'
+        run: python scripts/hourly_payment_sync.py
