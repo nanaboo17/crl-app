@@ -4,6 +4,7 @@
 .search { width:100%; min-height:2.8rem; border:1px solid var(--color-base-300); border-radius:.9rem; background:var(--color-base-100); color:var(--color-base-content); padding:.72rem .85rem; font-size:.88rem; outline:none; }
 .search:focus,.select:focus { border-color:#8b63dc; box-shadow:0 0 0 3px rgb(139 99 220 / .12); }
 .refreshButton { min-height:2.8rem; display:inline-flex; align-items:center; justify-content:center; gap:.45rem; padding:.6rem .8rem; border:1px solid var(--color-base-300); border-radius:.9rem; background:var(--color-base-100); color:var(--color-base-content); font-size:.78rem; font-weight:850; cursor:pointer; }
+.filterLabel { margin:0 0 .45rem .1rem; color:color-mix(in oklab,var(--color-base-content) 55%,transparent); font-size:.66rem; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
 .regionTabs { display:flex; flex-wrap:wrap; gap:.5rem; }
 .regionButton { min-height:2.35rem; padding:.5rem .72rem; border:1px solid var(--color-base-300); border-radius:999px; background:var(--color-base-100); color:color-mix(in oklab,var(--color-base-content) 72%,transparent); font-size:.75rem; font-weight:850; cursor:pointer; }
 .regionButtonActive { border-color:#8b63dc; background:#f0e8ff; color:#693bbf; }
@@ -13,7 +14,10 @@
 .territoryCard { padding:1rem; display:grid; gap:.9rem; border:1px solid color-mix(in oklab,var(--color-base-content) 9%,var(--color-base-300)); border-radius:1.2rem; background:var(--color-base-100); box-shadow:0 10px 26px rgb(71 49 100 / .05); }
 .cardTop { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
 .codeBadge { display:inline-flex; align-items:center; border-radius:999px; padding:.28rem .58rem; background:#f0e8ff; color:#6b3fc5; font-size:.7rem; font-weight:850; }
-.regionBadge { display:inline-flex; align-items:center; border-radius:999px; padding:.28rem .58rem; background:var(--color-base-200); color:var(--color-base-content); font-size:.68rem; font-weight:800; }
+.badgeRow { display:flex; flex-wrap:wrap; gap:.4rem; }
+.regionBadge,.phaseBadge { display:inline-flex; align-items:center; border-radius:999px; padding:.28rem .58rem; font-size:.68rem; font-weight:800; }
+.regionBadge { background:var(--color-base-200); color:var(--color-base-content); }
+.phaseBadge { background:#eef7eb; color:#477354; }
 .territoryName { margin:.45rem 0 .15rem; color:var(--color-base-content); font-size:1.05rem; font-weight:900; }
 .metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
 .metric { padding:.65rem .7rem; border-radius:.85rem; background:color-mix(in oklab,var(--color-base-200) 58%,var(--color-base-100)); }
@@ -36,6 +40,6 @@
 @keyframes pulse { to { background-position:-200% 0; } }
 :global(html[data-theme='crl-dark']) .regionButtonActive { background:#35284d; color:#d1c0ff; }
 :global(html[data-theme='crl-dark']) .codeBadge { background:#35284d; color:#d1c0ff; }
-:global(html[data-theme='crl-dark']) .agentNote { background:#24382d; color:#9bd1ac; }
+:global(html[data-theme='crl-dark']) .phaseBadge,:global(html[data-theme='crl-dark']) .agentNote { background:#24382d; color:#9bd1ac; }
 @media (max-width:1000px) { .territoryGrid { grid-template-columns:1fr; } }
 @media (max-width:640px) { .toolbar { grid-template-columns:1fr; } .refreshButton { width:100%; } .cardTop { align-items:stretch; flex-direction:column; } .priorityRow { grid-template-columns:repeat(5,minmax(3.2rem,1fr)); overflow-x:auto; } }
