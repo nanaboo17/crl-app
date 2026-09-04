@@ -40,6 +40,36 @@ const initialForm: FormState = {
   previsit_notes: '',
 }
 
+function jakartaInputNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? ''
+
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+}
+
+function jakartaLocalToIso(value: string) {
+  if (!value) return null
+  const normalized = value.length === 16 ? `${value}:00` : value
+  const date = new Date(`${normalized}+07:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
+function isPastJakartaDateTime(value: string) {
+  const iso = jakartaLocalToIso(value)
+  return Boolean(iso && new Date(iso).getTime() < Date.now())
+}
+
 export default function PreVisitForm() {
   const router = useRouter()
   const sp = useSearchParams()
@@ -52,6 +82,11 @@ export default function PreVisitForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState<FormState>(initialForm)
+  const [minDateTime, setMinDateTime] = useState('')
+
+  useEffect(() => {
+    setMinDateTime(jakartaInputNow())
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -76,22 +111,14 @@ export default function PreVisitForm() {
   }, [customerId])
 
   const outcome = useMemo(() => {
-    if (form.phone_contacted === null) {
-      return { status: 'Pending', reason: null, direct: false }
-    }
+    if (form.phone_contacted === null) return { status: 'Pending', reason: null, direct: false }
 
     if (form.phone_contacted) {
-      if (form.customer_available === null) {
-        return { status: 'Pending', reason: null, direct: false }
-      }
+      if (form.customer_available === null) return { status: 'Pending', reason: null, direct: false }
 
       if (!form.customer_available) {
-        if (form.willing_to_reschedule === null) {
-          return { status: 'Pending', reason: null, direct: false }
-        }
-        if (form.willing_to_reschedule) {
-          return { status: 'Rescheduled', reason: null, direct: false }
-        }
+        if (form.willing_to_reschedule === null) return { status: 'Pending', reason: null, direct: false }
+        if (form.willing_to_reschedule) return { status: 'Rescheduled', reason: null, direct: false }
         return {
           status: 'Stopped',
           reason: tx(
@@ -102,13 +129,8 @@ export default function PreVisitForm() {
         }
       }
 
-      if (form.address_confirmed === null) {
-        return { status: 'Pending', reason: null, direct: false }
-      }
-
-      if (form.wants_appointment === null) {
-        return { status: 'Pending', reason: null, direct: false }
-      }
+      if (form.address_confirmed === null) return { status: 'Pending', reason: null, direct: false }
+      if (form.wants_appointment === null) return { status: 'Pending', reason: null, direct: false }
 
       if (!form.wants_appointment) {
         return {
@@ -124,9 +146,7 @@ export default function PreVisitForm() {
       return { status: 'Ready for Visit', reason: null, direct: false }
     }
 
-    if (form.direct_visit === null) {
-      return { status: 'Pending', reason: null, direct: false }
-    }
+    if (form.direct_visit === null) return { status: 'Pending', reason: null, direct: false }
 
     if (!form.direct_visit) {
       return {
@@ -144,9 +164,7 @@ export default function PreVisitForm() {
 
   const contactResults = useMemo(() => {
     if (form.phone_contacted === false) {
-      return [
-        { value: 'Unable to Contact', label: tx('Unable to Contact', 'Tidak Dapat Dihubungi') },
-      ]
+      return [{ value: 'Unable to Contact', label: tx('Unable to Contact', 'Tidak Dapat Dihubungi') }]
     }
 
     if (form.phone_contacted === true) {
@@ -207,10 +225,6 @@ export default function PreVisitForm() {
     }))
   }
 
-  function setContactResult(value: string) {
-    setForm((current) => ({ ...current, contact_result: value }))
-  }
-
   async function submit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -220,7 +234,6 @@ export default function PreVisitForm() {
       if (form.phone_contacted === null) {
         throw new Error(tx('Please confirm whether the phone was contacted.', 'Konfirmasi apakah nomor telepon berhasil dihubungi.'))
       }
-
       if (!form.contact_result) {
         throw new Error(tx('Please select the contact result.', 'Pilih hasil kontak.'))
       }
@@ -237,6 +250,9 @@ export default function PreVisitForm() {
           if (form.willing_to_reschedule && !form.reschedule_date) {
             throw new Error(tx('Please select the reschedule date and time.', 'Pilih tanggal dan waktu penjadwalan ulang.'))
           }
+          if (form.willing_to_reschedule && isPastJakartaDateTime(form.reschedule_date)) {
+            throw new Error(tx('Reschedule date and time must be in the future.', 'Tanggal dan waktu penjadwalan ulang harus di masa mendatang.'))
+          }
         } else {
           if (form.address_confirmed === null) {
             throw new Error(tx('Please confirm the customer address.', 'Konfirmasi alamat pelanggan.'))
@@ -248,7 +264,10 @@ export default function PreVisitForm() {
             throw new Error(tx('Please confirm whether the customer wants an appointment.', 'Konfirmasi apakah pelanggan ingin membuat janji kunjungan.'))
           }
           if (form.wants_appointment && !form.appointment_date) {
-            throw new Error(tx('Please select the appointment date and time.', 'Pilih tanggal dan waktu kunjungan.'))
+            throw new Error(tx('Please select the visit date and time.', 'Pilih tanggal dan waktu kunjungan.'))
+          }
+          if (form.wants_appointment && isPastJakartaDateTime(form.appointment_date)) {
+            throw new Error(tx('Visit date and time must be in the future.', 'Tanggal dan waktu kunjungan harus di masa mendatang.'))
           }
         }
       } else if (form.direct_visit === null) {
@@ -264,6 +283,8 @@ export default function PreVisitForm() {
         form.wants_appointment === true
 
       const addressConfirmed = form.address_confirmed === true
+      const rescheduleIso = jakartaLocalToIso(form.reschedule_date)
+      const appointmentIso = jakartaLocalToIso(form.appointment_date)
 
       const payload = {
         customer_id: customerId,
@@ -279,9 +300,8 @@ export default function PreVisitForm() {
         reschedule_date:
           form.phone_contacted &&
           form.customer_available === false &&
-          form.willing_to_reschedule &&
-          form.reschedule_date
-            ? new Date(form.reschedule_date).toISOString()
+          form.willing_to_reschedule
+            ? rescheduleIso
             : null,
         still_want_to_visit: form.phone_contacted === false ? true : null,
         address_confirmed: addressConfirmed,
@@ -297,10 +317,7 @@ export default function PreVisitForm() {
             ? form.wants_appointment
             : null,
         appointment_confirmed: appointmentConfirmed,
-        appointment_date:
-          appointmentConfirmed && form.appointment_date
-            ? new Date(form.appointment_date).toISOString()
-            : null,
+        appointment_date: appointmentConfirmed ? appointmentIso : null,
         contact_result: form.contact_result || null,
         supervisor_approval: false,
         direct_visit: outcome.direct,
@@ -374,7 +391,7 @@ export default function PreVisitForm() {
                     key={result.value}
                     type="button"
                     className={form.contact_result === result.value ? styles.selected : ''}
-                    onClick={() => setContactResult(result.value)}
+                    onClick={() => setForm((current) => ({ ...current, contact_result: result.value }))}
                   >
                     {result.label}
                   </button>
@@ -414,8 +431,15 @@ export default function PreVisitForm() {
 
                 {form.willing_to_reschedule === true && (
                   <div className={styles.field}>
-                    <label>{tx('Reschedule date & time', 'Tanggal & waktu penjadwalan ulang')}</label>
-                    <input type="datetime-local" value={form.reschedule_date} onChange={(e) => setForm({ ...form, reschedule_date: e.target.value })} />
+                    <label>{tx('Reschedule date & time (WIB)', 'Tanggal & waktu penjadwalan ulang (WIB)')}</label>
+                    <input
+                      type="datetime-local"
+                      value={form.reschedule_date}
+                      min={minDateTime || undefined}
+                      step={300}
+                      onChange={(e) => setForm((current) => ({ ...current, reschedule_date: e.target.value }))}
+                    />
+                    <small>{tx('Time is saved in Jakarta time (WIB).', 'Waktu disimpan menggunakan zona waktu Jakarta (WIB).')}</small>
                   </div>
                 )}
               </>
@@ -444,13 +468,13 @@ export default function PreVisitForm() {
             {form.address_confirmed === false && (
               <div className={styles.field}>
                 <label>{tx('Corrected / confirmed address', 'Alamat yang dikoreksi / dikonfirmasi')}</label>
-                <textarea value={form.confirmed_address} onChange={(e) => setForm({ ...form, confirmed_address: e.target.value })} />
+                <textarea value={form.confirmed_address} onChange={(e) => setForm((current) => ({ ...current, confirmed_address: e.target.value }))} />
               </div>
             )}
 
             <div className={styles.field}>
               <label>{tx('Landmark / access note', 'Patokan / catatan akses')}</label>
-              <textarea value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} placeholder={tx('Nearest landmark or access note', 'Patokan terdekat atau catatan akses')} />
+              <textarea value={form.landmark} onChange={(e) => setForm((current) => ({ ...current, landmark: e.target.value }))} placeholder={tx('Nearest landmark or access note', 'Patokan terdekat atau catatan akses')} />
             </div>
           </section>
         )}
@@ -461,7 +485,7 @@ export default function PreVisitForm() {
               <span>4</span>
               <div>
                 <h2>{tx('Appointment', 'Janji Kunjungan')}</h2>
-                <p>{tx('Confirm whether the customer agrees to a visit schedule.', 'Konfirmasi apakah pelanggan menyetujui jadwal kunjungan.')}</p>
+                <p>{tx('Confirm the agreed visit date and time.', 'Konfirmasi tanggal dan waktu kunjungan yang telah disepakati.')}</p>
               </div>
             </div>
 
@@ -475,8 +499,15 @@ export default function PreVisitForm() {
 
             {form.wants_appointment === true && (
               <div className={styles.field}>
-                <label>{tx('Appointment date & time', 'Tanggal & waktu kunjungan')}</label>
-                <input type="datetime-local" value={form.appointment_date} onChange={(e) => setForm({ ...form, appointment_date: e.target.value })} />
+                <label>{tx('Visit date & time (WIB)', 'Tanggal & waktu kunjungan (WIB)')}</label>
+                <input
+                  type="datetime-local"
+                  value={form.appointment_date}
+                  min={minDateTime || undefined}
+                  step={300}
+                  onChange={(e) => setForm((current) => ({ ...current, appointment_date: e.target.value }))}
+                />
+                <small>{tx('Choose the agreed visit schedule in Jakarta time (WIB).', 'Pilih jadwal kunjungan yang disepakati dalam zona waktu Jakarta (WIB).')}</small>
               </div>
             )}
           </section>
@@ -507,9 +538,7 @@ export default function PreVisitForm() {
                     <span>{tx('Customer location', 'Lokasi pelanggan')}</span>
                     <strong>{customer?.service_address || tx('Address not available', 'Alamat tidak tersedia')}</strong>
                   </div>
-                  {hasCustomerCoordinates && (
-                    <small>{customerLat.toFixed(6)}, {customerLng.toFixed(6)}</small>
-                  )}
+                  {hasCustomerCoordinates && <small>{customerLat.toFixed(6)}, {customerLng.toFixed(6)}</small>}
                 </div>
 
                 {customerMapEmbedUrl ? (
@@ -525,12 +554,7 @@ export default function PreVisitForm() {
                 )}
 
                 {customerNavigationUrl && (
-                  <a
-                    href={customerNavigationUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={styles.navigateButton}
-                  >
+                  <a href={customerNavigationUrl} target="_blank" rel="noreferrer" className={styles.navigateButton}>
                     {tx('Open in Google Maps', 'Buka di Google Maps')}
                   </a>
                 )}
@@ -556,7 +580,7 @@ export default function PreVisitForm() {
 
           <div className={styles.field}>
             <label>{tx('Notes', 'Catatan')}</label>
-            <textarea value={form.previsit_notes} onChange={(e) => setForm({ ...form, previsit_notes: e.target.value })} placeholder={tx('Optional additional notes', 'Catatan tambahan (opsional)')} />
+            <textarea value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={tx('Optional additional notes', 'Catatan tambahan (opsional)')} />
           </div>
         </section>
 
