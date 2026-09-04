@@ -1,0 +1,172 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  background:
+    radial-gradient(circle at top left, rgba(196, 181, 253, 0.34), transparent 36%),
+    radial-gradient(circle at bottom right, rgba(186, 230, 253, 0.38), transparent 34%),
+    #f8fafc;
+  color: #172033;
+}
+
+.card {
+  width: min(100%, 640px);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 28px;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+}
+
+.eyebrow {
+  display: inline-flex;
+  margin-bottom: 0.85rem;
+  padding: 0.4rem 0.72rem;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 5vw, 2.8rem);
+  line-height: 1.05;
+}
+
+.card p {
+  margin: 1rem 0 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.digest {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.digest span,
+.digest strong {
+  display: block;
+}
+
+.digest span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.digest strong {
+  margin-top: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.primaryButton,
+.secondaryButton,
+.linkButton {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.72rem 1rem;
+  border-radius: 14px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.primaryButton {
+  border: 0;
+  background: #7c3aed;
+  color: white;
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.22);
+}
+
+.secondaryButton {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+}
+
+.linkButton {
+  border: 1px solid transparent;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover,
+.linkButton:hover {
+  transform: translateY(-1px);
+}
+
+:global(html[data-theme='crl-dark']) .page {
+  background:
+    radial-gradient(circle at top left, rgba(109, 40, 217, 0.22), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(3, 105, 161, 0.2), transparent 34%),
+    #0f172a;
+  color: #f8fafc;
+}
+
+:global(html[data-theme='crl-dark']) .card {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: rgba(148, 163, 184, 0.2);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+:global(html[data-theme='crl-dark']) .card p,
+:global(html[data-theme='crl-dark']) .digest span {
+  color: #94a3b8;
+}
+
+:global(html[data-theme='crl-dark']) .digest {
+  background: #111827;
+  border-color: #334155;
+}
+
+:global(html[data-theme='crl-dark']) .secondaryButton {
+  background: #111827;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding: 1rem;
+  }
+
+  .card {
+    border-radius: 22px;
+    padding: 1.35rem;
+  }
+
+  .actions {
+    display: grid;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .linkButton {
+    width: 100%;
+  }
+}
