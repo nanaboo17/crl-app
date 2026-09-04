@@ -142,6 +142,26 @@ export default function PreVisitForm() {
     return { status: 'Direct Visit', reason: null, direct: true }
   }, [form, locale])
 
+  const contactResults = useMemo(() => {
+    if (form.phone_contacted === false) {
+      return [
+        { value: 'Unable to Contact', label: tx('Unable to Contact', 'Tidak Dapat Dihubungi') },
+      ]
+    }
+
+    if (form.phone_contacted === true) {
+      return [
+        { value: 'Confirmed', label: tx('Confirmed', 'Terkonfirmasi') },
+        { value: 'Customer Unavailable', label: tx('Customer Unavailable', 'Pelanggan Tidak Tersedia') },
+        { value: 'Address Mismatch', label: tx('Address Mismatch', 'Alamat Tidak Sesuai') },
+        { value: 'Customer Refused Visit', label: tx('Customer Refused Visit', 'Pelanggan Menolak Kunjungan') },
+        { value: 'Account Not Recognized', label: tx('Account Not Recognized', 'Akun Tidak Dikenali') },
+      ]
+    }
+
+    return []
+  }, [form.phone_contacted, locale])
+
   const customerLat = Number(customer?.given_latitude)
   const customerLng = Number(customer?.given_longitude)
   const hasCustomerCoordinates =
@@ -170,6 +190,27 @@ export default function PreVisitForm() {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  function setPhoneContacted(value: boolean) {
+    setForm((current) => ({
+      ...current,
+      phone_contacted: value,
+      contact_result: value ? 'Confirmed' : 'Unable to Contact',
+      customer_available: null,
+      willing_to_reschedule: null,
+      reschedule_date: '',
+      direct_visit: null,
+      address_confirmed: null,
+      confirmed_address: '',
+      landmark: '',
+      wants_appointment: null,
+      appointment_date: '',
+    }))
+  }
+
+  function setContactResult(value: string) {
+    setForm((current) => ({ ...current, contact_result: value }))
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -178,6 +219,10 @@ export default function PreVisitForm() {
     try {
       if (form.phone_contacted === null) {
         throw new Error(tx('Please confirm whether the phone was contacted.', 'Konfirmasi apakah nomor telepon berhasil dihubungi.'))
+      }
+
+      if (!form.contact_result) {
+        throw new Error(tx('Please select the contact result.', 'Pilih hasil kontak.'))
       }
 
       if (form.phone_contacted) {
@@ -313,22 +358,29 @@ export default function PreVisitForm() {
           <div className={styles.question}>
             <label>{tx('Was the phone contacted?', 'Apakah pelanggan berhasil dihubungi?')}</label>
             <div className={styles.choiceGrid}>
-              <button type="button" className={form.phone_contacted === true ? styles.selected : ''} onClick={() => setBoolean('phone_contacted', true)}>{tx('Yes', 'Ya')}</button>
-              <button type="button" className={form.phone_contacted === false ? styles.selected : ''} onClick={() => setBoolean('phone_contacted', false)}>{tx('No', 'Tidak')}</button>
+              <button type="button" className={form.phone_contacted === true ? styles.selected : ''} onClick={() => setPhoneContacted(true)}>{tx('Yes', 'Ya')}</button>
+              <button type="button" className={form.phone_contacted === false ? styles.selected : ''} onClick={() => setPhoneContacted(false)}>{tx('No', 'Tidak')}</button>
             </div>
           </div>
 
-          <div className={styles.field}>
+          <div className={styles.question}>
             <label>{tx('Contact result', 'Hasil kontak')}</label>
-            <select value={form.contact_result} onChange={(e) => setForm({ ...form, contact_result: e.target.value })}>
-              <option value="">{tx('Select result', 'Pilih hasil')}</option>
-              <option value="Confirmed">{tx('Confirmed', 'Terkonfirmasi')}</option>
-              <option value="Unable to Contact">{tx('Unable to Contact', 'Tidak Dapat Dihubungi')}</option>
-              <option value="Customer Unavailable">{tx('Customer Unavailable', 'Pelanggan Tidak Tersedia')}</option>
-              <option value="Address Mismatch">{tx('Address Mismatch', 'Alamat Tidak Sesuai')}</option>
-              <option value="Customer Refused Visit">{tx('Customer Refused Visit', 'Pelanggan Menolak Kunjungan')}</option>
-              <option value="Account Not Recognized">{tx('Account Not Recognized', 'Akun Tidak Dikenali')}</option>
-            </select>
+            {form.phone_contacted === null ? (
+              <small>{tx('Choose Yes or No above first.', 'Pilih Ya atau Tidak di atas terlebih dahulu.')}</small>
+            ) : (
+              <div className={styles.choiceGrid}>
+                {contactResults.map((result) => (
+                  <button
+                    key={result.value}
+                    type="button"
+                    className={form.contact_result === result.value ? styles.selected : ''}
+                    onClick={() => setContactResult(result.value)}
+                  >
+                    {result.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
