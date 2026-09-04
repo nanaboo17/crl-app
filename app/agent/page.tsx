@@ -35,6 +35,17 @@ function jakartaDateKey(value: string | Date) {
   return `${get('year')}-${get('month')}-${get('day')}`
 }
 
+function previousWorkdayKey(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  do {
+    date.setUTCDate(date.getUTCDate() - 1)
+  } while (date.getUTCDay() === 0 || date.getUTCDay() === 6)
+
+  return date.toISOString().slice(0, 10)
+}
+
 export default async function AgentPage() {
   const supabase = await createClient()
   const locale = await getLocale()
@@ -84,11 +95,19 @@ export default async function AgentPage() {
   const recoveryToday = todayVisits.filter((row: any) => ['Sudah melakukan pembayaran', 'Bersedia bayar / Promise to Pay'].includes(row.conversation_result)).length
   const onTimeAttendance = attendance.filter((row: any) => (row.check_in_status ?? '').trim().toLowerCase() === 'on time').length
 
-  const checkedInAttendance = attendance.filter((row: any) => Boolean(row.check_in_at) && Boolean((row.check_in_status ?? '').trim()))
+  const attendanceByDate = new Map(
+    attendance
+      .filter((row: any) => Boolean(row.attendance_date) && Boolean(row.check_in_at))
+      .map((row: any) => [row.attendance_date, row])
+  )
+
   let onTimeStreak = 0
-  for (const row of checkedInAttendance) {
-    if ((row.check_in_status ?? '').trim().toLowerCase() !== 'on time') break
+  let expectedDate = todayKey
+  while (true) {
+    const row: any = attendanceByDate.get(expectedDate)
+    if (!row || (row.check_in_status ?? '').trim().toLowerCase() !== 'on time') break
     onTimeStreak += 1
+    expectedDate = previousWorkdayKey(expectedDate)
   }
 
   const totalXp =
@@ -169,7 +188,7 @@ export default async function AgentPage() {
         </div>
         <div className={styles.streakBlock}>
           <Flame className="h-6 w-6" aria-hidden="true" />
-          <div><strong>{onTimeStreak}</strong><span>{tx('consecutive on-time check-ins', 'check-in tepat waktu berturut-turut')}</span></div>
+          <div><strong>{onTimeStreak}</strong><span>{tx('consecutive on-time workdays', 'hari kerja tepat waktu berturut-turut')}</span></div>
         </div>
       </section>
 
