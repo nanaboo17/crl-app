@@ -6,6 +6,14 @@ import TerritoryManager from '@/components/territories/TerritoryManager'
 import { getLocale } from '@/lib/i18n/server'
 import styles from './page.module.css'
 
+type CoverageRow = {
+  region: string | null
+  territory_code: string
+  site_count: number | string
+  customer_count: number | string
+  agent_email: string | null
+}
+
 export default async function SuperadminTerritoriesPage() {
   const supabase = await createClient()
   const locale = await getLocale()
@@ -22,38 +30,38 @@ export default async function SuperadminTerritoriesPage() {
 
   if (!agent || !agent.active || agent.role !== 'superadmin') redirect('/auth/route')
 
-  const [territoriesResult, sitesResult, homepassesResult, assignedResult] = await Promise.all([
-    supabase.from('territories').select('territory_id', { count: 'exact', head: true }).eq('active', true),
-    supabase.from('territory_sites').select('site_id', { count: 'exact', head: true }),
-    supabase.from('territory_homepasses').select('customer_id', { count: 'exact', head: true }),
-    supabase.from('territories').select('territory_id', { count: 'exact', head: true }).not('agent_email', 'is', null).eq('active', true),
-  ])
+  const { data: coverageData } = await supabase.rpc('get_territory_coverage')
+  const coverage = (coverageData || []) as CoverageRow[]
+  const regions = new Set(coverage.map((row) => row.region).filter(Boolean))
+  const totalSites = coverage.reduce((sum, row) => sum + Number(row.site_count || 0), 0)
+  const totalCustomers = coverage.reduce((sum, row) => sum + Number(row.customer_count || 0), 0)
+  const assignedTerritories = coverage.filter((row) => row.agent_email).length
 
   const summary = [
-    { label: tx('Active Territories', 'Teritori Aktif'), value: territoriesResult.count ?? 0, icon: MapPinned, tone: 'purple' },
-    { label: tx('Sites', 'Site'), value: sitesResult.count ?? 0, icon: Building2, tone: 'green' },
-    { label: tx('Mapped Homepasses', 'Homepass Terpetakan'), value: homepassesResult.count ?? 0, icon: Route, tone: 'yellow' },
-    { label: tx('Assigned Territories', 'Teritori Terisi Agen'), value: assignedResult.count ?? 0, icon: Users, tone: 'blue' },
+    { label: tx('Regions', 'Region'), value: regions.size, icon: MapPinned, tone: 'purple' },
+    { label: tx('Territories', 'Teritori'), value: coverage.length, icon: Route, tone: 'green' },
+    { label: tx('Sites', 'Site'), value: totalSites, icon: Building2, tone: 'yellow' },
+    { label: tx('Mapped Customers', 'Pelanggan Terpetakan'), value: totalCustomers, icon: Users, tone: 'blue' },
   ]
 
   return (
     <div className={styles.page}>
       <SuperadminPageHeader
         breadcrumbs={[{ label: 'Superadmin', href: '/superadmin' }, { label: tx('Territories', 'Teritori'), icon: MapPinned }]}
-        title={tx('Territory & Homepass Management', 'Manajemen Teritori & Homepass')}
+        title={tx('Territory Coverage', 'Cakupan Teritori')}
         description={tx(
-          'Organize field coverage from territory to site to homepass, then keep agent ownership synchronized.',
-          'Atur cakupan lapangan dari teritori ke site hingga homepass, lalu sinkronkan kepemilikan agen.'
+          'Coverage is synchronized from customer region, territory, and site data. Assign field agents directly to each territory.',
+          'Cakupan disinkronkan dari data region, teritori, dan site pelanggan. Tetapkan agen lapangan langsung ke setiap teritori.'
         )}
       />
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span>{tx('FIELD COVERAGE', 'CAKUPAN LAPANGAN')}</span>
-          <h1>{tx('Build a cleaner field map.', 'Bangun peta lapangan yang lebih rapi.')}</h1>
+          <span>{tx('LIVE CUSTOMER COVERAGE', 'CAKUPAN PELANGGAN LIVE')}</span>
+          <h1>{tx('Region → Territory → Site → Customer', 'Region → Teritori → Site → Pelanggan')}</h1>
           <p>{tx(
-            'Create territories, group sites, map customers, and assign one field owner for every coverage area.',
-            'Buat teritori, kelompokkan site, petakan pelanggan, dan tetapkan satu pemilik lapangan untuk tiap area.'
+            `${regions.size} regions · ${coverage.length} territories · ${assignedTerritories} territories assigned to agents.`,
+            `${regions.size} region · ${coverage.length} teritori · ${assignedTerritories} teritori sudah memiliki agen.`
           )}</p>
         </div>
         <div className={styles.mapScene} aria-hidden="true">
@@ -78,10 +86,10 @@ export default async function SuperadminTerritoriesPage() {
       <section className={styles.managerPanel}>
         <div className={styles.sectionHead}>
           <div>
-            <span>{tx('COVERAGE BUILDER', 'PENGATUR CAKUPAN')}</span>
+            <span>{tx('COVERAGE ASSIGNMENT', 'PENUGASAN CAKUPAN')}</span>
             <h2>{tx('Territory workspace', 'Workspace teritori')}</h2>
           </div>
-          <p>{tx('Agent → Territory → Site → Homepass', 'Agen → Teritori → Site → Homepass')}</p>
+          <p>{tx('7 operational regions · synced from BigQuery customer data', '7 region operasional · tersinkron dari data pelanggan BigQuery')}</p>
         </div>
         <div className={styles.managerWrap}>
           <TerritoryManager />
