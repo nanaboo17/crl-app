@@ -46,6 +46,14 @@ function previousWorkdayKey(dateKey: string) {
   return date.toISOString().slice(0, 10)
 }
 
+function normalizeAttendanceStatus(value: unknown) {
+  return String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+}
+
+function isOnTimeAttendance(row: any) {
+  return Boolean(row?.check_in_at) && normalizeAttendanceStatus(row?.check_in_status) === 'on_time'
+}
+
 export default async function AgentPage() {
   const supabase = await createClient()
   const locale = await getLocale()
@@ -93,7 +101,7 @@ export default async function AgentPage() {
   const phoneValidationsToday = todayVisits.filter((row: any) => Boolean(row.updated_phone)).length
   const paidResults = allVisits.filter((row: any) => row.conversation_result === 'Sudah melakukan pembayaran').length
   const recoveryToday = todayVisits.filter((row: any) => ['Sudah melakukan pembayaran', 'Bersedia bayar / Promise to Pay'].includes(row.conversation_result)).length
-  const onTimeAttendance = attendance.filter((row: any) => (row.check_in_status ?? '').trim().toLowerCase() === 'on time').length
+  const onTimeAttendance = attendance.filter(isOnTimeAttendance).length
 
   const attendanceByDate = new Map(
     attendance
@@ -105,7 +113,7 @@ export default async function AgentPage() {
   let expectedDate = todayKey
   while (true) {
     const row: any = attendanceByDate.get(expectedDate)
-    if (!row || (row.check_in_status ?? '').trim().toLowerCase() !== 'on time') break
+    if (!row || !isOnTimeAttendance(row)) break
     onTimeStreak += 1
     expectedDate = previousWorkdayKey(expectedDate)
   }
@@ -124,7 +132,7 @@ export default async function AgentPage() {
   const missions = [
     {
       label: tx('Check in on time', 'Check-in tepat waktu'),
-      progress: todayAttendance && (todayAttendance.check_in_status ?? '').trim().toLowerCase() === 'on time' ? 1 : 0,
+      progress: todayAttendance && isOnTimeAttendance(todayAttendance) ? 1 : 0,
       target: 1,
       xp: 20,
     },
