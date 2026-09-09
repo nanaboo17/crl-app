@@ -75,7 +75,7 @@ function isPast(value: string) {
   return Boolean(iso && new Date(iso).getTime() < Date.now())
 }
 
-export default function EditStoppedPreVisitPage() {
+export default function EditPreVisitPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const id = decodeURIComponent(params.id)
@@ -101,12 +101,6 @@ export default function EditStoppedPreVisitPage() {
 
       if (error || !data) {
         setError(error?.message || 'Pre-visit record not found.')
-        setLoading(false)
-        return
-      }
-
-      if (data.previsit_status !== 'Stopped') {
-        setError('Only stopped pre-visit records can be edited here.')
         setLoading(false)
         return
       }
@@ -261,7 +255,7 @@ export default function EditStoppedPreVisitPage() {
       <PageTop title="Edit Pre-Visit" back />
 
       <section className={styles.headerCard}>
-        <span className={styles.eyebrow}>EDIT STOPPED PRE-VISIT</span>
+        <span className={styles.eyebrow}>EDIT PRE-VISIT</span>
         <h1>{customer?.customer_name || row?.customer_id || 'Pre-Visit'}</h1>
         <p>Edit the complete pre-visit flow. Saving updates this record; it does not create a new one.</p>
         {row && <div className={styles.recordMeta}><span>{row.previsit_id}</span><span>{row.customer_id}</span><span>New status: {outcome.status}</span></div>}
