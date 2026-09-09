@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarClock, CheckCircle2, ClipboardList, LocateFixed, MapPin, Navigation, PhoneCall, StickyNote } from 'lucide-react'
+import { CalendarClock, CheckCircle2, ClipboardList, LocateFixed, MapPin, Navigation, Pencil, PhoneCall, StickyNote } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { PreVisit, Customer } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -103,6 +103,7 @@ export default function PreVisitDetailPage() {
   }
 
   const canStartVisit = row.previsit_status === 'Ready for Visit' || row.previsit_status === 'Direct Visit'
+  const canEdit = row.previsit_status === 'Stopped'
   const addressValue = row.confirmed_address || customer?.service_address || '—'
 
   return (
@@ -117,6 +118,13 @@ export default function PreVisitDetailPage() {
         </div>
         <span className={styles.status}>{row.previsit_status}</span>
       </section>
+
+      {canEdit && (
+        <section className={styles.actionCard}>
+          <div><span>{tx('STOPPED RECORD', 'CATATAN DIHENTIKAN')}</span><strong>{tx('You can still correct or update this pre-visit data.', 'Data pra-kunjungan ini masih dapat diperbaiki atau diperbarui.')}</strong></div>
+          <Link className={styles.startButton} href={`/agent/pre-visits/${encodeURIComponent(row.previsit_id)}/edit`}><Pencil /> {tx('Edit Pre-Visit', 'Edit Pra-Kunjungan')}</Link>
+        </section>
+      )}
 
       <section className={styles.summaryGrid}>
         <article className={`${styles.summaryCard} ${styles.tonePurple}`}><PhoneCall /><div><span>{t('agent.preVisitDetail.contactConfirmed')}</span><strong>{row.contact_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div></article>
