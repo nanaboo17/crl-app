@@ -10,6 +10,7 @@ import AgentNav from '@/components/AgentNav'
 import Loading from '@/components/Loading'
 import EmptyState from '@/components/EmptyState'
 import StatusPill from '@/components/StatusPill'
+import { CrlFollowUpIllustration } from '@/components/illustrations/CrlIllustrations'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 
@@ -59,7 +60,7 @@ export default function PreVisitsPage() {
 
       {loading && <Loading />}
       {error && <div className={styles.errorCard}>{error}</div>}
-      {!loading && !error && rows.length === 0 && <EmptyState title={t('agent.preVisits.emptyTitle')} body={t('agent.preVisits.emptyBody')} />}
+      {!loading && !error && rows.length === 0 && <EmptyState title={t('agent.preVisits.emptyTitle')} body={t('agent.preVisits.emptyBody')} illustration={<CrlFollowUpIllustration className="crl-illustration crl-illustration-md" />} />}
 
       <section className={styles.historyCard}>
         <div className={styles.sectionHead}><div><span>{tx('SUBMITTED RECORDS', 'DATA TERKIRIM')}</span><h2>{tx('Pre-visit records', 'Catatan pra-kunjungan')}</h2></div><p>{rows.length} {tx('records', 'data')}</p></div>
