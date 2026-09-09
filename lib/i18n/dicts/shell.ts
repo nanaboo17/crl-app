@@ -26,6 +26,7 @@ export const shellMessages = defineMessages({
   'nav.customers': { en: 'Customers', id: 'Pelanggan' },
   'nav.preVisits': { en: 'Pre-Visits', id: 'Pra-Kunjungan' },
   'nav.visits': { en: 'Visits', id: 'Kunjungan' },
+  'nav.reports': { en: 'Reports', id: 'Laporan' },
   'nav.route': { en: 'Route', id: 'Rute' },
   'nav.brand': { en: 'CRL', id: 'CRL' },
 
@@ -44,6 +45,7 @@ export const shellMessages = defineMessages({
   'crumb.territories': { en: 'Territories', id: 'Teritori' },
   'crumb.preVisits': { en: 'Pre-Visits', id: 'Pra-Kunjungan' },
   'crumb.visits': { en: 'Visits', id: 'Kunjungan' },
+  'crumb.reports': { en: 'Reports', id: 'Laporan' },
   'crumb.visit': { en: 'Visit', id: 'Kunjungan' },
   'crumb.visitResult': { en: 'Visit Result', id: 'Hasil Kunjungan' },
 
