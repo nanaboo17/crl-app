@@ -1,5 +1,6 @@
 import './globals.css'
 import './theme-overrides.css'
+import './illustrations.css'
 import AppProviders from '@/components/providers/AppProviders'
 import { getLocale } from '@/lib/i18n/server'
 import { getTheme } from '@/lib/theme-server'
