@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ClipboardPenLine, Save, StickyNote } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
+import PageTop from '@/components/PageTop'
+import styles from './page.module.css'
 
 export default function EditStoppedPreVisitPage() {
   const params = useParams<{ id: string }>()
@@ -93,56 +95,92 @@ export default function EditStoppedPreVisitPage() {
     router.refresh()
   }
 
-  if (loading) return <main className="mx-auto max-w-2xl p-6"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></main>
+  if (loading) {
+    return (
+      <main className={styles.page}>
+        <PageTop title="Edit Pre-Visit" back />
+        <div className={styles.loading}><span className={styles.spinner} /></div>
+      </main>
+    )
+  }
 
   return (
-    <main className="mx-auto w-full max-w-2xl space-y-5 p-4 pb-24 sm:p-6">
-      <button type="button" onClick={() => router.back()} className="dui-btn dui-btn-ghost dui-btn-sm gap-2 px-0">
-        <ArrowLeft className="h-4 w-4" /> Back
-      </button>
+    <main className={styles.page}>
+      <PageTop title="Edit Pre-Visit" back />
 
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Stopped pre-visit</p>
-        <h1 className="text-2xl font-bold">Edit pre-visit data</h1>
-        <p className="mt-1 text-sm opacity-60">Update the saved information without creating a new pre-visit record.</p>
-      </div>
+      <section className={styles.headerCard}>
+        <span className={styles.eyebrow}>Stopped pre-visit</span>
+        <h1>Edit pre-visit data</h1>
+        <p>Correct the saved information without creating a new pre-visit record.</p>
+        {row && (
+          <div className={styles.recordMeta}>
+            <span>{row.previsit_id}</span>
+            <span>Customer {row.customer_id}</span>
+            <span>Status: {row.previsit_status}</span>
+          </div>
+        )}
+      </section>
 
-      {error && <div className="dui-alert dui-alert-error"><span>{error}</span></div>}
+      {error && <div className={styles.error}>{error}</div>}
 
       {row && (
-        <form onSubmit={submit} className="space-y-4">
-          <div className="dui-card border border-base-300 bg-base-100 shadow-sm">
-            <div className="dui-card-body gap-4">
-              <label className="dui-form-control">
-                <span className="dui-label-text font-semibold">Contact result</span>
-                <input className="dui-input dui-input-bordered w-full" value={form.contact_result} onChange={(e) => setForm({ ...form, contact_result: e.target.value })} />
-              </label>
-              <label className="dui-form-control">
-                <span className="dui-label-text font-semibold">Confirmed address</span>
-                <textarea className="dui-textarea dui-textarea-bordered min-h-24" value={form.confirmed_address} onChange={(e) => setForm({ ...form, confirmed_address: e.target.value })} />
-              </label>
-              <label className="dui-form-control">
-                <span className="dui-label-text font-semibold">Landmark</span>
-                <input className="dui-input dui-input-bordered w-full" value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} />
-              </label>
-              <label className="dui-form-control">
-                <span className="dui-label-text font-semibold">Unpaid reason</span>
-                <input className="dui-input dui-input-bordered w-full" value={form.unpaid_reason} onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })} />
-              </label>
-              <label className="dui-form-control">
-                <span className="dui-label-text font-semibold">Stop reason</span>
-                <textarea className="dui-textarea dui-textarea-bordered min-h-20" value={form.stop_reason} onChange={(e) => setForm({ ...form, stop_reason: e.target.value })} />
-              </label>
-              <label className="dui-form-control">
-                <span className="dui-label-text font-semibold">Pre-Visit notes *</span>
-                <textarea required className="dui-textarea dui-textarea-bordered min-h-28" value={form.previsit_notes} onChange={(e) => setForm({ ...form, previsit_notes: e.target.value })} />
-              </label>
+        <form onSubmit={submit} className={styles.form}>
+          <section className={styles.card}>
+            <div className={styles.sectionTitle}>
+              <div className={styles.sectionIcon}><ClipboardPenLine size={18} /></div>
+              <div>
+                <h2>Pre-Visit information</h2>
+                <p>Update the customer contact and location information for this stopped record.</p>
+              </div>
             </div>
-          </div>
 
-          <button type="submit" disabled={saving} className="dui-btn dui-btn-primary w-full gap-2">
-            <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save changes'}
-          </button>
+            <div className={styles.field}>
+              <label htmlFor="contact_result">Contact result</label>
+              <input id="contact_result" value={form.contact_result} onChange={(e) => setForm({ ...form, contact_result: e.target.value })} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="confirmed_address">Confirmed address</label>
+              <textarea id="confirmed_address" value={form.confirmed_address} onChange={(e) => setForm({ ...form, confirmed_address: e.target.value })} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="landmark">Landmark</label>
+              <input id="landmark" value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="unpaid_reason">Unpaid reason</label>
+              <input id="unpaid_reason" value={form.unpaid_reason} onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })} />
+            </div>
+          </section>
+
+          <section className={styles.card}>
+            <div className={styles.sectionTitle}>
+              <div className={styles.sectionIcon}><StickyNote size={18} /></div>
+              <div>
+                <h2>Stop reason & notes</h2>
+                <p>Keep the reason and field notes accurate before saving.</p>
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="stop_reason">Stop reason</label>
+              <textarea id="stop_reason" value={form.stop_reason} onChange={(e) => setForm({ ...form, stop_reason: e.target.value })} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="previsit_notes">Pre-Visit notes *</label>
+              <textarea id="previsit_notes" required className={styles.notes} value={form.previsit_notes} onChange={(e) => setForm({ ...form, previsit_notes: e.target.value })} />
+            </div>
+          </section>
+
+          <div className={styles.actions}>
+            <button type="button" className={styles.cancelButton} onClick={() => router.back()}>Cancel</button>
+            <button type="submit" disabled={saving} className={styles.saveButton}>
+              <Save size={17} /> {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
         </form>
       )}
     </main>
