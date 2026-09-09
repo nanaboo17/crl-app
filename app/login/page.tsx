@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
+import { CrlRecoveryIllustration } from '@/components/illustrations/CrlIllustrations'
 
 export default function LoginPage() {
   const { t } = useI18n()
@@ -43,6 +44,9 @@ export default function LoginPage() {
             <div className="auth-brand-name" translate="no">Indosat HiFi</div>
             <div className="auth-brand-subtitle">{t('auth.brand.subtitle')}</div>
           </div>
+        </div>
+        <div className="auth-illustration-wrap" aria-hidden="true">
+          <CrlRecoveryIllustration className="auth-illustration" />
         </div>
         <div className="auth-context-footer">
           <span className="auth-status-dot" aria-hidden="true" />
