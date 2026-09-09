@@ -103,7 +103,6 @@ export default function PreVisitDetailPage() {
   }
 
   const canStartVisit = row.previsit_status === 'Ready for Visit' || row.previsit_status === 'Direct Visit'
-  const canEdit = row.previsit_status === 'Stopped'
   const addressValue = row.confirmed_address || customer?.service_address || '—'
 
   return (
@@ -119,12 +118,10 @@ export default function PreVisitDetailPage() {
         <span className={styles.status}>{row.previsit_status}</span>
       </section>
 
-      {canEdit && (
-        <section className={styles.actionCard}>
-          <div><span>{tx('STOPPED RECORD', 'CATATAN DIHENTIKAN')}</span><strong>{tx('You can still correct or update this pre-visit data.', 'Data pra-kunjungan ini masih dapat diperbaiki atau diperbarui.')}</strong></div>
-          <Link className={styles.startButton} href={`/agent/pre-visits/${encodeURIComponent(row.previsit_id)}/edit`}><Pencil /> {tx('Edit Pre-Visit', 'Edit Pra-Kunjungan')}</Link>
-        </section>
-      )}
+      <section className={styles.actionCard}>
+        <div><span>{tx('EDIT RECORD', 'EDIT CATATAN')}</span><strong>{tx('You can correct or update this pre-visit data at any time.', 'Data pra-kunjungan ini dapat diperbaiki atau diperbarui kapan saja.')}</strong></div>
+        <Link className={styles.startButton} href={`/agent/pre-visits/${encodeURIComponent(row.previsit_id)}/edit`}><Pencil /> {tx('Edit Pre-Visit', 'Edit Pra-Kunjungan')}</Link>
+      </section>
 
       <section className={styles.summaryGrid}>
         <article className={`${styles.summaryCard} ${styles.tonePurple}`}><PhoneCall /><div><span>{t('agent.preVisitDetail.contactConfirmed')}</span><strong>{row.contact_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div></article>
