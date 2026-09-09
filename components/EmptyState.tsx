@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CrlSearchIllustration } from '@/components/illustrations/CrlIllustrations'
 
 export default function EmptyState({
   title,
@@ -9,9 +10,11 @@ export default function EmptyState({
   body: string
   illustration?: ReactNode
 }) {
+  const visual = illustration ?? <CrlSearchIllustration />
+
   return (
     <div className="card empty-state">
-      {illustration && <div className="empty-state-visual" aria-hidden="true">{illustration}</div>}
+      <div className="empty-state-visual" aria-hidden="true">{visual}</div>
       <strong>{title}</strong>
       <p className="muted">{body}</p>
     </div>
