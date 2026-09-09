@@ -15,6 +15,8 @@ type CoverageRow = {
   region: string | null
   phase: string | null
   territory_code: string
+  cities: string[] | null
+  districts: string[] | null
   site_count: number | string
   customer_count: number | string
   p1_count: number | string
@@ -27,7 +29,7 @@ type CoverageRow = {
   agent_email: string | null
 }
 
-const REGIONS = ['JABO 1', 'JABO 2', 'WJ', 'CJ', 'EJ', 'SS', 'NS'] as const
+const REGIONS = ['JABO', 'WJ', 'CJ', 'EJ', 'SS', 'NS'] as const
 const PHASES = ['Phase 1', 'Phase 2', 'Phase 3'] as const
 
 export default function TerritoryManager() {
@@ -83,6 +85,8 @@ export default function TerritoryManager() {
         row.territory_code,
         row.region || '',
         row.phase || '',
+        ...(row.cities || []),
+        ...(row.districts || []),
         assignedAgent?.agent_name || '',
         row.agent_email || '',
       ].some((value) => value.toLowerCase().includes(q))
@@ -133,7 +137,7 @@ export default function TerritoryManager() {
             style={{ paddingLeft: '2.35rem' }}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search territory, region, phase, or agent"
+            placeholder="Search territory, region, city, district, phase, or agent"
           />
         </div>
 
@@ -241,6 +245,13 @@ export default function TerritoryManager() {
                     <strong>{Number(row.customer_count || 0).toLocaleString('id-ID')}</strong>
                     <span>Active customers</span>
                   </div>
+                </div>
+
+                <div className={styles.agentNote}>
+                  <strong>City:</strong> {(row.cities || []).join(', ') || '—'}
+                </div>
+                <div className={styles.agentNote}>
+                  <strong>District:</strong> {(row.districts || []).join(', ') || '—'}
                 </div>
 
                 <div className={styles.priorityRow} aria-label="Customer priority distribution">
