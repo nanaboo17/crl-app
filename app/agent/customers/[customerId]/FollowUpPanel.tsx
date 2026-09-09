@@ -10,12 +10,7 @@ type FollowUp = {
   due_at: string
   note: string
   status: 'pending' | 'completed'
-  followup_type?: 'manual' | 'call' | 'appointment' | 'payment_promise' | 'revisit'
 }
-
-type FollowUpType = NonNullable<FollowUp['followup_type']>
-
-const FOLLOWUP_TYPES: FollowUpType[] = ['call', 'appointment', 'payment_promise', 'revisit', 'manual']
 
 function googleCalendarUrl(row: FollowUp, customerId: string) {
   const start = new Date(row.due_at)
@@ -45,7 +40,6 @@ export default function FollowUpPanel({
   const [rows, setRows] = useState(initialRows)
   const [dueAt, setDueAt] = useState('')
   const [note, setNote] = useState('')
-  const [followupType, setFollowupType] = useState<FollowUpType>('call')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -64,9 +58,11 @@ export default function FollowUpPanel({
         agent_email: agentEmail,
         due_at: new Date(dueAt).toISOString(),
         note: note.trim(),
-        followup_type: followupType,
+        followup_type: 'manual',
+        source_type: null,
+        source_id: null,
       })
-      .select('followup_id,due_at,note,status,followup_type')
+      .select('followup_id,due_at,note,status')
       .single()
 
     if (error) setError(error.message)
@@ -74,7 +70,6 @@ export default function FollowUpPanel({
       setRows((current) => [...current, data as FollowUp].sort((a, b) => a.due_at.localeCompare(b.due_at)))
       setDueAt('')
       setNote('')
-      setFollowupType('call')
     }
     setSaving(false)
   }
@@ -90,14 +85,6 @@ export default function FollowUpPanel({
     else setRows((current) => current.map((item) => item.followup_id === row.followup_id ? { ...item, status: 'completed' } : item))
   }
 
-  const typeLabel = (type?: FollowUpType) => {
-    if (type === 'payment_promise') return tx('Payment Promise', 'Janji Pembayaran')
-    if (type === 'appointment') return tx('Appointment', 'Janji Kunjungan')
-    if (type === 'revisit') return tx('Revisit', 'Kunjungan Ulang')
-    if (type === 'call') return tx('Call', 'Telepon')
-    return tx('Manual', 'Manual')
-  }
-
   return (
     <section className={styles.followupCard} aria-label={tx('Follow-up reminders', 'Pengingat tindak lanjut')}>
       <div className={styles.sectionHeading}>
@@ -105,31 +92,28 @@ export default function FollowUpPanel({
         <div>
           <h2>{tx('Follow-up reminders', 'Pengingat tindak lanjut')}</h2>
           <p>{tx(
-            `${pendingCount} pending. Reschedules, appointments and Promise to Pay reminders are also added automatically.`,
-            `${pendingCount} tertunda. Pengingat jadwal ulang, janji kunjungan, dan Promise to Pay juga ditambahkan otomatis.`
+            `${pendingCount} pending. Add only the follow-up reminders you want to see in the dashboard queue.`,
+            `${pendingCount} tertunda. Tambahkan hanya pengingat follow-up yang ingin ditampilkan di antrean dashboard.`
           )}</p>
         </div>
       </div>
 
       <form className={styles.followupForm} onSubmit={addReminder}>
-        <select value={followupType} onChange={(e) => setFollowupType(e.target.value as FollowUpType)} aria-label={tx('Follow-up type', 'Jenis tindak lanjut')}>
-          {FOLLOWUP_TYPES.map((type) => <option key={type} value={type}>{typeLabel(type)}</option>)}
-        </select>
         <input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} required />
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx('e.g. Call about payment promise', 'contoh: Hubungi terkait janji pembayaran')} required />
-        <button type="submit" disabled={saving}>{saving ? tx('Saving…', 'Menyimpan…') : tx('Add reminder', 'Tambah pengingat')}</button>
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tx('e.g. Call customer again tomorrow', 'contoh: Hubungi pelanggan lagi besok')} required />
+        <button type="submit" disabled={saving}>{saving ? tx('Saving…', 'Menyimpan…') : tx('Add follow-up reminder', 'Tambah pengingat follow-up')}</button>
       </form>
 
       {error && <div className={styles.followupError}>{error}</div>}
 
       <div className={styles.followupList}>
         {rows.length === 0 ? (
-          <p className={styles.followupEmpty}>{tx('No reminders yet.', 'Belum ada pengingat.')}</p>
+          <p className={styles.followupEmpty}>{tx('No follow-up reminders yet.', 'Belum ada pengingat follow-up.')}</p>
         ) : rows.map((row) => (
           <div key={row.followup_id} className={`${styles.followupItem} ${row.status === 'completed' ? styles.followupDone : ''}`}>
             <div>
               <strong>{new Date(row.due_at).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB')}</strong>
-              <span>{row.followup_type ? `${typeLabel(row.followup_type)} · ` : ''}{row.note}</span>
+              <span>{row.note}</span>
             </div>
             {row.status === 'pending' ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -138,7 +122,7 @@ export default function FollowUpPanel({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="dui-btn dui-btn-outline dui-btn-xs gap-1"
-                  title={tx('Open a pre-filled Google Calendar event', 'Buka event Google Calendar yang sudah terisi')}
+                  title={tx('Open this follow-up in Google Calendar', 'Buka follow-up ini di Google Calendar')}
                 >
                   <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
                   {tx('Google Calendar', 'Google Calendar')}
