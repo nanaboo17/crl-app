@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronRight, CheckCircle2, History, MapPin, Route } from 'lucide-react'
+import { CalendarDays, ChevronRight, CheckCircle2, MapPin, Route } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { Visit } from '@/lib/types'
 import { dateTime } from '@/lib/format'
+import { CrlRouteIllustration } from '@/components/illustrations/CrlIllustrations'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 
@@ -69,7 +70,7 @@ export default function VisitsPage() {
 
       {loading && <div className={styles.state}>{tx('Loading visit history…', 'Memuat riwayat kunjungan…')}</div>}
       {error && <div className={styles.error}>{error}</div>}
-      {!loading && !error && rows.length === 0 && <div className={styles.state}><History aria-hidden="true" /><strong>{tx('No visit history yet', 'Belum ada riwayat kunjungan')}</strong><span>{tx('Completed visits will appear here.', 'Kunjungan yang selesai akan tampil di sini.')}</span></div>}
+      {!loading && !error && rows.length === 0 && <div className={styles.state}><CrlRouteIllustration className="visit-empty-illustration" /><strong>{tx('No visit history yet', 'Belum ada riwayat kunjungan')}</strong><span>{tx('Completed visits will appear here.', 'Kunjungan yang selesai akan tampil di sini.')}</span></div>}
 
       {!loading && !error && grouped.map(([day, visits]) => (
         <section key={day} className={styles.dayGroup}>
