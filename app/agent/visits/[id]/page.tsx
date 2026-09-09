@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarClock, CheckCircle2, Image as ImageIcon, MapPin, Navigation, NotebookText, ShieldCheck } from 'lucide-react'
+import { CalendarClock, CheckCircle2, Image as ImageIcon, MapPin, Navigation, NotebookText, Pencil, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { Visit, Customer } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -10,6 +11,14 @@ import PageTop from '@/components/PageTop'
 import Loading from '@/components/Loading'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
+
+const STOPPED_VISIT_STATUSES = new Set([
+  'Pelanggan tidak ada di tempat',
+  'Alamat tidak ditemukan',
+  'Pelanggan sudah pindah',
+  'Tidak berhasil dikunjungi',
+  'Lainnya',
+])
 
 export default function VisitDetailPage() {
   const { t, locale } = useI18n()
@@ -54,6 +63,7 @@ export default function VisitDetailPage() {
 
   const hasLocation = row.latitude !== null && row.longitude !== null
   const locationLabel = hasLocation ? `${row.latitude?.toFixed(6)}, ${row.longitude?.toFixed(6)}` : '—'
+  const canEdit = STOPPED_VISIT_STATUSES.has((row as any).visit_status_kunjungan || '')
 
   return (
     <main className={styles.page}>
@@ -67,6 +77,14 @@ export default function VisitDetailPage() {
         </div>
         <span className={styles.status}>{row.visit_result || t('agent.visitDetail.submitted')}</span>
       </section>
+
+      {canEdit && (
+        <section className={styles.doneCard}>
+          <Pencil />
+          <div><strong>{tx('This stopped visit can still be edited.', 'Kunjungan yang dihentikan ini masih dapat diedit.')}</strong><span>{tx('GPS and evidence photo will remain attached.', 'GPS dan foto bukti tetap tersimpan.')}</span></div>
+          <Link className={styles.mapButton} href={`/agent/visits/${encodeURIComponent(row.visit_id)}/edit`}>{tx('Edit Visit', 'Edit Kunjungan')}</Link>
+        </section>
+      )}
 
       <section className={styles.summaryGrid}>
         <article className={`${styles.summaryCard} ${styles.tonePurple}`}><CalendarClock /><div><span>{t('agent.visitDetail.visitTime')}</span><strong>{dateTime(row.visit_date)}</strong></div></article>
