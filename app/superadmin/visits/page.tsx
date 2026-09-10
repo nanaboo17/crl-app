@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AlertCircle, CalendarDays, Eye, Inbox, MapPin, Route, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
+import { cacheGetOrSet } from '@/lib/redis-cache'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import SuperadminPagination from '@/components/superadmin/SuperadminPagination'
@@ -11,8 +12,18 @@ import { allMessages } from '@/lib/i18n/messages'
 import styles from './page.module.css'
 
 const PAGE_SIZE = 10
+const CACHE_TTL = 60
 
 type VisitFilter = 'all' | 'met' | 'absent' | 'gps' | 'none'
+type AgentRow = { email: string; agent_name: string | null; sales_code: string | null; active: boolean | null }
+type VisitRow = { agent_email: string | null; visit_status_kunjungan: string | null; location_match: boolean | null; visit_date: string }
+
+type VisitCache = {
+  agents: AgentRow[]
+  visits: VisitRow[]
+  totalVisits: number
+  mismatchCount: number
+}
 
 export default async function SuperadminVisitsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
@@ -30,20 +41,32 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', email).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const [{ data: allAgents, error }, { data: allVisits }, totalVisitsResult, mismatchResult] = await Promise.all([
-    supabase.from('agents').select('email, agent_name, sales_code, active').eq('role', 'agent').order('agent_name'),
-    supabase.from('visits').select('agent_email, visit_status_kunjungan, location_match, visit_date'),
-    supabase.from('visits').select('*', { count: 'exact', head: true }),
-    supabase.from('visits').select('*', { count: 'exact', head: true }).eq('location_match', false),
-  ])
-
-  if (error) {
-    console.error('superadmin/visits:', error.message)
+  let payload: VisitCache
+  try {
+    payload = await cacheGetOrSet<VisitCache>('crl:superadmin:visits:v1', CACHE_TTL, async () => {
+      const [agentsResult, visitsResult, totalVisitsResult, mismatchResult] = await Promise.all([
+        supabase.from('agents').select('email, agent_name, sales_code, active').eq('role', 'agent').order('agent_name'),
+        supabase.from('visits').select('agent_email, visit_status_kunjungan, location_match, visit_date'),
+        supabase.from('visits').select('*', { count: 'exact', head: true }),
+        supabase.from('visits').select('*', { count: 'exact', head: true }).eq('location_match', false),
+      ])
+      const error = agentsResult.error || visitsResult.error || totalVisitsResult.error || mismatchResult.error
+      if (error) throw error
+      return {
+        agents: (agentsResult.data ?? []) as AgentRow[],
+        visits: (visitsResult.data ?? []) as VisitRow[],
+        totalVisits: totalVisitsResult.count ?? 0,
+        mismatchCount: mismatchResult.count ?? 0,
+      }
+    })
+  } catch (error) {
+    console.error('superadmin/visits:', error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={t('superadmin.visits.errorDesc')} /></div>
   }
 
-  const visits = allVisits ?? []
-  const visitMap = new Map<string, typeof visits>()
+  const allAgents = payload.agents
+  const visits = payload.visits
+  const visitMap = new Map<string, VisitRow[]>()
   for (const visit of visits) {
     const key = (visit.agent_email || '').toLowerCase()
     if (!key) continue
@@ -59,7 +82,7 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
     return rows.some((row) => row.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')
   }
 
-  const filteredAgents = (allAgents ?? []).filter((agent) => matches(agent.email))
+  const filteredAgents = allAgents.filter((agent) => matches(agent.email))
   const totalAgents = filteredAgents.length
   const totalPages = Math.max(1, Math.ceil(totalAgents / PAGE_SIZE))
   const page = Math.min(requestedPage, totalPages)
@@ -67,21 +90,23 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const agentData = agents.map((agent) => ({ ...agent, visit_count: (visitMap.get(agent.email.toLowerCase()) ?? []).length }))
 
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-  const todayVisits = visits.filter((visit) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(visit.visit_date)) === today).length
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })
+  const today = dateFormatter.format(new Date())
+  const todayVisits = visits.filter((visit) => dateFormatter.format(new Date(visit.visit_date)) === today).length
+
   const filters: { key: VisitFilter; label: string; count: number }[] = [
-    { key: 'all', label: tx('All agents', 'Semua agen'), count: (allAgents ?? []).length },
-    { key: 'met', label: tx('Met customer', 'Bertemu pelanggan'), count: (allAgents ?? []).filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Bertemu dengan pelanggan')).length },
-    { key: 'absent', label: tx('Customer absent', 'Pelanggan tidak di tempat'), count: (allAgents ?? []).filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')).length },
-    { key: 'gps', label: tx('GPS mismatch', 'GPS tidak sesuai'), count: (allAgents ?? []).filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.location_match === false)).length },
-    { key: 'none', label: tx('No visits', 'Belum ada kunjungan'), count: (allAgents ?? []).filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).length === 0).length },
+    { key: 'all', label: tx('All agents', 'Semua agen'), count: allAgents.length },
+    { key: 'met', label: tx('Met customer', 'Bertemu pelanggan'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Bertemu dengan pelanggan')).length },
+    { key: 'absent', label: tx('Customer absent', 'Pelanggan tidak di tempat'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')).length },
+    { key: 'gps', label: tx('GPS mismatch', 'GPS tidak sesuai'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.location_match === false)).length },
+    { key: 'none', label: tx('No visits', 'Belum ada kunjungan'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).length === 0).length },
   ]
 
   const summaries = [
-    { label: t('superadmin.visits.totalAgents'), value: (allAgents ?? []).length, icon: Users, tone: 'purple' },
-    { label: t('superadmin.visits.totalVisits'), value: totalVisitsResult.count ?? 0, icon: MapPin, tone: 'blue' },
+    { label: t('superadmin.visits.totalAgents'), value: allAgents.length, icon: Users, tone: 'purple' },
+    { label: t('superadmin.visits.totalVisits'), value: payload.totalVisits, icon: MapPin, tone: 'blue' },
     { label: tx('Visits Today', 'Kunjungan Hari Ini'), value: todayVisits, icon: CalendarDays, tone: 'green' },
-    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: mismatchResult.count ?? 0, icon: Route, tone: 'yellow' },
+    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: payload.mismatchCount, icon: Route, tone: 'yellow' },
   ]
 
   return (
@@ -89,10 +114,7 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
       <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} />
       <section className={styles.hero}><div><span className={styles.heroKicker}>{tx('FIELD MONITORING', 'MONITORING LAPANGAN')}</span><h2>{tx('Follow every visit journey.', 'Pantau setiap perjalanan kunjungan.')}</h2><p>{tx('Review agent activity, visit volume and location validation from one place.', 'Tinjau aktivitas agen, volume kunjungan, dan validasi lokasi dari satu tempat.')}</p></div><div className={styles.heroScene} aria-hidden="true"><span>📍</span><span>🛵</span><span>🏘️</span></div></section>
       <section className={styles.summaryGrid} aria-label={tx('Visit summary', 'Ringkasan kunjungan')}>{summaries.map(({ label, value, icon: Icon, tone }) => <article key={label} className={`${styles.summaryCard} ${styles[`tone_${tone}`]}`}><div className={styles.summaryIcon}><Icon aria-hidden="true" className="size-5" /></div><div><div className={styles.summaryValue}>{value}</div><div className={styles.summaryLabel}>{label}</div></div></article>)}</section>
-
-      <nav className={styles.filterBar} aria-label={tx('Visit filters', 'Filter kunjungan')}>
-        {filters.map((item) => <Link key={item.key} href={`/superadmin/visits?filter=${item.key}&page=1`} className={`${styles.filterChip} ${filter === item.key ? styles.filterActive : ''}`}>{item.label}<span>{item.count}</span></Link>)}
-      </nav>
+      <nav className={styles.filterBar} aria-label={tx('Visit filters', 'Filter kunjungan')}>{filters.map((item) => <Link key={item.key} href={`/superadmin/visits?filter=${item.key}&page=1`} className={`${styles.filterChip} ${filter === item.key ? styles.filterActive : ''}`}>{item.label}<span>{item.count}</span></Link>)}</nav>
 
       {agents.length === 0 ? <SuperadminState icon={Inbox} title={tx('No agents match this filter', 'Tidak ada agen yang sesuai filter')} description={tx('Choose another visit filter to continue.', 'Pilih filter kunjungan lain untuk melanjutkan.')} /> : <>
         <section className={styles.monitorCard}><div className={styles.sectionHeader}><div><h2>{tx('Agent Visit Monitor', 'Monitoring Kunjungan Agen')}</h2><p>{tx('Open an agent to review visit days, checkpoints and details.', 'Buka agen untuk meninjau hari kunjungan, checkpoint, dan detail.')}</p></div></div>
