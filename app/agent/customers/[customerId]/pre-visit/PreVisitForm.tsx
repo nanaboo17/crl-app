@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { AlertTriangle, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { getCurrentProfile } from '@/lib/auth'
 import type { Customer } from '@/lib/types'
@@ -236,7 +237,7 @@ export default function PreVisitForm() {
       if (error) throw error
       router.replace(`/agent/pre-visits/${encodeURIComponent(data.previsit_id)}`)
     } catch (err: any) {
-      setError(err.message)
+      setError(err?.message || tx('Unable to save pre-visit.', 'Tidak dapat menyimpan pra-kunjungan.'))
     } finally {
       setSaving(false)
     }
@@ -247,7 +248,27 @@ export default function PreVisitForm() {
   return (
     <main className="container">
       <PageTop title={tx('New Pre-Visit', 'Pra-Kunjungan Baru')} back />
-      <form className={styles.form} onSubmit={submit}>
+
+      {error && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="previsit-warning-title" onClick={() => setError('')}>
+          <div className="w-full max-w-md rounded-3xl bg-base-100 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-warning/15 text-warning"><AlertTriangle className="size-6" aria-hidden="true" /></span>
+                <div>
+                  <h2 id="previsit-warning-title" className="text-lg font-black">{tx('Please check the form', 'Periksa kembali form')}</h2>
+                  <p className="mt-1 text-sm text-base-content/65">{tx('There is something that needs your attention before continuing.', 'Ada hal yang perlu diperiksa sebelum melanjutkan.')}</p>
+                </div>
+              </div>
+              <button type="button" className="dui-btn dui-btn-ghost dui-btn-sm dui-btn-circle" onClick={() => setError('')} aria-label={tx('Close warning', 'Tutup peringatan')}><X className="size-4" aria-hidden="true" /></button>
+            </div>
+            <div className="rounded-2xl border border-warning/25 bg-warning/10 p-4 text-sm font-semibold">{error}</div>
+            <div className="mt-5 flex justify-end"><button type="button" className="dui-btn dui-btn-primary min-w-28" onClick={() => setError('')}>{tx('OK, got it', 'OK, mengerti')}</button></div>
+          </div>
+        </div>
+      )}
+
+      <form className={styles.form} onSubmit={submit} noValidate>
         <section className={styles.customerCard}>
           <span>{tx('Customer', 'Pelanggan')}</span>
           <strong>{customer?.customer_name || '—'}</strong>
@@ -298,7 +319,7 @@ export default function PreVisitForm() {
             <div className={styles.stepTitle}><span>4</span><div><h2>{tx('Unpaid Reason', 'Alasan Belum Bayar')}</h2><p>{tx('Record why the customer has not paid yet.', 'Catat alasan pelanggan belum melakukan pembayaran.')}</p></div></div>
             <div className={styles.field}>
               <label>{tx('Unpaid reason', 'Alasan belum bayar')}</label>
-              <select value={form.unpaid_reason} onChange={(e) => setForm((current) => ({ ...current, unpaid_reason: e.target.value }))} required>
+              <select value={form.unpaid_reason} onChange={(e) => setForm((current) => ({ ...current, unpaid_reason: e.target.value }))}>
                 <option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>
                 {UNPAID_REASONS.map(([value, en]) => <option key={value} value={value}>{locale === 'id' ? value : en}</option>)}
               </select>
@@ -323,11 +344,10 @@ export default function PreVisitForm() {
         <section className={styles.stepCard}>
           <div className={styles.stepTitle}><span>✓</span><div><h2>{tx('Closure', 'Penutupan')}</h2><p>{tx('The status is calculated automatically from the answers above.', 'Status dihitung otomatis berdasarkan jawaban di atas.')}</p></div></div>
           <div className={styles.statusBox}><span>{tx('Pre-Visit status', 'Status Pra-Kunjungan')}</span><strong>{outcome.status}</strong>{outcome.reason && <small>{outcome.reason}</small>}</div>
-          <div className={styles.field}><label>{tx('Notes', 'Catatan')} *</label><textarea required value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={tx('Required notes', 'Catatan wajib diisi')} /></div>
+          <div className={styles.field}><label>{tx('Notes', 'Catatan')} *</label><textarea value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={tx('Required notes', 'Catatan wajib diisi')} /></div>
         </section>
 
-        {error && <div className={styles.error}>{error}</div>}
-        <button className={styles.submitButton} disabled={saving || outcome.status === 'Pending'}>{saving ? tx('Saving…', 'Menyimpan…') : tx('Save Pre-Visit', 'Simpan Pra-Kunjungan')}</button>
+        <button className={styles.submitButton} disabled={saving}>{saving ? tx('Saving…', 'Menyimpan…') : tx('Save Pre-Visit', 'Simpan Pra-Kunjungan')}</button>
       </form>
     </main>
   )
