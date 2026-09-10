@@ -7,6 +7,7 @@ import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 
 const CACHE_TTL = 60
 const TIMEZONE = 'Asia/Jakarta'
+const PHOTO_URL_TTL = 60 * 60
 
 type Agent = { email: string; agent_name: string | null; sales_code: string | null; active: boolean | null }
 type Activity = { agent_email: string | null; created_at?: string | null; visit_date?: string | null; visit_photo_url?: string | null }
@@ -23,6 +24,10 @@ function jakartaDate(value: string | Date) {
 
 function validDate(value: unknown) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function isAbsoluteUrl(value: string) {
+  return /^https?:\/\//i.test(value)
 }
 
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -51,17 +56,44 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     }
   })
 
+  const selectedDayPhotos = Array.from(new Set(
+    payload.visits
+      .filter((row) => row.visit_date && jakartaDate(row.visit_date) === selectedDate && row.visit_photo_url)
+      .map((row) => row.visit_photo_url as string)
+  ))
+
+  const photoUrlMap = new Map<string, string>()
+  const storagePaths = selectedDayPhotos.filter((path) => !isAbsoluteUrl(path))
+
+  selectedDayPhotos.filter(isAbsoluteUrl).forEach((url) => photoUrlMap.set(url, url))
+
+  if (storagePaths.length > 0) {
+    const { data: signedPhotos, error: signedError } = await supabase.storage
+      .from('visit-evidence')
+      .createSignedUrls(storagePaths, PHOTO_URL_TTL)
+
+    if (signedError) {
+      console.error('attendance photo signing failed:', signedError.message)
+    } else {
+      signedPhotos?.forEach((item, index) => {
+        if (item.signedUrl) photoUrlMap.set(storagePaths[index], item.signedUrl)
+      })
+    }
+  }
+
   const rows = payload.agents.map((agent) => {
     const email = agent.email.toLowerCase()
     const dayVisits = payload.visits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.visit_date && jakartaDate(row.visit_date) === selectedDate)
     const dayPreVisits = payload.preVisits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.created_at && jakartaDate(row.created_at) === selectedDate)
     const photos = dayVisits.map((row) => row.visit_photo_url).filter((value): value is string => Boolean(value))
+    const firstPhotoPath = photos[0] ?? null
+
     return {
       ...agent,
       visits: dayVisits.length,
       preVisits: dayPreVisits.length,
       present: dayVisits.length + dayPreVisits.length > 0,
-      attendancePhoto: photos[0] ?? null,
+      attendancePhoto: firstPhotoPath ? photoUrlMap.get(firstPhotoPath) ?? null : null,
       photoCount: photos.length,
     }
   })
@@ -108,7 +140,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
           <h2 className="font-bold">Agent attendance — {selectedDate}</h2>
-          <p className="text-sm text-base-content/60">Present means the agent created at least one pre-visit or visit record that day. The photo is the first visit photo recorded for that agent on the selected day.</p>
+          <p className="text-sm text-base-content/60">Present means the agent created at least one pre-visit or visit record that day. Visit evidence is read from the private Supabase bucket using a temporary signed URL.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="dui-table">
