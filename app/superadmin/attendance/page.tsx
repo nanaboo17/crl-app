@@ -10,8 +10,24 @@ const TIMEZONE = 'Asia/Jakarta'
 const PHOTO_URL_TTL = 60 * 60
 
 type Agent = { email: string; agent_name: string | null; sales_code: string | null; active: boolean | null }
-type Activity = { agent_email: string | null; created_at?: string | null; visit_date?: string | null; visit_photo_url?: string | null }
-type AttendancePayload = { agents: Agent[]; visits: Activity[]; preVisits: Activity[] }
+type VisitActivity = { agent_email: string | null; visit_date: string | null }
+type PreVisitActivity = { agent_email: string | null; created_at: string | null }
+type AttendanceRecord = {
+  agent_email: string
+  attendance_date: string
+  check_in_at: string | null
+  check_out_at: string | null
+  check_in_photo_path: string | null
+  check_out_photo_path: string | null
+  check_in_status: string | null
+  worked_minutes: number | null
+}
+type AttendancePayload = {
+  agents: Agent[]
+  visits: VisitActivity[]
+  preVisits: PreVisitActivity[]
+  attendance: AttendanceRecord[]
+}
 
 function jakartaDate(value: string | Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -26,10 +42,6 @@ function validDate(value: unknown) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-function isAbsoluteUrl(value: string) {
-  return /^https?:\/\//i.test(value)
-}
-
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
   const today = jakartaDate(new Date())
@@ -41,42 +53,46 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v2:${selectedDate}`, CACHE_TTL, async () => {
-    const [agentsResult, visitsResult, preVisitsResult] = await Promise.all([
+  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v3:${selectedDate}`, CACHE_TTL, async () => {
+    const [agentsResult, visitsResult, preVisitsResult, attendanceResult] = await Promise.all([
       supabase.from('agents').select('email, agent_name, sales_code, active').eq('role', 'agent').order('agent_name'),
-      supabase.from('visits').select('agent_email, visit_date, visit_photo_url'),
+      supabase.from('visits').select('agent_email, visit_date'),
       supabase.from('pre_visits').select('agent_email, created_at'),
+      supabase
+        .from('agent_attendance')
+        .select('agent_email, attendance_date, check_in_at, check_out_at, check_in_photo_path, check_out_photo_path, check_in_status, worked_minutes')
+        .eq('attendance_date', selectedDate),
     ])
-    const error = agentsResult.error || visitsResult.error || preVisitsResult.error
+
+    const error = agentsResult.error || visitsResult.error || preVisitsResult.error || attendanceResult.error
     if (error) throw error
+
     return {
       agents: (agentsResult.data ?? []) as Agent[],
-      visits: (visitsResult.data ?? []) as Activity[],
-      preVisits: (preVisitsResult.data ?? []) as Activity[],
+      visits: (visitsResult.data ?? []) as VisitActivity[],
+      preVisits: (preVisitsResult.data ?? []) as PreVisitActivity[],
+      attendance: (attendanceResult.data ?? []) as AttendanceRecord[],
     }
   })
 
-  const selectedDayPhotos = Array.from(new Set(
-    payload.visits
-      .filter((row) => row.visit_date && jakartaDate(row.visit_date) === selectedDate && row.visit_photo_url)
-      .map((row) => row.visit_photo_url as string)
+  const attendanceMap = new Map(payload.attendance.map((row) => [row.agent_email.toLowerCase(), row]))
+  const checkInPhotoPaths = Array.from(new Set(
+    payload.attendance
+      .map((row) => row.check_in_photo_path)
+      .filter((path): path is string => Boolean(path))
   ))
 
   const photoUrlMap = new Map<string, string>()
-  const storagePaths = selectedDayPhotos.filter((path) => !isAbsoluteUrl(path))
-
-  selectedDayPhotos.filter(isAbsoluteUrl).forEach((url) => photoUrlMap.set(url, url))
-
-  if (storagePaths.length > 0) {
+  if (checkInPhotoPaths.length > 0) {
     const { data: signedPhotos, error: signedError } = await supabase.storage
-      .from('visit-evidence')
-      .createSignedUrls(storagePaths, PHOTO_URL_TTL)
+      .from('attendance-evidence')
+      .createSignedUrls(checkInPhotoPaths, PHOTO_URL_TTL)
 
     if (signedError) {
-      console.error('attendance photo signing failed:', signedError.message)
+      console.error('attendance check-in photo signing failed:', signedError.message)
     } else {
       signedPhotos?.forEach((item, index) => {
-        if (item.signedUrl) photoUrlMap.set(storagePaths[index], item.signedUrl)
+        if (item.signedUrl) photoUrlMap.set(checkInPhotoPaths[index], item.signedUrl)
       })
     }
   }
@@ -85,16 +101,19 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     const email = agent.email.toLowerCase()
     const dayVisits = payload.visits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.visit_date && jakartaDate(row.visit_date) === selectedDate)
     const dayPreVisits = payload.preVisits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.created_at && jakartaDate(row.created_at) === selectedDate)
-    const photos = dayVisits.map((row) => row.visit_photo_url).filter((value): value is string => Boolean(value))
-    const firstPhotoPath = photos[0] ?? null
+    const attendance = attendanceMap.get(email) ?? null
+    const photoPath = attendance?.check_in_photo_path ?? null
 
     return {
       ...agent,
       visits: dayVisits.length,
       preVisits: dayPreVisits.length,
-      present: dayVisits.length + dayPreVisits.length > 0,
-      attendancePhoto: firstPhotoPath ? photoUrlMap.get(firstPhotoPath) ?? null : null,
-      photoCount: photos.length,
+      present: Boolean(attendance?.check_in_at),
+      checkInAt: attendance?.check_in_at ?? null,
+      checkOutAt: attendance?.check_out_at ?? null,
+      checkInStatus: attendance?.check_in_status ?? null,
+      workedMinutes: attendance?.worked_minutes ?? null,
+      attendancePhoto: photoPath ? photoUrlMap.get(photoPath) ?? null : null,
     }
   })
 
@@ -109,7 +128,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <SuperadminPageHeader
         breadcrumbs={[{ label: 'Superadmin', href: '/superadmin' }, { label: 'Attendance' }]}
         title="Daily Attendance Monitoring"
-        description="Attendance is inferred from recorded pre-visit or visit activity for the selected Jakarta calendar day. Visit photos are shown when available."
+        description="Attendance comes from agent_attendance for the selected Jakarta calendar day. The displayed photo is the agent check-in photo."
       />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
@@ -124,8 +143,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: 'Active agents', value: activeAgents.length, icon: Users },
-          { label: 'Present', value: present, icon: CheckCircle2 },
-          { label: 'No activity', value: absent, icon: XCircle },
+          { label: 'Checked in', value: present, icon: CheckCircle2 },
+          { label: 'Not checked in', value: absent, icon: XCircle },
           { label: 'Pre-visits', value: preVisitCount, icon: Clock3 },
           { label: 'Visits', value: visitCount, icon: CalendarDays },
         ].map(({ label, value, icon: Icon }) => (
@@ -140,7 +159,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
           <h2 className="font-bold">Agent attendance — {selectedDate}</h2>
-          <p className="text-sm text-base-content/60">Present means the agent created at least one pre-visit or visit record that day. Visit evidence is read from the private Supabase bucket using a temporary signed URL.</p>
+          <p className="text-sm text-base-content/60">Attendance is based on agent_attendance.check_in_at. Photo evidence is loaded from agent_attendance.check_in_photo_path in the private attendance-evidence bucket.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="dui-table">
@@ -153,7 +172,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                   <td>{row.active ? 'Active' : 'Inactive'}</td>
                   <td>{row.preVisits}</td>
                   <td>{row.visits}</td>
-                  <td><span className={`dui-badge ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.present ? 'Present' : 'No activity'}</span></td>
+                  <td><span className={`dui-badge ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.present ? 'Checked in' : 'Not checked in'}</span></td>
                   <td>
                     {row.attendancePhoto ? (
                       <a
@@ -161,16 +180,13 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                         target="_blank"
                         rel="noreferrer"
                         className="group inline-flex items-center gap-2 rounded-xl border border-base-300 bg-base-100 p-1.5 pr-3 transition hover:border-primary/40 hover:bg-base-200"
-                        title={`View attendance photo${row.photoCount > 1 ? ` (${row.photoCount} visit photos)` : ''}`}
+                        title="View check-in attendance photo"
                       >
-                        <img src={row.attendancePhoto} alt={`Attendance evidence for ${row.agent_name || row.email}`} className="h-12 w-12 rounded-lg object-cover" />
-                        <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                          View{row.photoCount > 1 ? ` +${row.photoCount - 1}` : ''}
-                          <ExternalLink className="size-3" aria-hidden="true" />
-                        </span>
+                        <img src={row.attendancePhoto} alt={`Check-in attendance evidence for ${row.agent_name || row.email}`} className="h-12 w-12 rounded-lg object-cover" />
+                        <span className="flex items-center gap-1 text-xs font-semibold text-primary">View<ExternalLink className="size-3" aria-hidden="true" /></span>
                       </a>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-base-content/40"><ImageIcon className="size-4" aria-hidden="true" />No photo</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-base-content/40"><ImageIcon className="size-4" aria-hidden="true" />No check-in photo</span>
                     )}
                   </td>
                 </tr>
