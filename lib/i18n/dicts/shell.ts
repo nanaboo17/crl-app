@@ -26,6 +26,7 @@ export const shellMessages = defineMessages({
   'nav.customers': { en: 'Customers', id: 'Pelanggan' },
   'nav.preVisits': { en: 'Pre-Visits', id: 'Pra-Kunjungan' },
   'nav.visits': { en: 'Visits', id: 'Kunjungan' },
+  'nav.attendance': { en: 'Attendance', id: 'Kehadiran' },
   'nav.reports': { en: 'Reports', id: 'Laporan' },
   'nav.route': { en: 'Route', id: 'Rute' },
   'nav.brand': { en: 'CRL', id: 'CRL' },
