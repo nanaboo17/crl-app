@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, CheckCircle2, Clock3, Users, XCircle } from 'lucide-react'
+import { CalendarDays, CheckCircle2, Clock3, ExternalLink, ImageIcon, Users, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import { cacheGetOrSet } from '@/lib/redis-cache'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
@@ -9,7 +9,7 @@ const CACHE_TTL = 60
 const TIMEZONE = 'Asia/Jakarta'
 
 type Agent = { email: string; agent_name: string | null; sales_code: string | null; active: boolean | null }
-type Activity = { agent_email: string | null; created_at?: string | null; visit_date?: string | null }
+type Activity = { agent_email: string | null; created_at?: string | null; visit_date?: string | null; visit_photo_url?: string | null }
 type AttendancePayload = { agents: Agent[]; visits: Activity[]; preVisits: Activity[] }
 
 function jakartaDate(value: string | Date) {
@@ -36,10 +36,10 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v1:${selectedDate}`, CACHE_TTL, async () => {
+  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v2:${selectedDate}`, CACHE_TTL, async () => {
     const [agentsResult, visitsResult, preVisitsResult] = await Promise.all([
       supabase.from('agents').select('email, agent_name, sales_code, active').eq('role', 'agent').order('agent_name'),
-      supabase.from('visits').select('agent_email, visit_date'),
+      supabase.from('visits').select('agent_email, visit_date, visit_photo_url'),
       supabase.from('pre_visits').select('agent_email, created_at'),
     ])
     const error = agentsResult.error || visitsResult.error || preVisitsResult.error
@@ -53,9 +53,17 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
   const rows = payload.agents.map((agent) => {
     const email = agent.email.toLowerCase()
-    const visits = payload.visits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.visit_date && jakartaDate(row.visit_date) === selectedDate).length
-    const preVisits = payload.preVisits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.created_at && jakartaDate(row.created_at) === selectedDate).length
-    return { ...agent, visits, preVisits, present: visits + preVisits > 0 }
+    const dayVisits = payload.visits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.visit_date && jakartaDate(row.visit_date) === selectedDate)
+    const dayPreVisits = payload.preVisits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.created_at && jakartaDate(row.created_at) === selectedDate)
+    const photos = dayVisits.map((row) => row.visit_photo_url).filter((value): value is string => Boolean(value))
+    return {
+      ...agent,
+      visits: dayVisits.length,
+      preVisits: dayPreVisits.length,
+      present: dayVisits.length + dayPreVisits.length > 0,
+      attendancePhoto: photos[0] ?? null,
+      photoCount: photos.length,
+    }
   })
 
   const activeAgents = rows.filter((row) => row.active)
@@ -69,7 +77,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <SuperadminPageHeader
         breadcrumbs={[{ label: 'Superadmin', href: '/superadmin' }, { label: 'Attendance' }]}
         title="Daily Attendance Monitoring"
-        description="Attendance is inferred from recorded pre-visit or visit activity for the selected Jakarta calendar day."
+        description="Attendance is inferred from recorded pre-visit or visit activity for the selected Jakarta calendar day. Visit photos are shown when available."
       />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
@@ -100,11 +108,11 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
           <h2 className="font-bold">Agent attendance — {selectedDate}</h2>
-          <p className="text-sm text-base-content/60">Present means the agent created at least one pre-visit or visit record that day.</p>
+          <p className="text-sm text-base-content/60">Present means the agent created at least one pre-visit or visit record that day. The photo is the first visit photo recorded for that agent on the selected day.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="dui-table">
-            <thead><tr><th>Agent</th><th>Sales code</th><th>Account</th><th>Pre-visits</th><th>Visits</th><th>Attendance</th></tr></thead>
+            <thead><tr><th>Agent</th><th>Sales code</th><th>Account</th><th>Pre-visits</th><th>Visits</th><th>Attendance</th><th>Photo</th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.email}>
@@ -114,6 +122,25 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                   <td>{row.preVisits}</td>
                   <td>{row.visits}</td>
                   <td><span className={`dui-badge ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.present ? 'Present' : 'No activity'}</span></td>
+                  <td>
+                    {row.attendancePhoto ? (
+                      <a
+                        href={row.attendancePhoto}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group inline-flex items-center gap-2 rounded-xl border border-base-300 bg-base-100 p-1.5 pr-3 transition hover:border-primary/40 hover:bg-base-200"
+                        title={`View attendance photo${row.photoCount > 1 ? ` (${row.photoCount} visit photos)` : ''}`}
+                      >
+                        <img src={row.attendancePhoto} alt={`Attendance evidence for ${row.agent_name || row.email}`} className="h-12 w-12 rounded-lg object-cover" />
+                        <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                          View{row.photoCount > 1 ? ` +${row.photoCount - 1}` : ''}
+                          <ExternalLink className="size-3" aria-hidden="true" />
+                        </span>
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-base-content/40"><ImageIcon className="size-4" aria-hidden="true" />No photo</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
