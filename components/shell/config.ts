@@ -1,5 +1,6 @@
 import {
   Building2,
+  CalendarCheck2,
   ClipboardList,
   FileBarChart2,
   LayoutDashboard,
@@ -55,6 +56,7 @@ export const superadminConfig: ShellConfig = {
       { href: '/superadmin/customers', labelKey: 'nav.customers', icon: Building2 },
       { href: '/superadmin/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
       { href: '/superadmin/visits', labelKey: 'nav.visits', icon: MapPin },
+      { href: '/superadmin/attendance', labelKey: 'nav.attendance', icon: CalendarCheck2 },
       { href: '/superadmin/reports', labelKey: 'nav.reports', icon: FileBarChart2 },
     ]),
   ],
