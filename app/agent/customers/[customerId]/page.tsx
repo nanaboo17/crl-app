@@ -27,23 +27,36 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   if (error) return <ErrorBlock message={error.message} backHref="/agent/customers" t={t} />
   if (!customer) return <ErrorBlock message={t('agent.customer.notFound')} backHref="/agent/customers" t={t} />
 
-  const [{ data: preVisit }, { data: visit }, { data: followups }] = await Promise.all([
-    supabase.from('pre_visits').select('previsit_id,previsit_status,created_at,updated_at,appointment_date,rescheduled_contact_date,contact_result').eq('customer_id', decodedCustomerId).eq('agent_email', email).maybeSingle(),
+  const [{ data: preVisits }, { data: visit }, { data: followups }] = await Promise.all([
+    supabase
+      .from('pre_visits')
+      .select('previsit_id,previsit_status,created_at,updated_at,appointment_date,rescheduled_contact_date,reschedule_date,contact_result')
+      .eq('customer_id', decodedCustomerId)
+      .eq('agent_email', email)
+      .order('created_at', { ascending: false }),
     supabase.from('visits').select('visit_id,visit_date,visit_status_kunjungan,conversation_result,visit_result').eq('customer_id', decodedCustomerId).eq('agent_email', email).maybeSingle(),
     supabase.from('customer_followups').select('followup_id,due_at,note,status,created_at,completed_at').eq('customer_id', decodedCustomerId).eq('agent_email', email).order('due_at', { ascending: true }),
   ])
 
+  const preVisit = preVisits?.[0] ?? null
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString('id-ID') : '-'
   const formatMoney = (value: number | string | null) => `Rp${Number(value ?? 0).toLocaleString('id-ID')}`
   const priority = customer.priority_rank
   const days = customer.days_left_to_churn
   const area = customer.sub_district || customer.district || customer.city || '-'
 
+  const preVisitTimeline = (preVisits || []).flatMap((row: any) => {
+    const items = []
+    if (row.created_at) items.push({ at: row.created_at, title: tx('Pre-visit submitted', 'Pre-visit dikirim'), detail: row.previsit_status || row.contact_result || '' })
+    if (row.appointment_date) items.push({ at: row.appointment_date, title: tx('Appointment scheduled', 'Janji kunjungan dijadwalkan'), detail: row.previsit_status || '' })
+    const rescheduleAt = row.reschedule_date || row.rescheduled_contact_date
+    if (rescheduleAt) items.push({ at: rescheduleAt, title: tx('Follow-up contact scheduled', 'Kontak tindak lanjut dijadwalkan'), detail: row.contact_result || '' })
+    return items
+  })
+
   const timeline = [
     customer.assignment_date ? { at: customer.assignment_date, title: tx('Customer assigned', 'Pelanggan ditugaskan'), detail: email } : null,
-    preVisit?.created_at ? { at: preVisit.created_at, title: tx('Pre-visit started', 'Pre-visit dimulai'), detail: preVisit.previsit_status || preVisit.contact_result || '' } : null,
-    preVisit?.appointment_date ? { at: preVisit.appointment_date, title: tx('Appointment scheduled', 'Janji kunjungan dijadwalkan'), detail: preVisit.previsit_status || '' } : null,
-    preVisit?.rescheduled_contact_date ? { at: preVisit.rescheduled_contact_date, title: tx('Follow-up contact scheduled', 'Kontak tindak lanjut dijadwalkan'), detail: preVisit.contact_result || '' } : null,
+    ...preVisitTimeline,
     visit?.visit_date ? { at: visit.visit_date, title: tx('Visit submitted', 'Kunjungan dikirim'), detail: visit.visit_result || visit.visit_status_kunjungan || visit.conversation_result || '' } : null,
     ...(followups || []).map((row: any) => ({ at: row.due_at, title: row.status === 'completed' ? tx('Follow-up completed', 'Tindak lanjut selesai') : tx('Follow-up reminder', 'Pengingat tindak lanjut'), detail: row.note })),
   ].filter(Boolean).sort((a: any, b: any) => new Date(a.at).getTime() - new Date(b.at).getTime()) as { at: string; title: string; detail: string }[]
