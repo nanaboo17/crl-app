@@ -88,6 +88,7 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
         ]}
         canStartPreVisit={!visit && !preVisit}
         preVisitHref={preVisitHref}
+        initiallyUnlocked={Boolean(preVisit)}
       />
 
       <InfoCard title={t('agent.customer.cardSales')} icon={Store}><InfoGrid t={t} items={[[t('agent.customer.aeName'), customer.ae_name],[t('agent.customer.tlName'), customer.tl_name],[t('agent.customer.smName'), customer.sm_name],[t('agent.customer.salesChannel'), customer.sales_channel],[t('agent.customer.billingCycle'), customer.billing_cycle]]} /></InfoCard>
