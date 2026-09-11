@@ -25,10 +25,11 @@ export default async function AgentLayout({
     redirect('/login')
   }
 
+  const normalizedEmail = user.email.trim().toLowerCase()
   const { data: agent } = await supabase
     .from('agents')
     .select('agent_name, email, role, active')
-    .eq('email', user.email.toLowerCase())
+    .ilike('email', normalizedEmail)
     .maybeSingle()
 
   if (!agent || !agent.active) {
