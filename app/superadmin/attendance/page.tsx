@@ -38,6 +38,17 @@ function jakartaDate(value: string | Date) {
   }).format(new Date(value))
 }
 
+function jakartaTime(value: string | null) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
+}
+
 function validDate(value: unknown) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
@@ -159,11 +170,11 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
           <h2 className="font-bold">Agent attendance — {selectedDate}</h2>
-          <p className="text-sm text-base-content/60">Attendance is based on agent_attendance.check_in_at. Photo evidence is loaded from agent_attendance.check_in_photo_path in the private attendance-evidence bucket.</p>
+          <p className="text-sm text-base-content/60">Check-in and check-out times are shown in WIB (Asia/Jakarta). Attendance is based on agent_attendance.check_in_at.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="dui-table">
-            <thead><tr><th>Agent</th><th>Sales code</th><th>Account</th><th>Pre-visits</th><th>Visits</th><th>Attendance</th><th>Photo</th></tr></thead>
+            <thead><tr><th>Agent</th><th>Sales code</th><th>Account</th><th>Pre-visits</th><th>Visits</th><th>Attendance</th><th>Check in</th><th>Check out</th><th>Photo</th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.email}>
@@ -173,6 +184,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                   <td>{row.preVisits}</td>
                   <td>{row.visits}</td>
                   <td><span className={`dui-badge ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.present ? 'Checked in' : 'Not checked in'}</span></td>
+                  <td className="whitespace-nowrap font-semibold">{jakartaTime(row.checkInAt)}{row.checkInStatus ? <div className="mt-1 text-[11px] font-normal text-base-content/50">{row.checkInStatus}</div> : null}</td>
+                  <td className="whitespace-nowrap font-semibold">{jakartaTime(row.checkOutAt)}</td>
                   <td>
                     {row.attendancePhoto ? (
                       <a
