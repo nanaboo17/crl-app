@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BadgeCheck, BellRing, Building2, CheckCircle2, ClipboardList, MapPin, Phone, Sparkles, Store, UserRound } from 'lucide-react'
+import { BadgeCheck, BellRing, Building2, CheckCircle2, ClipboardList, MapPin, Sparkles, Store, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { getLocale } from '@/lib/i18n/server'
 import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import FollowUpPanel from './FollowUpPanel'
+import SensitiveCustomerData from './SensitiveCustomerData'
 import styles from './page.module.css'
 
 const TIMEZONE = 'Asia/Jakarta'
@@ -42,6 +43,7 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   const priority = customer.priority_rank
   const days = customer.days_left_to_churn
   const area = customer.sub_district || customer.district || customer.city || '-'
+  const preVisitHref = `/agent/customers/${encodeURIComponent(customer.customer_id)}/pre-visit`
 
   const preVisitTimeline = (preVisits || []).flatMap((row: any) => {
     const items = []
@@ -66,12 +68,37 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
       {visit ? <div className="dui-alert dui-alert-success"><CheckCircle2 className="h-5 w-5 shrink-0" /><span>{t('agent.customer.visitComplete')}{visit.visit_date ? ` · ${formatWibDateTime(visit.visit_date)}` : ''}{visit.visit_status_kunjungan ? ` · ${visit.visit_status_kunjungan}` : ''}</span></div> : <div className="dui-alert dui-alert-info"><MapPin className="h-5 w-5 shrink-0" /><span>{t('agent.customer.visitTimeDue')}</span></div>}
       <section className={styles.timelineCard}><div className={styles.sectionHeading}><BellRing /><div><h2>{tx('Customer timeline', 'Linimasa pelanggan')}</h2><p>{tx('Assignment, pre-visit, visit and follow-up activity in one place.', 'Penugasan, pre-visit, kunjungan, dan tindak lanjut dalam satu tempat.')}</p></div></div><div className={styles.timeline}>{timeline.map((item, index) => <div className={styles.timelineItem} key={`${item.at}-${index}`}><div className={styles.timelineRail}><span className={styles.timelineDot} />{index < timeline.length - 1 && <span className={styles.timelineLine} />}</div><div className={styles.timelineContent}><strong>{item.title}</strong><span>{formatWibDateTime(item.at)}</span>{item.detail && <span>{item.detail}</span>}</div></div>)}</div></section>
       <FollowUpPanel customerId={customer.customer_id} agentEmail={email} initialRows={(followups || []).map((row: any) => ({ followup_id: row.followup_id, due_at: row.due_at, note: row.note, status: row.status }))} locale={locale} />
-      <InfoCard title={t('agent.customer.cardContact')} icon={Phone}><InfoGrid t={t} items={[[t('agent.customer.phoneMain'), customer.phone_number],[t('agent.customer.phoneAlt1'), customer.alternative_phone_1],[t('agent.customer.phoneAlt2'), customer.alternative_phone_2],[t('agent.customer.phoneAlt3'), customer.alternative_phone_3],[t('agent.customer.address'), customer.service_address]]} /></InfoCard>
-      <InfoCard title={t('agent.customer.cardLocation')} icon={MapPin}><InfoGrid t={t} items={[[t('agent.customer.region'), customer.region],[t('agent.customer.city'), customer.city],[t('agent.customer.district'), customer.district],[t('agent.customer.subDistrict'), customer.sub_district]]} /></InfoCard>
+
+      <SensitiveCustomerData
+        customerId={customer.customer_id}
+        agentEmail={email}
+        locale={locale}
+        contactItems={[
+          [t('agent.customer.phoneMain'), customer.phone_number],
+          [t('agent.customer.phoneAlt1'), customer.alternative_phone_1],
+          [t('agent.customer.phoneAlt2'), customer.alternative_phone_2],
+          [t('agent.customer.phoneAlt3'), customer.alternative_phone_3],
+          [t('agent.customer.address'), customer.service_address],
+        ]}
+        locationItems={[
+          [t('agent.customer.region'), customer.region],
+          [t('agent.customer.city'), customer.city],
+          [t('agent.customer.district'), customer.district],
+          [t('agent.customer.subDistrict'), customer.sub_district],
+        ]}
+        canStartPreVisit={!visit && !preVisit}
+        preVisitHref={preVisitHref}
+      />
+
       <InfoCard title={t('agent.customer.cardSales')} icon={Store}><InfoGrid t={t} items={[[t('agent.customer.aeName'), customer.ae_name],[t('agent.customer.tlName'), customer.tl_name],[t('agent.customer.smName'), customer.sm_name],[t('agent.customer.salesChannel'), customer.sales_channel],[t('agent.customer.billingCycle'), customer.billing_cycle]]} /></InfoCard>
       <InfoCard title={t('agent.customer.cardBilling')} icon={Building2}><InfoGrid t={t} items={[[t('agent.customer.invoiceDate'), formatDate(customer.invoice_date)],[t('agent.customer.dueDate'), formatDate(customer.payment_due_date)],[t('agent.customer.suspensionDate'), formatDate(customer.suspension_date)],[t('agent.customer.estimatedChurn'), formatDate(customer.estimated_churn_date)],[t('agent.customer.invoiceAmount'), formatMoney(customer.invoice_amount)],[t('agent.customer.paymentStatus'), customer.payment_status ? customer.payment_status.toUpperCase() : t('agent.customer.notSet')],[t('agent.customer.tenure'), customer.customer_tenure],[t('agent.customer.visitStatus'), customer.visit_status || t('agent.customer.notStarted')]]} /></InfoCard>
       <InfoCard title={t('agent.customer.cardOffer')} icon={Sparkles}><InfoGrid t={t} items={[[t('agent.customer.recommendedOffer'), customer.recommended_offer],[t('agent.customer.maximumOffer'), customer.maximum_offer]]} /></InfoCard>
-      <section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body">{visit ? <Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}/visit-result`} className="dui-btn dui-btn-primary w-full"><BadgeCheck className="h-5 w-5" />{t('agent.customer.viewVisitResult')}</Link> : !preVisit ? <Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}/pre-visit`} className="dui-btn dui-btn-primary w-full"><ClipboardList className="h-5 w-5" />{t('agent.customer.startPreVisit')}</Link> : preVisit.previsit_status !== 'Ready for Visit' && preVisit.previsit_status !== 'Direct Visit' ? <Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}/pre-visit`} className="dui-btn dui-btn-secondary w-full"><ClipboardList className="h-5 w-5" />{t('agent.customer.continuePreVisit')}</Link> : <><div className="flex items-center gap-2 rounded-box bg-success/10 px-4 py-3 text-sm font-semibold text-success"><CheckCircle2 className="h-5 w-5" />{t('agent.customer.preVisitReady')}</div><Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}/visit`} className="dui-btn dui-btn-primary w-full"><MapPin className="h-5 w-5" />{t('agent.customer.startVisit')}</Link></>}</div></section>
+
+      {visit ? (
+        <section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body"><Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}/visit-result`} className="dui-btn dui-btn-primary w-full"><BadgeCheck className="h-5 w-5" />{t('agent.customer.viewVisitResult')}</Link></div></section>
+      ) : preVisit ? (
+        <section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body">{preVisit.previsit_status !== 'Ready for Visit' && preVisit.previsit_status !== 'Direct Visit' ? <Link href={preVisitHref} className="dui-btn dui-btn-secondary w-full"><ClipboardList className="h-5 w-5" />{t('agent.customer.continuePreVisit')}</Link> : <><div className="flex items-center gap-2 rounded-box bg-success/10 px-4 py-3 text-sm font-semibold text-success"><CheckCircle2 className="h-5 w-5" />{t('agent.customer.preVisitReady')}</div><Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}/visit`} className="dui-btn dui-btn-primary w-full"><MapPin className="h-5 w-5" />{t('agent.customer.startVisit')}</Link></>}</div></section>
+      ) : null}
     </div>
   )
 }
