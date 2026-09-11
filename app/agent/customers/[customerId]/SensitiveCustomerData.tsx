@@ -13,10 +13,11 @@ type Props = {
   locationItems: [string, string | null | undefined][]
   canStartPreVisit: boolean
   preVisitHref: string
+  initiallyUnlocked?: boolean
 }
 
-export default function SensitiveCustomerData({ customerId, agentEmail, locale, contactItems, locationItems, canStartPreVisit, preVisitHref }: Props) {
-  const [unlocked, setUnlocked] = useState(false)
+export default function SensitiveCustomerData({ customerId, agentEmail, locale, contactItems, locationItems, canStartPreVisit, preVisitHref, initiallyUnlocked = false }: Props) {
+  const [unlocked, setUnlocked] = useState(initiallyUnlocked)
   const [unlocking, setUnlocking] = useState(false)
   const [error, setError] = useState('')
   const tx = (en: string, id: string) => locale === 'id' ? id : en
@@ -49,7 +50,10 @@ export default function SensitiveCustomerData({ customerId, agentEmail, locale, 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-base font-bold"><LockKeyhole className="h-5 w-5 text-primary" />{tx('Protected customer data', 'Data pelanggan terlindungi')}</h2>
-              <p className="mt-1 text-sm text-base-content/60">{tx('Contact and location details are hidden until you unlock them. Every unlock is recorded.', 'Data kontak dan lokasi disembunyikan sampai Anda membukanya. Setiap pembukaan data dicatat.')}</p>
+              <p className="mt-1 text-sm text-base-content/60">{initiallyUnlocked
+                ? tx('Customer data stays unlocked because a Pre-Visit already exists.', 'Data pelanggan tetap terbuka karena Pra-Kunjungan sudah tersedia.')
+                : tx('Contact and location details are hidden until you unlock them. Every unlock is recorded.', 'Data kontak dan lokasi disembunyikan sampai Anda membukanya. Setiap pembukaan data dicatat.')}
+              </p>
             </div>
             <button type="button" className={`dui-btn ${unlocked ? 'dui-btn-success' : 'dui-btn-primary'}`} onClick={unlock} disabled={unlocking || unlocked}>
               {unlocking ? <Loader2 className="h-4 w-4 animate-spin" /> : unlocked ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
