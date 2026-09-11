@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, ClipboardList, Clock3, PhoneCall } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { PreVisit } from '@/lib/types'
@@ -33,7 +33,7 @@ function wibDateTime(value: string | null | undefined, locale: string) {
 export default function PreVisitsPage() {
   const { t, locale } = useI18n()
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
-  const [rows, setRows] = useState<PreVisit[]>([])
+  const [records, setRecords] = useState<PreVisit[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
@@ -47,10 +47,18 @@ export default function PreVisitsPage() {
         .order('created_at', { ascending: false })
         .order('previsit_id', { ascending: false })
       if (error) setError(error.message)
-      else setRows((data || []) as PreVisit[])
+      else setRecords((data || []) as PreVisit[])
       setLoading(false)
     })()
   }, [])
+
+  const rows = useMemo(() => {
+    const latestByCustomer = new Map<string, PreVisit>()
+    for (const record of records) {
+      if (!latestByCustomer.has(record.customer_id)) latestByCustomer.set(record.customer_id, record)
+    }
+    return Array.from(latestByCustomer.values())
+  }, [records])
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -64,14 +72,14 @@ export default function PreVisitsPage() {
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <span>{tx('PRE-VISIT HISTORY', 'RIWAYAT PRA-KUNJUNGAN')}</span>
-          <h1>{tx('Every submission is shown as its own Pre-Visit record.', 'Setiap pengiriman ditampilkan sebagai catatan Pra-Kunjungan tersendiri.')}</h1>
-          <p>{tx('A customer can appear more than once when multiple Pre-Visits have been submitted. Each card is identified by its Pre-Visit ID.', 'Satu pelanggan dapat muncul lebih dari sekali jika memiliki beberapa Pra-Kunjungan. Setiap kartu dibedakan berdasarkan ID Pra-Kunjungan.')}</p>
+          <h1>{tx('One customer, one latest Pre-Visit.', 'Satu pelanggan, satu Pra-Kunjungan terbaru.')}</h1>
+          <p>{tx('Each customer is shown once. If a customer has multiple Pre-Visit submissions, only the latest record is displayed here.', 'Setiap pelanggan hanya ditampilkan satu kali. Jika pelanggan memiliki beberapa Pra-Kunjungan, hanya catatan terbaru yang ditampilkan di sini.')}</p>
         </div>
         <div className={styles.heroScene} aria-hidden="true"><PhoneCall /><span className={styles.bubbleOne} /><span className={styles.bubbleTwo} /></div>
       </section>
 
       <section className={styles.summaryGrid}>
-        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><ClipboardList /></div><strong>{rows.length}</strong><span>{tx('Total pre-visit records', 'Total catatan pra-kunjungan')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><ClipboardList /></div><strong>{rows.length}</strong><span>{tx('Customers with pre-visit', 'Pelanggan dengan pra-kunjungan')}</span></article>
         <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{ready}</strong><span>{tx('Ready for visit', 'Siap dikunjungi')}</span></article>
         <article className={`${styles.summaryCard} ${styles.toneYellow}`}><div className={styles.summaryIcon}><Clock3 /></div><strong>{followUp}</strong><span>{tx('Need follow-up', 'Perlu tindak lanjut')}</span></article>
       </section>
@@ -81,21 +89,21 @@ export default function PreVisitsPage() {
       {!loading && !error && rows.length === 0 && <EmptyState title={t('agent.preVisits.emptyTitle')} body={t('agent.preVisits.emptyBody')} illustration={<CrlFollowUpIllustration className="crl-illustration crl-illustration-md" />} />}
 
       <section className={styles.historyCard}>
-        <div className={styles.sectionHead}><div><span>{tx('SUBMITTED RECORDS', 'DATA TERKIRIM')}</span><h2>{tx('Pre-Visit ID records', 'Catatan berdasarkan ID Pra-Kunjungan')}</h2></div><p>{rows.length} {tx('records', 'data')}</p></div>
+        <div className={styles.sectionHead}><div><span>{tx('LATEST PER CUSTOMER', 'TERBARU PER PELANGGAN')}</span><h2>{tx('Pre-Visit customers', 'Pelanggan Pra-Kunjungan')}</h2></div><p>{rows.length} {tx('customers', 'pelanggan')}</p></div>
         <div className={styles.listStack}>
           {pageRows.map((r) => (
-            <Link className={styles.card} href={`/agent/pre-visits/${encodeURIComponent(r.previsit_id)}`} key={r.previsit_id}>
+            <Link className={styles.card} href={`/agent/pre-visits/${encodeURIComponent(r.previsit_id)}`} key={r.customer_id}>
               <div className={styles.cardRow}>
                 <div>
-                  <span className={styles.previsitId}>{tx('Pre-Visit ID', 'ID Pra-Kunjungan')}</span>
-                  <strong>{r.previsit_id}</strong>
+                  <span className={styles.previsitId}>{tx('Customer ID', 'ID Pelanggan')}</span>
+                  <strong>{r.customer_id}</strong>
                 </div>
                 <StatusPill>{r.previsit_status}</StatusPill>
               </div>
-              <div className={styles.meta}>{tx('Customer ID', 'ID Pelanggan')}: {r.customer_id}</div>
+              <div className={styles.meta}>{tx('Latest Pre-Visit ID', 'ID Pra-Kunjungan terbaru')}: {r.previsit_id}</div>
               <div className={styles.meta}>{tx('Submitted', 'Dikirim')}: {wibDateTime(r.created_at, locale)}</div>
               <div className={styles.meta}>{t('agent.preVisits.appointment', { date: dateTime(r.appointment_date) })}</div>
-              <div className={styles.openRow}><span>{tx('View this Pre-Visit record', 'Lihat catatan Pra-Kunjungan ini')}</span><span>›</span></div>
+              <div className={styles.openRow}><span>{tx('View latest Pre-Visit', 'Lihat Pra-Kunjungan terbaru')}</span><span>›</span></div>
             </Link>
           ))}
         </div>
