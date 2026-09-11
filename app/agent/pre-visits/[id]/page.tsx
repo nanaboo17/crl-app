@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarClock, CheckCircle2, ClipboardList, History, LocateFixed, MapPin, Navigation, Pencil, PhoneCall, StickyNote } from 'lucide-react'
+import { CalendarClock, CheckCircle2, ClipboardList, LocateFixed, MapPin, Navigation, PhoneCall, StickyNote } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { PreVisit, Customer } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -11,32 +11,6 @@ import PageTop from '@/components/PageTop'
 import Loading from '@/components/Loading'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
-
-type EditHistory = {
-  history_id: number
-  edited_by: string
-  edited_at: string
-  old_data: Record<string, any>
-  new_data: Record<string, any>
-}
-
-const HISTORY_FIELDS: { key: string; en: string; id: string }[] = [
-  { key: 'phone_contacted', en: 'Customer contacted', id: 'Pelanggan dihubungi' },
-  { key: 'customer_available', en: 'Customer available', id: 'Pelanggan tersedia' },
-  { key: 'willing_to_reschedule', en: 'Willing to reschedule', id: 'Bersedia menjadwalkan ulang' },
-  { key: 'reschedule_date', en: 'Reschedule date', id: 'Tanggal penjadwalan ulang' },
-  { key: 'direct_visit', en: 'Direct visit', id: 'Kunjungan langsung' },
-  { key: 'address_confirmed', en: 'Address confirmed', id: 'Alamat dikonfirmasi' },
-  { key: 'confirmed_address', en: 'Confirmed address', id: 'Alamat terkonfirmasi' },
-  { key: 'landmark', en: 'Landmark', id: 'Patokan' },
-  { key: 'wants_appointment', en: 'Wants appointment', id: 'Ingin janji kunjungan' },
-  { key: 'appointment_date', en: 'Appointment date', id: 'Tanggal janji kunjungan' },
-  { key: 'contact_result', en: 'Contact result', id: 'Hasil kontak' },
-  { key: 'unpaid_reason', en: 'Unpaid reason', id: 'Alasan belum bayar' },
-  { key: 'previsit_notes', en: 'Pre-Visit notes', id: 'Catatan Pra-Kunjungan' },
-  { key: 'previsit_status', en: 'Pre-Visit status', id: 'Status Pra-Kunjungan' },
-  { key: 'stop_reason', en: 'Stop reason', id: 'Alasan berhenti' },
-]
 
 function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000
@@ -52,18 +26,6 @@ function formatDistance(meters: number) {
   return `${(meters / 1000).toFixed(1)} km`
 }
 
-function formatHistoryValue(value: any, locale: string, key: string) {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'boolean') return value ? (locale === 'id' ? 'Ya' : 'Yes') : (locale === 'id' ? 'Tidak' : 'No')
-  if (key.includes('date')) {
-    const parsed = new Date(value)
-    if (!Number.isNaN(parsed.getTime())) {
-      return `${parsed.toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`
-    }
-  }
-  return String(value)
-}
-
 export default function PreVisitDetailPage() {
   const { t, locale } = useI18n()
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
@@ -71,7 +33,6 @@ export default function PreVisitDetailPage() {
   const id = decodeURIComponent(params.id)
   const [row, setRow] = useState<PreVisit | null>(null)
   const [customer, setCustomer] = useState<Customer | null>(null)
-  const [history, setHistory] = useState<EditHistory[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [latitude, setLatitude] = useState<number | null>(null)
@@ -90,12 +51,8 @@ export default function PreVisitDetailPage() {
         return
       }
       setRow(data as PreVisit)
-      const [{ data: c }, { data: historyRows }] = await Promise.all([
-        s.from('customers').select('*').eq('customer_id', data.customer_id).single(),
-        s.from('previsit_edit_history').select('history_id,edited_by,edited_at,old_data,new_data').eq('previsit_id', id).order('edited_at', { ascending: false }),
-      ])
+      const { data: c } = await s.from('customers').select('*').eq('customer_id', data.customer_id).single()
       setCustomer((c || null) as Customer | null)
-      setHistory((historyRows || []) as EditHistory[])
       setLoading(false)
     })()
   }, [id])
@@ -161,11 +118,6 @@ export default function PreVisitDetailPage() {
         <span className={styles.status}>{row.previsit_status}</span>
       </section>
 
-      <section className={styles.actionCard}>
-        <div><span>{tx('EDIT RECORD', 'EDIT CATATAN')}</span><strong>{tx('You can correct or update this pre-visit data at any time. Every edit is saved in the history.', 'Data pra-kunjungan ini dapat diperbaiki atau diperbarui kapan saja. Setiap perubahan disimpan dalam riwayat.')}</strong></div>
-        <Link className={styles.startButton} href={`/agent/pre-visits/${encodeURIComponent(row.previsit_id)}/edit`}><Pencil /> {tx('Edit Pre-Visit', 'Edit Pra-Kunjungan')}</Link>
-      </section>
-
       <section className={styles.summaryGrid}>
         <article className={`${styles.summaryCard} ${styles.tonePurple}`}><PhoneCall /><div><span>{t('agent.preVisitDetail.contactConfirmed')}</span><strong>{row.contact_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div></article>
         <article className={`${styles.summaryCard} ${styles.toneGreen}`}><MapPin /><div><span>{t('agent.preVisitDetail.addressConfirmed')}</span><strong>{row.address_confirmed ? t('agent.preVisitDetail.yes') : t('agent.preVisitDetail.no')}</strong></div></article>
@@ -188,40 +140,6 @@ export default function PreVisitDetailPage() {
           <div className={styles.block}><span>{t('agent.preVisitDetail.appointment')}</span><p><CalendarClock size={14} /> {dateTime(row.appointment_date)}</p></div>
         </section>
       </div>
-
-      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
-        <div className="dui-card-body gap-4">
-          <div className="flex items-start gap-3">
-            <History className="mt-0.5 h-5 w-5 text-primary" />
-            <div><h2 className="font-bold">{tx('Edit history', 'Riwayat edit')}</h2><p className="text-sm text-base-content/60">{tx('Shows who edited this Pre-Visit, when it was edited, and what changed.', 'Menampilkan siapa yang mengedit Pra-Kunjungan ini, waktu edit, dan data yang berubah.')}</p></div>
-          </div>
-          {history.length === 0 ? (
-            <div className="rounded-box bg-base-200/60 px-4 py-3 text-sm text-base-content/60">{tx('No edits have been recorded yet.', 'Belum ada edit yang tercatat.')}</div>
-          ) : (
-            <div className="space-y-3">
-              {history.map((entry) => {
-                const changes = HISTORY_FIELDS.filter(({ key }) => JSON.stringify(entry.old_data?.[key] ?? null) !== JSON.stringify(entry.new_data?.[key] ?? null))
-                return (
-                  <article key={entry.history_id} className="rounded-box border border-base-300 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-200 pb-3">
-                      <div><strong className="text-sm">{entry.edited_by}</strong><div className="text-xs text-base-content/50">{new Date(entry.edited_at).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB</div></div>
-                      <span className="dui-badge dui-badge-outline">{changes.length} {tx('changes', 'perubahan')}</span>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {changes.length === 0 ? <div className="text-sm text-base-content/50">{tx('System-only update.', 'Perubahan sistem saja.')}</div> : changes.map(({ key, en, id: idLabel }) => (
-                        <div key={key} className="grid gap-1 rounded-lg bg-base-200/50 p-3 text-sm sm:grid-cols-[180px_1fr]">
-                          <strong>{tx(en, idLabel)}</strong>
-                          <div className="break-words"><span className="text-error line-through decoration-error/40">{formatHistoryValue(entry.old_data?.[key], locale, key)}</span><span className="mx-2 text-base-content/40">→</span><span className="font-semibold text-success">{formatHistoryValue(entry.new_data?.[key], locale, key)}</span></div>
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </section>
 
       <section className={styles.routeCard}>
         <div className={styles.routeHeader}>
