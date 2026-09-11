@@ -64,7 +64,7 @@ export default async function AgentPage() {
   if (!user?.email) redirect('/login')
   const email = user.email.trim().toLowerCase()
 
-  const { data: agent, error } = await supabase.from('agents').select('email,agent_name,sales_code,role,active').eq('email', email).maybeSingle()
+  const { data: agent, error } = await supabase.from('agents').select('email,agent_name,sales_code,role,active').ilike('email', email).maybeSingle()
   if (error) return <div className={styles.page}><div className="dui-alert dui-alert-error">{t('agent.dashboard.accountError', { message: error.message })}</div></div>
   if (!agent) return <div className={styles.page}><div className="dui-alert dui-alert-warning">{t('agent.dashboard.agentNotFound', { email })}</div></div>
   if (!agent.active) return <div className={styles.page}><div className="dui-alert dui-alert-error">{t('agent.dashboard.accountInactive')}</div></div>
