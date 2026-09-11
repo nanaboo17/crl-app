@@ -73,11 +73,18 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
     stopped: 'Stopped',
   }[key])
 
+  const rowsForFilter = (agentEmail: string) => {
+    const rows = preVisitMap.get(agentEmail.toLowerCase()) ?? []
+    if (filter === 'all') return rows
+    if (filter === 'none') return []
+    return rows.filter((row) => row.previsit_status === statusFor(filter))
+  }
+
   const matches = (agentEmail: string) => {
     const rows = preVisitMap.get(agentEmail.toLowerCase()) ?? []
     if (filter === 'all') return true
     if (filter === 'none') return rows.length === 0
-    return rows.some((row) => row.previsit_status === statusFor(filter))
+    return rowsForFilter(agentEmail).length > 0
   }
 
   const filteredAgents = allAgents.filter((agent) => matches(agent.email))
@@ -86,7 +93,7 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
   const page = Math.min(requestedPage, totalPages)
   if (totalAgents > 0 && requestedPage !== page) redirect(`/superadmin/pre-visits?filter=${filter}&page=${page}`)
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const agentData = agents.map((agent) => ({ ...agent, previsit_count: (preVisitMap.get(agent.email.toLowerCase()) ?? []).length }))
+  const agentData = agents.map((agent) => ({ ...agent, previsit_count: filter === 'none' ? 0 : rowsForFilter(agent.email).length }))
 
   const countStatus = (status: string) => preVisits.filter((row) => row.previsit_status === status).length
   const readyCount = countStatus('Ready for Visit')
@@ -101,6 +108,8 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
     { key: 'none', label: tx('No pre-visit', 'Belum ada pra-kunjungan'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).length === 0).length },
   ]
 
+  const agentHref = (agentEmail: string) => `/superadmin/pre-visits/${encodeURIComponent(agentEmail)}?filter=${filter}`
+
   return (
     <div className={styles.page}>
       <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.preVisits') }]} title={t('superadmin.preVisits.title')} description={t('superadmin.preVisits.description')} />
@@ -109,8 +118,8 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
       <nav className={styles.filterBar} aria-label={tx('Pre-visit filters', 'Filter pra-kunjungan')}>{filters.map((item) => <Link key={item.key} href={`/superadmin/pre-visits?filter=${item.key}&page=1`} className={`${styles.filterChip} ${filter === item.key ? styles.filterActive : ''}`}>{item.label}<span>{item.count}</span></Link>)}</nav>
 
       {agents.length === 0 ? <SuperadminState icon={Inbox} title={tx('No agents match this filter', 'Tidak ada agen yang sesuai filter')} description={tx('Choose another pre-visit filter to continue.', 'Pilih filter pra-kunjungan lain untuk melanjutkan.')} /> : <section className={styles.rosterCard}><div className={styles.sectionHeader}><div><span>{tx('MONITOR BY AGENT', 'PANTAU PER AGEN')}</span><h2>{tx('Pre-Visit Activity', 'Aktivitas Pra-Kunjungan')}</h2><p>{tx('Open an agent to review activity by day and individual pre-visit record.', 'Buka agen untuk melihat aktivitas per hari dan detail setiap pra-kunjungan.')}</p></div></div>
-        <div className={styles.tableCard}><div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>{t('superadmin.preVisits.thAgent')}</th><th>{t('superadmin.preVisits.thSalesCode')}</th><th>{t('superadmin.preVisits.thStatus')}</th><th>{t('superadmin.preVisits.thPreVisits')}</th><th aria-label={t('superadmin.preVisits.thActions')} /></tr></thead><tbody>{agentData.map((agent, index) => <tr key={agent.email}><td><Link href={`/superadmin/pre-visits/${encodeURIComponent(agent.email)}`} className={styles.agentLink}><span className={`${styles.avatar} ${styles[`avatar${index % 4}`]}`}>{(agent.agent_name || agent.email).slice(0, 2).toUpperCase()}</span><span><strong className={styles.agentName}>{agent.agent_name || '—'}</strong><small className={styles.agentEmail}>{agent.email}</small></span></Link></td><td>{agent.sales_code || '—'}</td><td><span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span></td><td><span className={styles.countPill}>{agent.previsit_count}</span></td><td className={styles.actionCell}><Link href={`/superadmin/pre-visits/${encodeURIComponent(agent.email)}`} aria-label={t('superadmin.preVisits.viewAria', { name: agent.agent_name || agent.email })} title={t('superadmin.preVisits.viewTitle')} className={styles.iconButton}><Eye aria-hidden="true" className="size-4" /></Link></td></tr>)}</tbody></table></div></div>
-        <div className={styles.mobileList}>{agentData.map((agent, index) => <article key={agent.email} className={styles.mobileCard}><div className={styles.mobileTop}><div className={styles.mobileIdentity}><span className={`${styles.avatar} ${styles[`avatar${index % 4}`]}`}>{(agent.agent_name || agent.email).slice(0, 2).toUpperCase()}</span><div><div className={styles.agentName}>{agent.agent_name || '—'}</div><div className={styles.agentEmail}>{agent.email}</div></div></div><span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span></div><div className={styles.mobileMeta}><div><span>{t('superadmin.preVisits.thSalesCode')}</span><strong>{agent.sales_code || '—'}</strong></div><div><span>{t('superadmin.preVisits.thPreVisits')}</span><strong>{agent.previsit_count}</strong></div></div><div className={styles.mobileAction}><Link href={`/superadmin/pre-visits/${encodeURIComponent(agent.email)}`} className={styles.viewButton}><Eye aria-hidden="true" className="size-4" />{t('superadmin.preVisits.viewTitle')}</Link></div></article>)}</div>
+        <div className={styles.tableCard}><div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>{t('superadmin.preVisits.thAgent')}</th><th>{t('superadmin.preVisits.thSalesCode')}</th><th>{t('superadmin.preVisits.thStatus')}</th><th>{t('superadmin.preVisits.thPreVisits')}</th><th aria-label={t('superadmin.preVisits.thActions')} /></tr></thead><tbody>{agentData.map((agent, index) => <tr key={agent.email}><td><Link href={agentHref(agent.email)} className={styles.agentLink}><span className={`${styles.avatar} ${styles[`avatar${index % 4}`]}`}>{(agent.agent_name || agent.email).slice(0, 2).toUpperCase()}</span><span><strong className={styles.agentName}>{agent.agent_name || '—'}</strong><small className={styles.agentEmail}>{agent.email}</small></span></Link></td><td>{agent.sales_code || '—'}</td><td><span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span></td><td><span className={styles.countPill}>{agent.previsit_count}</span></td><td className={styles.actionCell}><Link href={agentHref(agent.email)} aria-label={t('superadmin.preVisits.viewAria', { name: agent.agent_name || agent.email })} title={t('superadmin.preVisits.viewTitle')} className={styles.iconButton}><Eye aria-hidden="true" className="size-4" /></Link></td></tr>)}</tbody></table></div></div>
+        <div className={styles.mobileList}>{agentData.map((agent, index) => <article key={agent.email} className={styles.mobileCard}><div className={styles.mobileTop}><div className={styles.mobileIdentity}><span className={`${styles.avatar} ${styles[`avatar${index % 4}`]}`}>{(agent.agent_name || agent.email).slice(0, 2).toUpperCase()}</span><div><div className={styles.agentName}>{agent.agent_name || '—'}</div><div className={styles.agentEmail}>{agent.email}</div></div></div><span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span></div><div className={styles.mobileMeta}><div><span>{t('superadmin.preVisits.thSalesCode')}</span><strong>{agent.sales_code || '—'}</strong></div><div><span>{t('superadmin.preVisits.thPreVisits')}</span><strong>{agent.previsit_count}</strong></div></div><div className={styles.mobileAction}><Link href={agentHref(agent.email)} className={styles.viewButton}><Eye aria-hidden="true" className="size-4" />{t('superadmin.preVisits.viewTitle')}</Link></div></article>)}</div>
         <SuperadminPagination page={page} pageSize={PAGE_SIZE} total={totalAgents} basePath={`/superadmin/pre-visits?filter=${filter}`} />
       </section>}
     </div>
