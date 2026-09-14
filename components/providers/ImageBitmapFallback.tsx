@@ -15,6 +15,21 @@ function scaledSize(width: number, height: number) {
   }
 }
 
+function reportPhotoProcessingError(error: unknown, source?: ImageBitmapSource) {
+  if (typeof window === 'undefined') return
+  const message = error instanceof Error ? error.message : String(error)
+  const blob = source instanceof Blob ? source : null
+
+  window.dispatchEvent(new CustomEvent('crl-photo-processing-error', {
+    detail: {
+      message,
+      file_type: blob?.type || null,
+      file_size_bytes: blob?.size || null,
+      max_dimension: MAX_IMAGE_DIMENSION,
+    },
+  }))
+}
+
 export default function ImageBitmapFallback() {
   useEffect(() => {
     const nativeCreateImageBitmap = window.createImageBitmap?.bind(window)
@@ -65,6 +80,8 @@ export default function ImageBitmapFallback() {
     }
 
     const resilientCreateImageBitmap = async (source: ImageBitmapSource, options?: ImageBitmapOptions) => {
+      let nativeError: unknown = null
+
       if (nativeCreateImageBitmap) {
         try {
           const bitmap = await nativeCreateImageBitmap(source, options)
@@ -82,15 +99,26 @@ export default function ImageBitmapFallback() {
             if (Math.max(bitmap.width, bitmap.height) > MAX_IMAGE_DIMENSION) bitmap.close()
           }
         } catch (error) {
-          if (!(source instanceof Blob)) throw error
+          nativeError = error
+          if (!(source instanceof Blob)) {
+            reportPhotoProcessingError(error, source)
+            throw error
+          }
         }
       }
 
       if (source instanceof Blob) {
-        return decodeWithImageElement(source) as any
+        try {
+          return await decodeWithImageElement(source) as any
+        } catch (fallbackError) {
+          reportPhotoProcessingError(fallbackError || nativeError, source)
+          throw fallbackError
+        }
       }
 
-      throw new TypeError('This browser cannot process the selected photo format.')
+      const error = new TypeError('This browser cannot process the selected photo format.')
+      reportPhotoProcessingError(error, source)
+      throw error
     }
 
     const previous = window.createImageBitmap
