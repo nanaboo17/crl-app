@@ -111,6 +111,16 @@ export default function FieldFormDiagnostics() {
       })
     }
 
+    const onPhotoProcessingError = (event: Event) => {
+      const detail = (event as CustomEvent<Record<string, unknown>>).detail || {}
+      const message = typeof detail.message === 'string' ? detail.message : 'Photo processing failed'
+      void log('photo_processing', 'error', message, {
+        file_type: detail.file_type ?? null,
+        file_size_bytes: detail.file_size_bytes ?? null,
+        max_dimension: detail.max_dimension ?? null,
+      })
+    }
+
     const onOffline = () => void log('network_state', 'warning', 'Browser went offline')
     const onOnline = () => void log('network_state', 'info', 'Browser came online')
 
@@ -132,6 +142,7 @@ export default function FieldFormDiagnostics() {
 
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onUnhandledRejection)
+    window.addEventListener('crl-photo-processing-error', onPhotoProcessingError)
     window.addEventListener('offline', onOffline)
     window.addEventListener('online', onOnline)
 
@@ -139,6 +150,7 @@ export default function FieldFormDiagnostics() {
       observer.disconnect()
       window.removeEventListener('error', onError)
       window.removeEventListener('unhandledrejection', onUnhandledRejection)
+      window.removeEventListener('crl-photo-processing-error', onPhotoProcessingError)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('online', onOnline)
     }
