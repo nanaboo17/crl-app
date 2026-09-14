@@ -1,24 +1,38 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import { CrlRecoveryIllustration } from '@/components/illustrations/CrlIllustrations'
 
 export default function LoginPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setSessionExpired(params.get('reason') === 'session_expired')
+    const authError = params.get('error')
+    if (authError) setError(authError)
+  }, [])
 
   async function signInGoogle() {
     setLoading(true)
     setError('')
     const supabase = createClient()
+    const params = new URLSearchParams(window.location.search)
+    const requestedNext = params.get('next')
+    const safeNext = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : null
+    const callbackUrl = new URL('/auth/callback', window.location.origin)
+    if (safeNext) callbackUrl.searchParams.set('next', safeNext)
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/route`,
+        redirectTo: callbackUrl.toString(),
       },
     })
 
@@ -58,6 +72,13 @@ export default function LoginPage() {
         <div className="auth-eyebrow">{t('auth.card.eyebrow')}</div>
         <h2 id="login-heading">{t('auth.login.title')}</h2>
         <p className="auth-copy">{t('auth.login.copy')}</p>
+        {sessionExpired && (
+          <div className="mb-4 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm font-semibold" role="status">
+            {locale === 'id'
+              ? 'Sesi Anda sudah berakhir atau token login tidak lagi valid. Silakan masuk kembali. Setelah login, Anda akan dikembalikan ke halaman sebelumnya.'
+              : 'Your session expired or its login token is no longer valid. Please sign in again. After login, you will return to the previous page.'}
+          </div>
+        )}
         <button className="btn" onClick={signInGoogle} disabled={loading} aria-busy={loading}>
           <svg className="google-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M21.35 12.27c0-.78-.07-1.53-.2-2.24H12v4.24h5.23a4.47 4.47 0 0 1-1.94 2.93v2.75h3.14c1.84-1.69 2.92-4.18 2.92-7.68Z" />
