@@ -10,6 +10,14 @@ function inferFieldContext() {
   const url = new URL(window.location.href)
   const path = url.pathname
 
+  if (path === '/agent/attendance' || path.startsWith('/agent/attendance/')) {
+    return {
+      formType: 'attendance' as const,
+      customerId: null,
+      pagePath: `${path}${url.search}`,
+    }
+  }
+
   if (path.includes('/pre-visit')) {
     return {
       formType: 'previsit' as const,
@@ -130,7 +138,8 @@ async function writeDiagnosticLog(args: {
 
   let target = url
   try {
-    target = new URL(url).pathname
+    const parsedUrl = new URL(url)
+    target = `${parsedUrl.pathname}${parsedUrl.search}`
   } catch {
     // Keep original target.
   }
