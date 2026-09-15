@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   AlertTriangle,
@@ -22,6 +22,7 @@ import styles from './page.module.css'
 
 const LOCATION_LIMIT_METERS = 200
 const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
+const MAX_PHOTO_DIMENSION = 1600
 
 function normalizePhone(value: string | null | undefined) {
   return (value ?? '').replace(/[^0-9]/g, '')
@@ -53,6 +54,8 @@ export default function VisitPage() {
   const router = useRouter()
   const customerId = decodeURIComponent(params.customerId as string)
   const draftKey = `crl:visit-draft:${customerId}`
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
 
   const [customer, setCustomer] = useState<any>(null)
   const [agent, setAgent] = useState<any>(null)
@@ -82,6 +85,9 @@ export default function VisitPage() {
   const [additionalNotes, setAdditionalNotes] = useState('')
   const [draftReady, setDraftReady] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraStarting, setCameraStarting] = useState(false)
+  const [capturingPhoto, setCapturingPhoto] = useState(false)
 
   const alternativePhones = useMemo(
     () => [customer?.alternative_phone_1, customer?.alternative_phone_2, customer?.alternative_phone_3]
@@ -236,6 +242,11 @@ export default function VisitPage() {
     if (photoPreview) URL.revokeObjectURL(photoPreview)
   }, [photoPreview])
 
+  useEffect(() => () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+    cameraStreamRef.current = null
+  }, [])
+
   function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
     const R = 6371000
     const toRad = (value: number) => (value * Math.PI) / 180
@@ -277,15 +288,66 @@ export default function VisitPage() {
     )
   }
 
+  function stopCamera() {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+    cameraStreamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+    setCameraOpen(false)
+    setCameraStarting(false)
+  }
+
+  async function startCamera() {
+    if (latitude === null || longitude === null || !gpsCapturedAt) {
+      setError(t('agent.visit.err.gpsFirstPhoto'))
+      return
+    }
+    setError('')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError(locale === 'id'
+        ? 'Kamera di dalam aplikasi tidak didukung oleh browser ini. Gunakan tombol Pilih Foto sebagai alternatif.'
+        : 'In-app camera is not supported by this browser. Use Choose Photo as a fallback.')
+      return
+    }
+    setCameraStarting(true)
+    try {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 1280 },
+        },
+      })
+      cameraStreamRef.current = stream
+      setCameraOpen(true)
+      requestAnimationFrame(async () => {
+        if (!videoRef.current) return
+        videoRef.current.srcObject = stream
+        try { await videoRef.current.play() } catch {}
+      })
+    } catch (cameraError) {
+      const message = cameraError instanceof Error ? cameraError.message : String(cameraError)
+      window.dispatchEvent(new CustomEvent('crl-photo-processing-error', { detail: { message: `Camera start failed: ${message}` } }))
+      setError(locale === 'id'
+        ? `Kamera tidak dapat dibuka: ${message}. Pastikan izin kamera diberikan.`
+        : `Unable to open camera: ${message}. Make sure camera permission is allowed.`)
+      stopCamera()
+    } finally {
+      setCameraStarting(false)
+    }
+  }
+
   async function stampImage(file: File, capturedAt: string) {
     if (latitude === null || longitude === null) throw new Error(t('agent.visit.err.gpsBeforePhoto'))
 
     let bitmap: ImageBitmap | null = null
     try {
       bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(bitmap.width, bitmap.height))
       const canvas = document.createElement('canvas')
-      canvas.width = bitmap.width
-      canvas.height = bitmap.height
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error(t('agent.visit.err.cannotProcess'))
 
@@ -315,7 +377,7 @@ export default function VisitPage() {
       })
 
       return await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(t('agent.visit.err.cannotStamp'))), 'image/jpeg', 0.88)
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(t('agent.visit.err.cannotStamp'))), 'image/jpeg', 0.84)
       })
     } catch (err) {
       if (err instanceof Error) throw err
@@ -335,13 +397,52 @@ export default function VisitPage() {
     try {
       const capturedAt = new Date().toISOString()
       const stamped = await stampImage(selectedFile, capturedAt)
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
       const nextPreview = URL.createObjectURL(stamped)
       setPhoto(selectedFile)
       setStampedPhoto(stamped)
       setPhotoCapturedAt(capturedAt)
       setPhotoPreview(nextPreview)
     } catch (err: any) {
+      window.dispatchEvent(new CustomEvent('crl-photo-processing-error', {
+        detail: {
+          message: err?.message || 'Photo processing failed',
+          file_type: selectedFile.type || null,
+          file_size_bytes: selectedFile.size,
+          max_dimension: MAX_PHOTO_DIMENSION,
+        },
+      }))
       setError(err.message || t('agent.visit.err.cannotProcess'))
+    }
+  }
+
+  async function captureFromCamera() {
+    const video = videoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setError(locale === 'id' ? 'Kamera belum siap. Tunggu sebentar lalu coba lagi.' : 'Camera is not ready yet. Wait a moment and try again.')
+      return
+    }
+    setCapturingPhoto(true)
+    setError('')
+    try {
+      const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale))
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error(t('agent.visit.err.cannotProcess'))
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error(t('agent.visit.err.cannotProcess'))), 'image/jpeg', 0.86)
+      })
+      const file = new File([blob], `visit-${customerId}-${Date.now()}.jpg`, { type: 'image/jpeg' })
+      await handlePhoto(file)
+      stopCamera()
+    } catch (err: any) {
+      window.dispatchEvent(new CustomEvent('crl-photo-processing-error', { detail: { message: err?.message || 'Camera capture failed' } }))
+      setError(err?.message || t('agent.visit.err.cannotProcess'))
+    } finally {
+      setCapturingPhoto(false)
     }
   }
 
@@ -417,6 +518,7 @@ export default function VisitPage() {
       return
     }
     try { sessionStorage.removeItem(draftKey) } catch {}
+    stopCamera()
     router.replace(`/agent/customers/${encodeURIComponent(customerId)}`)
     router.refresh()
   }
@@ -483,7 +585,32 @@ export default function VisitPage() {
 
       <StepCard t={t} step="3" title={t('agent.visit.step3')}>
         {!gpsCaptured && <div className="dui-alert dui-alert-warning"><AlertTriangle className="h-5 w-5 shrink-0" /><span>{t('agent.visit.photoGpsWarning')}</span></div>}
-        <Field label={t('agent.visit.fieldPhoto')}><input type="file" accept="image/*" capture="environment" disabled={!gpsCaptured} onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)} className="dui-file-input w-full" /></Field>
+        {gpsCaptured && !cameraOpen && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="button" className="dui-btn dui-btn-primary w-full" onClick={startCamera} disabled={cameraStarting}>
+              <Camera className="h-5 w-5" />
+              {cameraStarting ? (locale === 'id' ? 'Membuka kamera…' : 'Opening camera…') : (locale === 'id' ? 'Ambil Foto di Aplikasi' : 'Take Photo In App')}
+            </button>
+            <label className="dui-btn dui-btn-outline w-full cursor-pointer">
+              <Camera className="h-5 w-5" />
+              {locale === 'id' ? 'Pilih Foto' : 'Choose Photo'}
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)} className="hidden" />
+            </label>
+          </div>
+        )}
+        {cameraOpen && (
+          <div className="grid gap-3 rounded-box border border-base-300 bg-base-200/40 p-3">
+            <video ref={videoRef} autoPlay muted playsInline className="max-h-[68vh] w-full rounded-box bg-black object-cover" />
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className="dui-btn" onClick={stopCamera} disabled={capturingPhoto}>{locale === 'id' ? 'Batal' : 'Cancel'}</button>
+              <button type="button" className="dui-btn dui-btn-primary" onClick={captureFromCamera} disabled={capturingPhoto}>
+                {capturingPhoto ? <span className="dui-loading dui-loading-spinner dui-loading-sm" /> : <Camera className="h-5 w-5" />}
+                {capturingPhoto ? (locale === 'id' ? 'Memproses…' : 'Processing…') : (locale === 'id' ? 'Gunakan Foto' : 'Use Photo')}
+              </button>
+            </div>
+          </div>
+        )}
+        {gpsCaptured && <p className="text-xs text-base-content/60">{locale === 'id' ? 'Gunakan “Ambil Foto di Aplikasi” agar halaman tidak berpindah ke aplikasi kamera dan tidak memuat ulang. “Pilih Foto” tersedia sebagai alternatif.' : 'Use “Take Photo In App” so the page stays open instead of switching to the phone camera app. “Choose Photo” is available as a fallback.'}</p>}
         {photoPreview && (
           <div className={styles.photoPreviewCard}>
             <div className={styles.photoFrame}><img src={photoPreview} alt={t('agent.visit.photoAlt')} /></div>
@@ -511,7 +638,7 @@ export default function VisitPage() {
       <StepCard t={t} step="7" title={t('agent.visit.step7')}><p className="text-sm text-base-content/60">{t('agent.visit.notesHint')}</p><Field label={t('agent.visit.fieldNotes')}><textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} className="dui-textarea w-full" rows={3} placeholder={t('agent.visit.notesPlaceholder')} /></Field></StepCard>
 
       {error && <div className="dui-alert dui-alert-error" role="alert"><XCircle className="h-5 w-5 shrink-0" /><span>{error}</span></div>}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-3xl gap-2"><button type="button" className="dui-btn flex-1" onClick={() => router.push(backHref)} disabled={saving}>{t('agent.visit.cancel')}</button><button type="button" className="dui-btn dui-btn-primary flex-1" disabled={saving} onClick={submitVisit}>{saving ? <><span className="dui-loading dui-loading-spinner dui-loading-sm" />{t('agent.visit.saving')}</> : <><Save className="h-5 w-5" />{t('agent.visit.submit')}</>}</button></div></div>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-3xl gap-2"><button type="button" className="dui-btn flex-1" onClick={() => { stopCamera(); router.push(backHref) }} disabled={saving}>{t('agent.visit.cancel')}</button><button type="button" className="dui-btn dui-btn-primary flex-1" disabled={saving || cameraOpen} onClick={submitVisit}>{saving ? <><span className="dui-loading dui-loading-spinner dui-loading-sm" />{t('agent.visit.saving')}</> : <><Save className="h-5 w-5" />{t('agent.visit.submit')}</>}</button></div></div>
     </div>
   )
 }
