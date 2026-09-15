@@ -21,6 +21,7 @@ import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 
 const LOCATION_LIMIT_METERS = 200
+const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
 function normalizePhone(value: string | null | undefined) {
   return (value ?? '').replace(/[^0-9]/g, '')
@@ -51,6 +52,7 @@ export default function VisitPage() {
   const params = useParams()
   const router = useRouter()
   const customerId = decodeURIComponent(params.customerId as string)
+  const draftKey = `crl:visit-draft:${customerId}`
 
   const [customer, setCustomer] = useState<any>(null)
   const [agent, setAgent] = useState<any>(null)
@@ -78,6 +80,8 @@ export default function VisitPage() {
   const [plannedPaymentDate, setPlannedPaymentDate] = useState('')
   const [unpaidReason, setUnpaidReason] = useState('')
   const [additionalNotes, setAdditionalNotes] = useState('')
+  const [draftReady, setDraftReady] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
 
   const alternativePhones = useMemo(
     () => [customer?.alternative_phone_1, customer?.alternative_phone_2, customer?.alternative_phone_3]
@@ -147,6 +151,7 @@ export default function VisitPage() {
         .eq('customer_id', customerId)
         .maybeSingle()
       if (existingVisit) {
+        try { sessionStorage.removeItem(draftKey) } catch {}
         setError(t('agent.visit.alreadySubmitted'))
         setLoading(false)
         return
@@ -154,11 +159,78 @@ export default function VisitPage() {
 
       setAgent(agentData)
       setCustomer(customerData)
-      setVisitAddress(customerData.service_address ?? '')
+
+      let restored = false
+      try {
+        const raw = sessionStorage.getItem(draftKey)
+        if (raw) {
+          const draft = JSON.parse(raw)
+          const savedAt = Number(draft.savedAt || 0)
+          if (savedAt && Date.now() - savedAt <= VISIT_DRAFT_MAX_AGE_MS) {
+            if (typeof draft.visitAddress === 'string') setVisitAddress(draft.visitAddress)
+            if (typeof draft.latitude === 'number') setLatitude(draft.latitude)
+            if (typeof draft.longitude === 'number') setLongitude(draft.longitude)
+            if (typeof draft.gpsAccuracy === 'number') setGpsAccuracy(draft.gpsAccuracy)
+            if (typeof draft.gpsCapturedAt === 'string') setGpsCapturedAt(draft.gpsCapturedAt)
+            if (typeof draft.distanceMeters === 'number') setDistanceMeters(draft.distanceMeters)
+            if (typeof draft.locationMatch === 'boolean') setLocationMatch(draft.locationMatch)
+            if (typeof draft.phoneCorrect === 'boolean') setPhoneCorrect(draft.phoneCorrect)
+            if (typeof draft.updatedPhone === 'string') setUpdatedPhone(draft.updatedPhone)
+            if (typeof draft.consentGiven === 'boolean') setConsentGiven(draft.consentGiven)
+            if (typeof draft.visitStatusKunjungan === 'string') setVisitStatusKunjungan(draft.visitStatusKunjungan)
+            if (typeof draft.conversationResult === 'string') setConversationResult(draft.conversationResult)
+            if (typeof draft.approvedOffer === 'string') setApprovedOffer(draft.approvedOffer)
+            if (typeof draft.plannedPaymentDate === 'string') setPlannedPaymentDate(draft.plannedPaymentDate)
+            if (typeof draft.unpaidReason === 'string') setUnpaidReason(draft.unpaidReason)
+            if (typeof draft.additionalNotes === 'string') setAdditionalNotes(draft.additionalNotes)
+            restored = true
+          } else {
+            sessionStorage.removeItem(draftKey)
+          }
+        }
+      } catch {
+        // Draft recovery is best-effort only.
+      }
+
+      if (!restored) setVisitAddress(customerData.service_address ?? '')
+      setDraftRestored(restored)
+      setDraftReady(true)
       setLoading(false)
     }
     void loadPage()
-  }, [customerId, router, t])
+  }, [customerId, draftKey, router, t])
+
+  useEffect(() => {
+    if (!draftReady) return
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({
+        savedAt: Date.now(),
+        visitAddress,
+        latitude,
+        longitude,
+        gpsAccuracy,
+        gpsCapturedAt,
+        distanceMeters,
+        locationMatch,
+        phoneCorrect,
+        updatedPhone,
+        consentGiven,
+        visitStatusKunjungan,
+        conversationResult,
+        approvedOffer,
+        plannedPaymentDate,
+        unpaidReason,
+        additionalNotes,
+      }))
+    } catch {
+      // A visit must still work if browser storage is unavailable.
+    }
+  }, [
+    draftReady, draftKey, visitAddress, latitude, longitude, gpsAccuracy, gpsCapturedAt,
+    distanceMeters, locationMatch, phoneCorrect, updatedPhone, consentGiven,
+    visitStatusKunjungan, conversationResult, approvedOffer, plannedPaymentDate,
+    unpaidReason, additionalNotes,
+  ])
 
   useEffect(() => () => {
     if (photoPreview) URL.revokeObjectURL(photoPreview)
@@ -344,6 +416,7 @@ export default function VisitPage() {
       setSaving(false)
       return
     }
+    try { sessionStorage.removeItem(draftKey) } catch {}
     router.replace(`/agent/customers/${encodeURIComponent(customerId)}`)
     router.refresh()
   }
@@ -369,6 +442,13 @@ export default function VisitPage() {
         description={t('agent.visit.description')}
       />
 
+      {draftRestored && (
+        <div className="dui-alert dui-alert-info">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <span>{locale === 'id' ? 'Data kunjungan sebelumnya dipulihkan setelah halaman dimuat ulang. GPS tidak perlu diambil ulang.' : 'Your visit data was restored after the page reloaded. You do not need to capture GPS again.'}</span>
+        </div>
+      )}
+
       <section className="dui-card dui-card-border bg-base-100 shadow-sm">
         <div className="dui-card-body"><div className="flex items-center gap-3"><div className="dui-avatar dui-avatar-placeholder"><div className="w-12 rounded-full bg-primary/10 font-black text-primary">{(customer?.customer_name ?? 'P').slice(0, 2).toUpperCase()}</div></div><div className="min-w-0"><div className="truncate text-lg font-bold">{customer?.customer_name}</div><div className="truncate text-sm text-base-content/60">{customer?.customer_id}</div></div></div></div>
       </section>
@@ -383,7 +463,6 @@ export default function VisitPage() {
             <div className="dui-alert dui-alert-success"><CheckCircle2 className="h-5 w-5 shrink-0" /><span>{t('agent.visit.gpsCaptured')}</span></div>
             <div className="grid grid-cols-2 gap-3"><ReadOnly label={t('agent.visit.latitude')} value={latitude?.toFixed(7)} /><ReadOnly label={t('agent.visit.longitude')} value={longitude?.toFixed(7)} /><ReadOnly label={t('agent.visit.accuracy')} value={gpsAccuracy !== null ? t('agent.visit.meterUnit', { value: gpsAccuracy.toFixed(1) }) : '-'} /><ReadOnly label={t('agent.visit.capturedAt')} value={gpsCapturedAt ? formatVisitTimestamp(gpsCapturedAt) : '-'} /></div>
             {distanceMeters !== null && <div className={locationMatch ? 'dui-alert dui-alert-success' : 'dui-alert dui-alert-warning'}>{locationMatch ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertTriangle className="h-5 w-5 shrink-0" />}<div><div className="font-semibold">{t('agent.visit.distanceFromAddress')} <span className="font-bold">{t('agent.visit.meterUnitBold', { value: distanceMeters.toFixed(1) })}</span></div><div className="text-sm opacity-80">{locationMatch ? t('agent.visit.locationMatch') : t('agent.visit.locationOutOfRange')}</div></div></div>}
-            <div className="aspect-video w-full overflow-hidden rounded-box border border-base-300"><iframe title={t('agent.visit.mapTitle')} src={`https://maps.google.com/maps?q=${latitude},${longitude}&z=17&output=embed`} loading="lazy" className="h-full w-full border-0" /></div>
             <a href={`https://www.google.com/maps?q=${latitude},${longitude}`} target="_blank" rel="noreferrer" className="dui-btn dui-btn-outline w-full"><MapPin className="h-5 w-5" />{t('agent.visit.openInMaps')}</a>
           </>
         )}
