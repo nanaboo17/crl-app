@@ -219,7 +219,7 @@ export default function SuperadminReportsPage() {
               <span className="dui-fieldset-legend">{tx('End date', 'Tanggal akhir')}</span>
               <input type="date" className="dui-input w-full" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </label>
-            <label className="dui-fieldset md:col-span-1">
+            <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Agent', 'Agen')}</span>
               <select className="dui-select w-full" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
                 <option value="">{tx('All agents', 'Semua agen')}</option>
