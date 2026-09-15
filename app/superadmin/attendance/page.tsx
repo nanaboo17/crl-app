@@ -139,7 +139,6 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <SuperadminPageHeader
         breadcrumbs={[{ label: 'Superadmin', href: '/superadmin' }, { label: 'Attendance' }]}
         title="Daily Attendance Monitoring"
-        description="Attendance comes from agent_attendance for the selected Jakarta calendar day. The displayed photo is the agent check-in photo."
       />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
@@ -170,7 +169,6 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
           <h2 className="font-bold">Agent attendance — {selectedDate}</h2>
-          <p className="text-sm text-base-content/60">Check-in and check-out times are shown in WIB (Asia/Jakarta). Attendance is based on agent_attendance.check_in_at.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="dui-table">
