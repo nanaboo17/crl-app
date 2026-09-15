@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 
 type FieldContext = {
-  formType: 'previsit' | 'visit'
+  formType: 'previsit' | 'visit' | 'attendance'
   customerId: string | null
   pagePath: string
 }
@@ -12,6 +12,14 @@ type FieldContext = {
 function getContext(): FieldContext | null {
   const url = new URL(window.location.href)
   const path = url.pathname
+
+  if (path === '/agent/attendance' || path.startsWith('/agent/attendance/')) {
+    return {
+      formType: 'attendance',
+      customerId: null,
+      pagePath: `${path}${url.search}`,
+    }
+  }
 
   if (path.includes('/pre-visit')) {
     return {
@@ -121,6 +129,16 @@ export default function FieldFormDiagnostics() {
       })
     }
 
+    const onAttendanceDiagnostic = (event: Event) => {
+      if (context.formType !== 'attendance') return
+      const detail = (event as CustomEvent<Record<string, unknown>>).detail || {}
+      const stage = typeof detail.stage === 'string' ? detail.stage : 'attendance_action'
+      const severity = detail.severity === 'error' || detail.severity === 'warning' ? detail.severity : 'info'
+      const message = typeof detail.message === 'string' ? detail.message : 'Attendance action'
+      const metadata = typeof detail.metadata === 'object' && detail.metadata ? detail.metadata as Record<string, unknown> : {}
+      void log(stage, severity, message, metadata)
+    }
+
     const onOffline = () => void log('network_state', 'warning', 'Browser went offline')
     const onOnline = () => void log('network_state', 'info', 'Browser came online')
 
@@ -143,6 +161,7 @@ export default function FieldFormDiagnostics() {
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onUnhandledRejection)
     window.addEventListener('crl-photo-processing-error', onPhotoProcessingError)
+    window.addEventListener('crl-attendance-diagnostic', onAttendanceDiagnostic)
     window.addEventListener('offline', onOffline)
     window.addEventListener('online', onOnline)
 
@@ -151,6 +170,7 @@ export default function FieldFormDiagnostics() {
       window.removeEventListener('error', onError)
       window.removeEventListener('unhandledrejection', onUnhandledRejection)
       window.removeEventListener('crl-photo-processing-error', onPhotoProcessingError)
+      window.removeEventListener('crl-attendance-diagnostic', onAttendanceDiagnostic)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('online', onOnline)
     }
