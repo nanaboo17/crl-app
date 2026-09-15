@@ -25,9 +25,17 @@ type Attendance = {
 }
 
 type Action = 'in' | 'out'
+type DiagnosticSeverity = 'info' | 'warning' | 'error'
 
 const MIN_WORK_MINUTES = 8 * 60
 const ATTENDANCE_TIMEZONE = 'Asia/Jakarta'
+
+function attendanceDiagnostic(stage: string, severity: DiagnosticSeverity, message: string, metadata: Record<string, unknown> = {}) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('crl-attendance-diagnostic', {
+    detail: { stage, severity, message, metadata },
+  }))
+}
 
 function localDateKey() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -69,12 +77,17 @@ export default function AgentAttendancePage() {
 
   async function loadPhoto(path: string | null, action: Action) {
     if (!path) return
-    const { data } = await supabase.storage.from('attendance-evidence').createSignedUrl(path, 3600)
+    const { data, error } = await supabase.storage.from('attendance-evidence').createSignedUrl(path, 3600)
+    if (error) {
+      attendanceDiagnostic('attendance_photo_preview', 'warning', error.message, { action, path_exists: Boolean(path) })
+      return
+    }
     if (data?.signedUrl) setPreviews((current) => ({ ...current, [action]: data.signedUrl }))
   }
 
   async function loadToday() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError) attendanceDiagnostic('attendance_auth', 'error', authError.message)
     if (!user?.email) { window.location.href = '/login'; return }
     const currentEmail = user.email.trim().toLowerCase()
     setEmail(currentEmail)
@@ -84,10 +97,17 @@ export default function AgentAttendancePage() {
       .eq('agent_email', currentEmail)
       .eq('attendance_date', localDateKey())
       .maybeSingle()
-    if (error) setError(error.message)
-    else {
+    if (error) {
+      attendanceDiagnostic('attendance_load', 'error', error.message, { attendance_date: localDateKey() })
+      setError(error.message)
+    } else {
       const row = data as Attendance | null
       setAttendance(row)
+      attendanceDiagnostic('attendance_load', 'info', row ? 'Attendance record loaded' : 'No attendance record for today', {
+        attendance_date: localDateKey(),
+        checked_in: Boolean(row?.check_in_at),
+        checked_out: Boolean(row?.check_out_at),
+      })
       if (row) {
         void loadPhoto(row.check_in_photo_path, 'in')
         void loadPhoto(row.check_out_photo_path, 'out')
@@ -117,8 +137,16 @@ export default function AgentAttendancePage() {
     const file = event.target.files?.[0] ?? null
     setFiles((current) => ({ ...current, [action]: file }))
     if (file) {
+      attendanceDiagnostic('attendance_photo_selected', 'info', 'Attendance photo selected', {
+        action,
+        file_type: file.type || null,
+        file_size_bytes: file.size,
+        file_extension: file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : null,
+      })
       const url = URL.createObjectURL(file)
       setPreviews((current) => ({ ...current, [action]: url }))
+    } else {
+      attendanceDiagnostic('attendance_photo_selected', 'warning', 'Attendance photo selection returned no file', { action })
     }
   }
 
@@ -132,11 +160,29 @@ export default function AgentAttendancePage() {
     if (!email) throw new Error(tx('Agent account is not ready.', 'Akun agen belum siap.'))
     const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
     const path = `${email}/${localDateKey()}/${action}-${Date.now()}.${extension}`
+    attendanceDiagnostic('attendance_photo_upload_start', 'info', 'Uploading attendance photo', {
+      action,
+      file_type: file.type || null,
+      file_size_bytes: file.size,
+      attendance_date: localDateKey(),
+    })
     const { error } = await supabase.storage.from('attendance-evidence').upload(path, file, {
       contentType: file.type || 'image/jpeg',
       upsert: false,
     })
-    if (error) throw error
+    if (error) {
+      attendanceDiagnostic('attendance_photo_upload', 'error', error.message, {
+        action,
+        file_type: file.type || null,
+        file_size_bytes: file.size,
+      })
+      throw error
+    }
+    attendanceDiagnostic('attendance_photo_upload', 'info', 'Attendance photo uploaded', {
+      action,
+      file_type: file.type || null,
+      file_size_bytes: file.size,
+    })
     return path
   }
 
@@ -150,31 +196,77 @@ export default function AgentAttendancePage() {
 
   async function run(action: Action) {
     if (action === 'out' && !canCheckOut) {
-      setError(tx(
+      const message = tx(
         `Minimum work duration is 8 hours. Remaining: ${formatDuration(remainingMinutes, 'en')}.`,
         `Durasi kerja minimum adalah 8 jam. Sisa waktu: ${formatDuration(remainingMinutes, 'id')}.`
-      ))
+      )
+      attendanceDiagnostic('attendance_validation', 'warning', message, { action, remaining_minutes: remainingMinutes })
+      setError(message)
       return
     }
     setSaving(true)
     setError('')
+    let photoPath: string | null = null
+    attendanceDiagnostic('attendance_action_start', 'info', action === 'in' ? 'Check-in started' : 'Check-out started', {
+      action,
+      attendance_date: localDateKey(),
+      online: navigator.onLine,
+    })
     try {
-      const position = await getPosition()
-      const photoPath = await uploadPhoto(action)
+      let position: GeolocationPosition
+      try {
+        position = await getPosition()
+        attendanceDiagnostic('attendance_gps', 'info', 'GPS captured for attendance', {
+          action,
+          accuracy_m: position.coords.accuracy,
+        })
+      } catch (gpsError) {
+        const message = gpsError instanceof Error ? gpsError.message : 'GPS capture failed'
+        attendanceDiagnostic('attendance_gps', 'error', message, {
+          action,
+          geolocation_code: typeof GeolocationPositionError !== 'undefined' && gpsError instanceof GeolocationPositionError ? gpsError.code : null,
+        })
+        throw gpsError
+      }
+
+      photoPath = await uploadPhoto(action)
       const fn = action === 'in' ? 'agent_check_in' : 'agent_check_out'
+      attendanceDiagnostic('attendance_rpc_start', 'info', `Calling ${fn}`, { action })
       const { data, error } = await supabase.rpc(fn, {
         p_latitude: position.coords.latitude,
         p_longitude: position.coords.longitude,
         p_accuracy_m: position.coords.accuracy,
         p_photo_path: photoPath,
       })
-      if (error) throw error
+      if (error) {
+        attendanceDiagnostic('attendance_rpc', 'error', error.message, {
+          action,
+          rpc: fn,
+          code: error.code || null,
+          details: error.details || null,
+          hint: error.hint || null,
+          photo_uploaded: Boolean(photoPath),
+        })
+        throw error
+      }
       const row = data as Attendance
       setAttendance(row)
       setFiles((current) => ({ ...current, [action]: null }))
+      attendanceDiagnostic('attendance_saved', 'info', action === 'in' ? 'Check-in saved successfully' : 'Check-out saved successfully', {
+        action,
+        attendance_id: row.attendance_id,
+        attendance_date: row.attendance_date,
+        check_in_status: row.check_in_status,
+      })
       void loadPhoto(action === 'in' ? row.check_in_photo_path : row.check_out_photo_path, action)
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx('Unable to save attendance.', 'Tidak dapat menyimpan absensi.'))
+      const message = err instanceof Error ? err.message : tx('Unable to save attendance.', 'Tidak dapat menyimpan absensi.')
+      attendanceDiagnostic('attendance_save_failed', 'error', message, {
+        action,
+        photo_uploaded_before_failure: Boolean(photoPath),
+        online: navigator.onLine,
+      })
+      setError(message)
     } finally {
       setSaving(false)
     }
@@ -196,7 +288,7 @@ export default function AgentAttendancePage() {
         <Link href="/agent" className={styles.backButton}>{tx('Back', 'Kembali')}</Link>
       </header>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className={styles.error} role="alert">{error}</div>}
 
       <section className={styles.statusCard}>
         <div className={styles.statusIcon}>{checkedOut ? <CheckCircle2 /> : <Clock3 />}</div>
