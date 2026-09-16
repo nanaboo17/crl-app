@@ -97,14 +97,14 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
           <div className="text-center">
             <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-secondary/15 text-secondary"><CalendarDays className="size-7" /></div>
             <h2 id="visit-view-title" className="text-2xl font-black">{tx('Choose Visit View', 'Pilih Tampilan Kunjungan')}</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-base-content/60">{tx('Review all Visits for one date, or continue with the existing agent-based monitor.', 'Tinjau semua Kunjungan untuk satu tanggal, atau lanjutkan dengan monitoring berbasis agen.')}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-base-content/60">{tx('Review Visits across a date range, or continue with the existing agent-based monitor.', 'Tinjau Kunjungan dalam rentang tanggal, atau lanjutkan dengan monitoring berbasis agen.')}</p>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Link href={`/superadmin/visits/date?date=${today}`} className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-primary hover:bg-primary/5">
+            <Link href={`/superadmin/visits/date?start=${today}&end=${today}`} className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-primary hover:bg-primary/5">
               <CalendarDays className="mb-3 size-6 text-primary" />
-              <div className="font-black">{tx('View by Date', 'Lihat per Tanggal')}</div>
-              <div className="mt-1 text-xs leading-5 text-base-content/60">{tx('Choose a WIB date, see every Supabase Visit field, and generate a CSV report.', 'Pilih tanggal WIB, lihat semua field Visit dari Supabase, dan buat laporan CSV.')}</div>
+              <div className="font-black">{tx('View by Date Range', 'Lihat per Rentang Tanggal')}</div>
+              <div className="mt-1 text-xs leading-5 text-base-content/60">{tx('Choose WIB start and end dates, see every Supabase Visit field, and generate a filtered CSV report.', 'Pilih tanggal mulai dan akhir WIB, lihat semua field Visit dari Supabase, dan buat laporan CSV terfilter.')}</div>
             </Link>
             <Link href="/superadmin/visits?mode=agent&filter=all&page=1" className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-secondary hover:bg-secondary/5">
               <Users className="mb-3 size-6 text-secondary" />
