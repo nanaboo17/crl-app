@@ -27,6 +27,23 @@ type FormState = {
   previsit_notes: string
 }
 
+type PreviousPreVisit = {
+  previsit_id: string
+  phone_contacted: boolean | null
+  customer_available: boolean | null
+  willing_to_reschedule: boolean | null
+  reschedule_date: string | null
+  direct_visit: boolean | null
+  address_confirmed: boolean | null
+  confirmed_address: string | null
+  landmark: string | null
+  wants_appointment: boolean | null
+  appointment_date: string | null
+  contact_result: string | null
+  unpaid_reason: string | null
+  previsit_notes: string | null
+}
+
 const initialForm: FormState = {
   phone_contacted: null,
   customer_available: null,
@@ -76,9 +93,44 @@ function jakartaLocalToIso(value: string) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
+function isoToJakartaInput(value: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+}
+
 function isPastJakartaDateTime(value: string) {
   const iso = jakartaLocalToIso(value)
   return Boolean(iso && new Date(iso).getTime() < Date.now())
+}
+
+function previousToForm(previous: PreviousPreVisit): FormState {
+  return {
+    phone_contacted: previous.phone_contacted,
+    customer_available: previous.customer_available,
+    willing_to_reschedule: previous.willing_to_reschedule,
+    reschedule_date: isoToJakartaInput(previous.reschedule_date),
+    direct_visit: previous.direct_visit,
+    address_confirmed: previous.address_confirmed,
+    confirmed_address: previous.confirmed_address || '',
+    landmark: previous.landmark || '',
+    wants_appointment: previous.wants_appointment,
+    appointment_date: isoToJakartaInput(previous.appointment_date),
+    contact_result: previous.contact_result || '',
+    unpaid_reason: previous.unpaid_reason || '',
+    previsit_notes: previous.previsit_notes || '',
+  }
 }
 
 export default function PreVisitForm() {
@@ -89,6 +141,7 @@ export default function PreVisitForm() {
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
 
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [previousPreVisitId, setPreviousPreVisitId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -104,10 +157,33 @@ export default function PreVisitForm() {
         setLoading(false)
         return
       }
+
       const s = createClient()
-      const { data, error } = await s.from('customers').select('*').eq('customer_id', customerId).single()
-      if (error) setError(error.message)
-      else setCustomer(data as Customer)
+      const [{ data: customerData, error: customerError }, { data: previousData, error: previousError }] = await Promise.all([
+        s.from('customers').select('*').eq('customer_id', customerId).single(),
+        s.from('pre_visits')
+          .select('previsit_id,phone_contacted,customer_available,willing_to_reschedule,reschedule_date,direct_visit,address_confirmed,confirmed_address,landmark,wants_appointment,appointment_date,contact_result,unpaid_reason,previsit_notes')
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false })
+          .order('previsit_id', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+
+      if (customerError) {
+        setError(customerError.message)
+      } else {
+        setCustomer(customerData as Customer)
+      }
+
+      if (previousError) {
+        setError(previousError.message)
+      } else if (previousData) {
+        const previous = previousData as PreviousPreVisit
+        setPreviousPreVisitId(previous.previsit_id)
+        setForm(previousToForm(previous))
+      }
+
       setLoading(false)
     })()
   }, [customerId])
@@ -175,8 +251,10 @@ export default function PreVisitForm() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
     setError('')
+
     try {
       if (form.phone_contacted === null) throw new Error(tx('Please confirm whether the phone was contacted.', 'Konfirmasi apakah nomor telepon berhasil dihubungi.'))
       if (!form.contact_result) throw new Error(tx('Please select the contact result.', 'Pilih hasil kontak.'))
@@ -211,6 +289,7 @@ export default function PreVisitForm() {
       const payload = {
         customer_id: customerId,
         agent_email: p.email,
+        previous_previsit_id: previousPreVisitId,
         contact_attempt_date: new Date().toISOString(),
         contact_confirmed: form.phone_contacted === true,
         phone_contacted: form.phone_contacted,
@@ -247,7 +326,7 @@ export default function PreVisitForm() {
 
   return (
     <main className="container">
-      <PageTop title={tx('New Pre-Visit', 'Pra-Kunjungan Baru')} back />
+      <PageTop title={previousPreVisitId ? tx('Continue Pre-Visit', 'Lanjutkan Pra-Kunjungan') : tx('New Pre-Visit', 'Pra-Kunjungan Baru')} back />
 
       {error && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="previsit-warning-title" onClick={() => setError('')}>
@@ -255,10 +334,7 @@ export default function PreVisitForm() {
             <div className="mb-4 flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-warning/15 text-warning"><AlertTriangle className="size-6" aria-hidden="true" /></span>
-                <div>
-                  <h2 id="previsit-warning-title" className="text-lg font-black">{tx('Please check the form', 'Periksa kembali form')}</h2>
-                  <p className="mt-1 text-sm text-base-content/65">{tx('There is something that needs your attention before continuing.', 'Ada hal yang perlu diperiksa sebelum melanjutkan.')}</p>
-                </div>
+                <div><h2 id="previsit-warning-title" className="text-lg font-black">{tx('Please check the form', 'Periksa kembali form')}</h2><p className="mt-1 text-sm text-base-content/65">{tx('There is something that needs your attention before continuing.', 'Ada hal yang perlu diperiksa sebelum melanjutkan.')}</p></div>
               </div>
               <button type="button" className="dui-btn dui-btn-ghost dui-btn-sm dui-btn-circle" onClick={() => setError('')} aria-label={tx('Close warning', 'Tutup peringatan')}><X className="size-4" aria-hidden="true" /></button>
             </div>
@@ -274,36 +350,20 @@ export default function PreVisitForm() {
           <strong>{customer?.customer_name || '—'}</strong>
           <small>{customer?.customer_id}</small>
           <small>{customer?.phone_number || tx('No phone number', 'Nomor telepon tidak tersedia')}</small>
+          {previousPreVisitId && <small>{tx('Copied from previous Pre-Visit', 'Data disalin dari Pra-Kunjungan sebelumnya')}: {previousPreVisitId}</small>}
         </section>
 
         <section className={styles.stepCard}>
           <div className={styles.stepTitle}><span>1</span><div><h2>{tx('Contact Customer', 'Hubungi Pelanggan')}</h2><p>{tx('Try the registered customer phone number.', 'Hubungi nomor telepon pelanggan yang terdaftar.')}</p></div></div>
-          <div className={styles.question}>
-            <label>{tx('Was the phone contacted?', 'Apakah pelanggan berhasil dihubungi?')}</label>
-            <div className={styles.choiceGrid}>
-              <button type="button" className={form.phone_contacted === true ? styles.selected : ''} onClick={() => setPhoneContacted(true)}>{tx('Yes', 'Ya')}</button>
-              <button type="button" className={form.phone_contacted === false ? styles.selected : ''} onClick={() => setPhoneContacted(false)}>{tx('No', 'Tidak')}</button>
-            </div>
-          </div>
-          <div className={styles.question}>
-            <label>{tx('Contact result', 'Hasil kontak')}</label>
-            {form.phone_contacted === null ? <small>{tx('Choose Yes or No above first.', 'Pilih Ya atau Tidak di atas terlebih dahulu.')}</small> : (
-              <div className={styles.choiceGrid}>{contactResults.map((result) => <button key={result.value} type="button" className={form.contact_result === result.value ? styles.selected : ''} onClick={() => setForm((current) => ({ ...current, contact_result: result.value }))}>{result.label}</button>)}</div>
-            )}
-          </div>
+          <div className={styles.question}><label>{tx('Was the phone contacted?', 'Apakah pelanggan berhasil dihubungi?')}</label><div className={styles.choiceGrid}><button type="button" className={form.phone_contacted === true ? styles.selected : ''} onClick={() => setPhoneContacted(true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.phone_contacted === false ? styles.selected : ''} onClick={() => setPhoneContacted(false)}>{tx('No', 'Tidak')}</button></div></div>
+          <div className={styles.question}><label>{tx('Contact result', 'Hasil kontak')}</label>{form.phone_contacted === null ? <small>{tx('Choose Yes or No above first.', 'Pilih Ya atau Tidak di atas terlebih dahulu.')}</small> : <div className={styles.choiceGrid}>{contactResults.map((result) => <button key={result.value} type="button" className={form.contact_result === result.value ? styles.selected : ''} onClick={() => setForm((current) => ({ ...current, contact_result: result.value }))}>{result.label}</button>)}</div>}</div>
         </section>
 
         {form.phone_contacted === true && (
           <section className={styles.stepCard}>
             <div className={styles.stepTitle}><span>2</span><div><h2>{tx('Customer Availability', 'Ketersediaan Pelanggan')}</h2><p>{tx('Confirm whether the customer can continue the pre-visit discussion.', 'Konfirmasi apakah pelanggan dapat melanjutkan pembahasan pra-kunjungan.')}</p></div></div>
-            <div className={styles.question}>
-              <label>{tx('Is the customer available?', 'Apakah pelanggan tersedia?')}</label>
-              <div className={styles.choiceGrid}><button type="button" className={form.customer_available === true ? styles.selected : ''} onClick={() => setBoolean('customer_available', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.customer_available === false ? styles.selected : ''} onClick={() => setBoolean('customer_available', false)}>{tx('No', 'Tidak')}</button></div>
-            </div>
-            {form.customer_available === false && <>
-              <div className={styles.question}><label>{tx('Is the customer willing to reschedule?', 'Apakah pelanggan bersedia menjadwalkan ulang?')}</label><div className={styles.choiceGrid}><button type="button" className={form.willing_to_reschedule === true ? styles.selected : ''} onClick={() => setBoolean('willing_to_reschedule', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.willing_to_reschedule === false ? styles.selected : ''} onClick={() => setBoolean('willing_to_reschedule', false)}>{tx('No', 'Tidak')}</button></div></div>
-              {form.willing_to_reschedule === true && <div className={styles.field}><label>{tx('Reschedule date & time (WIB)', 'Tanggal & waktu penjadwalan ulang (WIB)')}</label><input type="datetime-local" value={form.reschedule_date} min={minDateTime || undefined} step={60} onChange={(e) => setForm((current) => ({ ...current, reschedule_date: e.target.value }))} /><small>{tx('Time is saved in Jakarta time (WIB).', 'Waktu disimpan menggunakan zona waktu Jakarta (WIB).')}</small></div>}
-            </>}
+            <div className={styles.question}><label>{tx('Is the customer available?', 'Apakah pelanggan tersedia?')}</label><div className={styles.choiceGrid}><button type="button" className={form.customer_available === true ? styles.selected : ''} onClick={() => setBoolean('customer_available', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.customer_available === false ? styles.selected : ''} onClick={() => setBoolean('customer_available', false)}>{tx('No', 'Tidak')}</button></div></div>
+            {form.customer_available === false && <><div className={styles.question}><label>{tx('Is the customer willing to reschedule?', 'Apakah pelanggan bersedia menjadwalkan ulang?')}</label><div className={styles.choiceGrid}><button type="button" className={form.willing_to_reschedule === true ? styles.selected : ''} onClick={() => setBoolean('willing_to_reschedule', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.willing_to_reschedule === false ? styles.selected : ''} onClick={() => setBoolean('willing_to_reschedule', false)}>{tx('No', 'Tidak')}</button></div></div>{form.willing_to_reschedule === true && <div className={styles.field}><label>{tx('Reschedule date & time (WIB)', 'Tanggal & waktu penjadwalan ulang (WIB)')}</label><input type="datetime-local" value={form.reschedule_date} min={minDateTime || undefined} step={60} onChange={(e) => setForm((current) => ({ ...current, reschedule_date: e.target.value }))} /></div>}</>}
           </section>
         )}
 
@@ -315,22 +375,9 @@ export default function PreVisitForm() {
             <div className={styles.field}><label>{tx('Landmark / access note', 'Patokan / catatan akses')}</label><textarea value={form.landmark} onChange={(e) => setForm((current) => ({ ...current, landmark: e.target.value }))} placeholder={tx('Nearest landmark or access note', 'Patokan terdekat atau catatan akses')} /></div>
           </section>
 
-          <section className={styles.stepCard}>
-            <div className={styles.stepTitle}><span>4</span><div><h2>{tx('Unpaid Reason', 'Alasan Belum Bayar')}</h2><p>{tx('Record why the customer has not paid yet.', 'Catat alasan pelanggan belum melakukan pembayaran.')}</p></div></div>
-            <div className={styles.field}>
-              <label>{tx('Unpaid reason', 'Alasan belum bayar')}</label>
-              <select value={form.unpaid_reason} onChange={(e) => setForm((current) => ({ ...current, unpaid_reason: e.target.value }))}>
-                <option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>
-                {UNPAID_REASONS.map(([value, en]) => <option key={value} value={value}>{locale === 'id' ? value : en}</option>)}
-              </select>
-            </div>
-          </section>
+          <section className={styles.stepCard}><div className={styles.stepTitle}><span>4</span><div><h2>{tx('Unpaid Reason', 'Alasan Belum Bayar')}</h2><p>{tx('Record why the customer has not paid yet.', 'Catat alasan pelanggan belum melakukan pembayaran.')}</p></div></div><div className={styles.field}><label>{tx('Unpaid reason', 'Alasan belum bayar')}</label><select value={form.unpaid_reason} onChange={(e) => setForm((current) => ({ ...current, unpaid_reason: e.target.value }))}><option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>{UNPAID_REASONS.map(([value, en]) => <option key={value} value={value}>{locale === 'id' ? value : en}</option>)}</select></div></section>
 
-          <section className={styles.stepCard}>
-            <div className={styles.stepTitle}><span>5</span><div><h2>{tx('Appointment', 'Janji Kunjungan')}</h2><p>{tx('Confirm the agreed visit date and time.', 'Konfirmasi tanggal dan waktu kunjungan yang telah disepakati.')}</p></div></div>
-            <div className={styles.question}><label>{tx('Does the customer want to make an appointment?', 'Apakah pelanggan ingin membuat janji kunjungan?')}</label><div className={styles.choiceGrid}><button type="button" className={form.wants_appointment === true ? styles.selected : ''} onClick={() => setBoolean('wants_appointment', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.wants_appointment === false ? styles.selected : ''} onClick={() => setBoolean('wants_appointment', false)}>{tx('No', 'Tidak')}</button></div></div>
-            {form.wants_appointment === true && <div className={styles.field}><label>{tx('Visit date & time (WIB)', 'Tanggal & waktu kunjungan (WIB)')}</label><input type="datetime-local" value={form.appointment_date} min={minDateTime || undefined} step={60} onChange={(e) => setForm((current) => ({ ...current, appointment_date: e.target.value }))} /><small>{tx('Choose the agreed visit schedule in Jakarta time (WIB).', 'Pilih jadwal kunjungan yang disepakati dalam zona waktu Jakarta (WIB).')}</small></div>}
-          </section>
+          <section className={styles.stepCard}><div className={styles.stepTitle}><span>5</span><div><h2>{tx('Appointment', 'Janji Kunjungan')}</h2><p>{tx('Confirm the agreed visit date and time.', 'Konfirmasi tanggal dan waktu kunjungan yang telah disepakati.')}</p></div></div><div className={styles.question}><label>{tx('Does the customer want to make an appointment?', 'Apakah pelanggan ingin membuat janji kunjungan?')}</label><div className={styles.choiceGrid}><button type="button" className={form.wants_appointment === true ? styles.selected : ''} onClick={() => setBoolean('wants_appointment', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.wants_appointment === false ? styles.selected : ''} onClick={() => setBoolean('wants_appointment', false)}>{tx('No', 'Tidak')}</button></div></div>{form.wants_appointment === true && <div className={styles.field}><label>{tx('Visit date & time (WIB)', 'Tanggal & waktu kunjungan (WIB)')}</label><input type="datetime-local" value={form.appointment_date} min={minDateTime || undefined} step={60} onChange={(e) => setForm((current) => ({ ...current, appointment_date: e.target.value }))} /></div>}</section>
         </>}
 
         {form.phone_contacted === false && (
@@ -341,13 +388,9 @@ export default function PreVisitForm() {
           </section>
         )}
 
-        <section className={styles.stepCard}>
-          <div className={styles.stepTitle}><span>✓</span><div><h2>{tx('Closure', 'Penutupan')}</h2><p>{tx('The status is calculated automatically from the answers above.', 'Status dihitung otomatis berdasarkan jawaban di atas.')}</p></div></div>
-          <div className={styles.statusBox}><span>{tx('Pre-Visit status', 'Status Pra-Kunjungan')}</span><strong>{outcome.status}</strong>{outcome.reason && <small>{outcome.reason}</small>}</div>
-          <div className={styles.field}><label>{tx('Notes', 'Catatan')} *</label><textarea value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={tx('Required notes', 'Catatan wajib diisi')} /></div>
-        </section>
+        <section className={styles.stepCard}><div className={styles.stepTitle}><span>✓</span><div><h2>{tx('Closure', 'Penutupan')}</h2><p>{tx('The status is calculated automatically from the answers above.', 'Status dihitung otomatis berdasarkan jawaban di atas.')}</p></div></div><div className={styles.statusBox}><span>{tx('Pre-Visit status', 'Status Pra-Kunjungan')}</span><strong>{outcome.status}</strong>{outcome.reason && <small>{outcome.reason}</small>}</div><div className={styles.field}><label>{tx('Notes', 'Catatan')} *</label><textarea value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={tx('Required notes', 'Catatan wajib diisi')} /></div></section>
 
-        <button className={styles.submitButton} disabled={saving}>{saving ? tx('Saving…', 'Menyimpan…') : tx('Save Pre-Visit', 'Simpan Pra-Kunjungan')}</button>
+        <button className={styles.submitButton} disabled={saving}>{saving ? tx('Saving…', 'Menyimpan…') : previousPreVisitId ? tx('Save New Pre-Visit', 'Simpan Pra-Kunjungan Baru') : tx('Save Pre-Visit', 'Simpan Pra-Kunjungan')}</button>
       </form>
     </main>
   )
