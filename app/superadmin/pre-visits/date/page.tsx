@@ -1,11 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ChevronLeft, Inbox } from 'lucide-react'
+import { CalendarDays, ChevronLeft, Inbox } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import FilterableDataTable from '@/components/superadmin/FilterableDataTable'
-import IonicDateRangePicker from '@/components/superadmin/IonicDateRangePicker'
 
 const PREVISIT_COLUMNS = [
   'previsit_id',
@@ -94,13 +93,17 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
       />
 
       <div className="flex flex-col gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm lg:flex-row lg:items-end lg:justify-between">
-        <IonicDateRangePicker
-          basePath="/superadmin/pre-visits/date"
-          initialStart={startDate}
-          initialEnd={endDate}
-          startLabel="Pre-Visit start date (WIB)"
-          endLabel="Pre-Visit end date (WIB)"
-        />
+        <form method="get" className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="form-control w-full sm:w-auto">
+            <span className="mb-1 text-xs font-bold uppercase tracking-wide text-base-content/60">Start date (WIB)</span>
+            <input className="dui-input dui-input-bordered" type="date" name="start" defaultValue={startDate} />
+          </label>
+          <label className="form-control w-full sm:w-auto">
+            <span className="mb-1 text-xs font-bold uppercase tracking-wide text-base-content/60">End date (WIB)</span>
+            <input className="dui-input dui-input-bordered" type="date" name="end" defaultValue={endDate} min={startDate} />
+          </label>
+          <button className="dui-btn dui-btn-secondary" type="submit"><CalendarDays className="size-4" />View Range</button>
+        </form>
         <div className="flex flex-wrap gap-2">
           <Link className="dui-btn dui-btn-ghost" href="/superadmin/pre-visits"><ChevronLeft className="size-4" />Change View</Link>
         </div>
