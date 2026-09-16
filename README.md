@@ -1,82 +1,132 @@
-# CRL Field App v1
+# CRL Field App
 
-Mobile-first CRL field operations app built with Next.js 15 and Supabase.
+CRL Field App is an internal field-operations application for customer retention, collection, pre-visit preparation, field visits, payment monitoring, territory assignment, attendance, and Superadmin reporting.
 
-## Implemented in v1
+**Documentation status:** updated 16 September 2026.
 
-- Google OAuth sign-in
-- Registered-user routing by role: Agent / Admin / Superadmin
-- Database-level Row Level Security (RLS)
-- Agent mobile dashboard
-- Agent-only customer list and customer detail
-- One Pre-Visit per customer
-- Pre-Visit form + detail
-- One Visit per customer
-- Visit form with high-accuracy browser GPS, accuracy value, camera/photo upload, mandatory consent, result and summary
-- Sequential human-readable IDs generated safely by PostgreSQL: `PRE00001`, `VIS00001`, ...
-- Customer status synchronization via database triggers
-- Admin dashboard + customer-to-agent assignment + visit monitoring
-- Superadmin dashboard + agent/customer/pre-visit/visit management
-- Private Supabase Storage bucket for visit evidence
+## Documentation
 
-## 1. Create Supabase project
+- [Full system documentation](docs/CRL_DOCUMENTATION.md)
+- [Superadmin operating guide](docs/SUPERADMIN_GUIDE.md)
+- [Design system and UI conventions](DESIGN.md)
 
-Create a project at Supabase, then open **SQL Editor** and run:
+## Current product scope
 
-`supabase/schema.sql`
+The application supports three authenticated roles:
 
-Use a new project/schema for the first setup. The script creates tables, RLS policies, sequences, triggers and the private `visit-evidence` bucket.
+- **Agent** — works assigned customers, completes Pre-Visits and Visits, captures field evidence, and manages follow-up work.
+- **Admin** — monitors operational data and agent activity with broader access than Agents.
+- **Superadmin** — manages users, customers, territories, attendance, Pre-Visits, Visits, diagnostics, and reports.
 
-## 2. Configure Google Auth
+Authentication uses Google OAuth through Supabase Auth. Access to operational records is protected by Supabase Row Level Security.
 
-In Supabase: **Authentication → Providers → Google** and enable Google.
+## Core workflow
 
-Add your local and production URLs to the allowed redirect URLs, including:
+1. Customer data is loaded into `customers`.
+2. Customers can be assigned to Agents through territory and assignment rules.
+3. An Agent performs a **Pre-Visit**.
+4. A customer may have **multiple Pre-Visit records**. Continued Pre-Visits create a new row and link to the previous record through `previous_previsit_id`.
+5. When appropriate, the Agent performs a **Visit** with GPS, location validation, photo evidence, consent, result, conversation outcome, offers, payment planning, and notes.
+6. Payment synchronization updates `payment_status` without removing the historical/current `agent_email`.
+7. A paid customer with a Visit is marked `agent_fee_eligible = true`.
 
-- `http://localhost:3000/auth/route`
-- `https://YOUR-DOMAIN/auth/route`
+## Important business rules
 
-## 3. Environment
+### Customer status
 
-Copy `.env.example` to `.env.local` and fill:
+`customer_status` is the authoritative CRL workflow status.
+
+`assign_status` and `visit_status` are compatibility mirrors and should not be treated as independent sources of truth:
+
+- assignment source of truth: `agent_email`
+- visit source of truth: existence of a row in `visits`
+- payment source of truth: `payment_status`
+
+### Agent ownership after payment
+
+A change to `payment_status = 'paid'` **does not clear `agent_email`**. The Agent remains attached to the customer for historical ownership, performance reporting, and fee eligibility.
+
+### Agent fee eligibility
+
+`customers.agent_fee_eligible` is maintained automatically.
+
+It is `true` only when:
+
+```text
+payment_status = paid
+AND
+customer_id exists in visits
+```
+
+Otherwise it is `false`.
+
+### Application deletion policy
+
+Customers, Pre-Visits, and Visits are **not deletable through the application**, including by Superadmin. Destructive cleanup must be performed intentionally through authorized Supabase administration/SQL access.
+
+## Superadmin reporting
+
+Superadmin Visits and Pre-Visits support two entry modes:
+
+- **View by Date**
+- **View by Agent**
+
+The date views:
+
+- use Jakarta/WIB calendar dates
+- show all fields from the corresponding Supabase table
+- support Excel-style filtering on every column
+- allow multiple column filters at the same time
+- export the currently filtered data as CSV through **Generate Report**
+
+See [Superadmin Guide](docs/SUPERADMIN_GUIDE.md) for step-by-step instructions.
+
+## Technology
+
+- Next.js 15
+- React 19
+- TypeScript
+- Supabase Auth, PostgreSQL, RLS, Storage
+- Tailwind CSS / daisyUI
+- OpenNext configuration for Cloudflare-compatible deployment
+
+## Local development
+
+Create `.env.local` from `.env.example` and provide the public Supabase configuration:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-## 4. Create first Superadmin
-
-Before first sign-in, add the first authorized email in Supabase SQL Editor:
-
-```sql
-insert into public.agents (email, agent_name, sales_code, role, active)
-values ('your-email@gmail.com', 'Your Name', 'SL00001', 'superadmin', true);
-```
-
-The Google account email must match exactly (email comparisons in RLS are case-insensitive).
-
-## 5. Run locally
+Then run:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` on desktop or your phone on the same local network.
+Open `http://localhost:3000`.
 
-## Security model
+## Database changes
 
-- Unregistered/inactive emails cannot retrieve operational rows.
-- Agent receives only customers assigned to their authenticated email.
-- Agent receives only their own pre-visits and visits.
-- Admin receives all operational rows and can assign customers.
-- Superadmin can manage all tables.
-- Visit evidence is stored in a private bucket; signed URLs are generated for authorized viewers.
+Database evolution is stored under:
 
-## Important production notes
+```text
+supabase/migrations/
+```
 
-- GPS requires HTTPS in production (localhost is allowed for development).
-- Browser GPS precision depends on the device, environment and user permission. The app stores latitude/longitude as double precision and also stores reported accuracy in meters.
-- Photo compression is not implemented yet. Add client-side compression before a large production rollout to control storage and bandwidth costs.
-- The current visit form contains the first core fields. SOP-specific conditional branches (retention, signal issue, competitor, relocation, closure/ticket/SLA) are the next implementation phase.
+Production database logic should be changed through migrations so the repository and live Supabase schema remain aligned.
+
+## Security notes
+
+- Unregistered or inactive users are blocked from operational access.
+- Agents are restricted to their allowed operational data by RLS and application routing.
+- Admin and Superadmin access is validated against the `agents` table.
+- Visit evidence is stored through Supabase Storage and should remain private to authorized users.
+- Application roles do not receive DELETE policies for `customers`, `pre_visits`, or `visits`.
+- Do not commit secret/service-role credentials to the repository.
+
+## Timezone
+
+Operational date views and date-based reporting use **Asia/Jakarta (WIB, UTC+7)** unless a field explicitly stores or displays another timezone.
