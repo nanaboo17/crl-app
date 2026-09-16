@@ -8,9 +8,12 @@ export default function PreVisitViewChooser() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const isRoot = pathname === '/superadmin/pre-visits'
-  const hasAgentViewState = searchParams.has('filter') || searchParams.has('page') || searchParams.get('mode') === 'agent'
+  const isAgentMode = searchParams.get('mode') === 'agent'
 
-  if (!isRoot || hasAgentViewState) return null
+  // Show the chooser whenever Superadmin enters the root Pre-Visits route.
+  // Existing filter/page params must not suppress it; only an explicit
+  // mode=agent selection means the user has already chosen the agent view.
+  if (!isRoot || isAgentMode) return null
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-4 backdrop-blur-sm">
