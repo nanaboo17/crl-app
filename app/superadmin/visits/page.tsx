@@ -92,23 +92,24 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
     <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} />
 
     {mode !== 'agent' && (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="visit-view-title">
-        <div className="w-full max-w-2xl rounded-3xl bg-base-100 p-6 shadow-2xl sm:p-8">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><MapPin className="size-6" aria-hidden="true" /></div>
+      <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-4 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" aria-labelledby="visit-view-title" className="w-full max-w-xl rounded-3xl border border-base-300 bg-base-100 p-6 shadow-2xl sm:p-8">
+          <div className="text-center">
+            <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-secondary/15 text-secondary"><CalendarDays className="size-7" /></div>
             <h2 id="visit-view-title" className="text-2xl font-black">{tx('Choose Visit View', 'Pilih Tampilan Kunjungan')}</h2>
-            <p className="mt-2 text-sm text-base-content/60">{tx('Review visits grouped by date or by agent.', 'Tinjau kunjungan berdasarkan tanggal atau agen.')}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-base-content/60">{tx('Review all Visits for one date, or continue with the existing agent-based monitor.', 'Tinjau semua Kunjungan untuk satu tanggal, atau lanjutkan dengan monitoring berbasis agen.')}</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Link href={`/superadmin/visits/date?date=${today}`} className="group rounded-2xl border border-base-300 p-5 transition hover:border-primary hover:bg-primary/5">
-              <CalendarDays className="mb-4 size-7 text-primary" aria-hidden="true" />
-              <div className="text-lg font-black">{tx('View by Date', 'Lihat per Tanggal')}</div>
-              <p className="mt-1 text-sm text-base-content/60">{tx('Choose a date, see all visit fields, and generate a report.', 'Pilih tanggal, lihat semua field kunjungan, dan buat laporan.')}</p>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <Link href={`/superadmin/visits/date?date=${today}`} className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-primary hover:bg-primary/5">
+              <CalendarDays className="mb-3 size-6 text-primary" />
+              <div className="font-black">{tx('View by Date', 'Lihat per Tanggal')}</div>
+              <div className="mt-1 text-xs leading-5 text-base-content/60">{tx('Choose a WIB date, see every Supabase Visit field, and generate a CSV report.', 'Pilih tanggal WIB, lihat semua field Visit dari Supabase, dan buat laporan CSV.')}</div>
             </Link>
-            <Link href="/superadmin/visits?mode=agent&filter=all&page=1" className="group rounded-2xl border border-base-300 p-5 transition hover:border-secondary hover:bg-secondary/5">
-              <Users className="mb-4 size-7 text-secondary" aria-hidden="true" />
-              <div className="text-lg font-black">{tx('View by Agent', 'Lihat per Agen')}</div>
-              <p className="mt-1 text-sm text-base-content/60">{tx('Use the existing agent visit monitor and drill into agent activity.', 'Gunakan monitoring kunjungan agen dan lihat aktivitas tiap agen.')}</p>
+            <Link href="/superadmin/visits?mode=agent&filter=all&page=1" className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-secondary hover:bg-secondary/5">
+              <Users className="mb-3 size-6 text-secondary" />
+              <div className="font-black">{tx('View by Agent', 'Lihat per Agen')}</div>
+              <div className="mt-1 text-xs leading-5 text-base-content/60">{tx('Use the current agent monitor, filters, daily activity, and record details.', 'Gunakan monitoring agen, filter, aktivitas harian, dan detail record.')}</div>
             </Link>
           </div>
         </div>
