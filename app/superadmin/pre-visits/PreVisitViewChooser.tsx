@@ -21,14 +21,14 @@ export default function PreVisitViewChooser() {
         <div className="text-center">
           <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-secondary/15 text-secondary"><CalendarDays className="size-7" /></div>
           <h2 id="previsit-view-title" className="text-2xl font-black">Choose Pre-Visit View</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-base-content/60">Review all Pre-Visits for one date, or continue with the existing agent-based monitor.</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-base-content/60">Review Pre-Visits across a date range, or continue with the existing agent-based monitor.</p>
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <Link href="/superadmin/pre-visits/date" className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-primary hover:bg-primary/5">
             <CalendarDays className="mb-3 size-6 text-primary" />
-            <div className="font-black">View by Date</div>
-            <div className="mt-1 text-xs leading-5 text-base-content/60">Choose a WIB date, see every Supabase Pre-Visit field, and generate a CSV report.</div>
+            <div className="font-black">View by Date Range</div>
+            <div className="mt-1 text-xs leading-5 text-base-content/60">Choose a WIB start and end date, see every Supabase Pre-Visit field, and generate a filtered CSV report.</div>
           </Link>
           <Link href="/superadmin/pre-visits?mode=agent&filter=all&page=1" className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-secondary hover:bg-secondary/5">
             <Users className="mb-3 size-6 text-secondary" />
