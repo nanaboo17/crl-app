@@ -61,8 +61,8 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   if (!user?.email) redirect('/login')
 
   const applyStatus = <T extends { is: Function; not: Function; neq: Function; or: Function; eq: Function }>(query: T): T => {
-    if (status === 'unassigned') return query.eq('assign_status', 'unassigned') as T
-    if (status === 'assigned') return query.eq('assign_status', 'assigned') as T
+    if (status === 'unassigned') return query.is('agent_email', null) as T
+    if (status === 'assigned') return query.not('agent_email', 'is', null) as T
     if (status === 'visited') return query.or('customer_status.ilike.%visited%,visit_status.ilike.visited') as T
     if (status === 'paid') return query.or('payment_status.eq.paid,customer_status.ilike.paid') as T
     return query
@@ -102,10 +102,10 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
 
     const [totalResult, assignedResult, visitedResult, paidResult, unassignedResult, filteredResult, regionResult] = await Promise.all([
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }),
-      supabase.from('customers').select('customer_id', { count: 'exact', head: true }).eq('assign_status', 'assigned'),
+      supabase.from('customers').select('customer_id', { count: 'exact', head: true }).not('agent_email', 'is', null),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).or('customer_status.ilike.%visited%,visit_status.ilike.visited'),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).or('payment_status.eq.paid,customer_status.ilike.paid'),
-      supabase.from('customers').select('customer_id', { count: 'exact', head: true }).eq('assign_status', 'unassigned'),
+      supabase.from('customers').select('customer_id', { count: 'exact', head: true }).is('agent_email', null),
       filteredCountQuery,
       supabase.from('customers').select('region').not('region', 'is', null).order('region'),
     ])
@@ -139,7 +139,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   try {
     const cacheRegion = encodeURIComponent(region.toLowerCase())
     const cacheSearch = encodeURIComponent(safeSearch.toLowerCase())
-    payload = await cacheGetOrSet(`crl:superadmin:customers:v3:${status}:${cacheRegion}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
+    payload = await cacheGetOrSet(`crl:superadmin:customers:v4:${status}:${cacheRegion}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
   } catch (error) {
     console.error('superadmin/customers:', error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} /></div>
