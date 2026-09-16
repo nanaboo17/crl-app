@@ -53,8 +53,12 @@ function validDate(value: string) {
 
 export default async function SuperadminPreVisitsByDatePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
-  const requested = typeof params.date === 'string' ? params.date : jakartaToday()
-  const date = validDate(requested) ? requested : jakartaToday()
+  const today = jakartaToday()
+  const requestedStart = typeof params.start === 'string' ? params.start : today
+  const startDate = validDate(requestedStart) ? requestedStart : today
+  const requestedEnd = typeof params.end === 'string' ? params.end : startDate
+  const validRequestedEnd = validDate(requestedEnd) ? requestedEnd : startDate
+  const endDate = validRequestedEnd >= startDate ? validRequestedEnd : startDate
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -63,16 +67,18 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', email).maybeSingle()
   if (!currentUser || !currentUser.active || !['admin', 'superadmin'].includes(currentUser.role)) redirect('/auth/route')
 
-  const start = new Date(`${date}T00:00:00+07:00`)
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  const start = new Date(`${startDate}T00:00:00+07:00`)
+  const endInclusive = new Date(`${endDate}T00:00:00+07:00`)
+  const endExclusive = new Date(endInclusive.getTime() + 24 * 60 * 60 * 1000)
   const { data, error } = await supabase
     .from('pre_visits')
     .select('*')
     .gte('created_at', start.toISOString())
-    .lt('created_at', end.toISOString())
+    .lt('created_at', endExclusive.toISOString())
     .order('created_at', { ascending: true })
 
   const rows = (data ?? []) as Record<string, unknown>[]
+  const rangeLabel = startDate === endDate ? startDate : `${startDate} → ${endDate}`
 
   return (
     <div className="mx-auto grid w-full max-w-[96rem] gap-5 p-4 sm:p-6 lg:p-8">
@@ -80,19 +86,23 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
         breadcrumbs={[
           { label: 'Superadmin', href: '/superadmin' },
           { label: 'Pre-Visits', href: '/superadmin/pre-visits' },
-          { label: 'By Date' },
+          { label: 'By Date Range' },
         ]}
-        title="Pre-Visits by Date"
-        description="Review every Supabase Pre-Visit field for one Jakarta/WIB calendar date."
+        title="Pre-Visits by Date Range"
+        description="Review every Supabase Pre-Visit field across a Jakarta/WIB date range."
       />
 
       <div className="flex flex-col gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <form method="get" className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <label className="form-control w-full sm:w-auto">
-            <span className="mb-1 text-xs font-bold uppercase tracking-wide text-base-content/60">Pre-Visit date (WIB)</span>
-            <input className="dui-input dui-input-bordered" type="date" name="date" defaultValue={date} />
+            <span className="mb-1 text-xs font-bold uppercase tracking-wide text-base-content/60">Start date (WIB)</span>
+            <input className="dui-input dui-input-bordered" type="date" name="start" defaultValue={startDate} />
           </label>
-          <button className="dui-btn dui-btn-secondary" type="submit"><CalendarDays className="size-4" />View Date</button>
+          <label className="form-control w-full sm:w-auto">
+            <span className="mb-1 text-xs font-bold uppercase tracking-wide text-base-content/60">End date (WIB)</span>
+            <input className="dui-input dui-input-bordered" type="date" name="end" defaultValue={endDate} min={startDate} />
+          </label>
+          <button className="dui-btn dui-btn-secondary" type="submit"><CalendarDays className="size-4" />View Range</button>
         </form>
         <div className="flex flex-wrap gap-2">
           <Link className="dui-btn dui-btn-ghost" href="/superadmin/pre-visits"><ChevronLeft className="size-4" />Change View</Link>
@@ -100,7 +110,7 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
       </div>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <article className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm"><div className="text-xs font-bold uppercase tracking-wide text-base-content/55">Selected date</div><div className="mt-1 text-xl font-black">{date}</div></article>
+        <article className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm"><div className="text-xs font-bold uppercase tracking-wide text-base-content/55">Selected range</div><div className="mt-1 text-xl font-black">{rangeLabel}</div></article>
         <article className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm"><div className="text-xs font-bold uppercase tracking-wide text-base-content/55">Total pre-visits</div><div className="mt-1 text-xl font-black">{rows.length}</div></article>
         <article className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm"><div className="text-xs font-bold uppercase tracking-wide text-base-content/55">Fields shown</div><div className="mt-1 text-xl font-black">{PREVISIT_COLUMNS.length}</div></article>
       </section>
@@ -108,12 +118,12 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
       {error ? (
         <SuperadminState tone="error" icon={Inbox} title="Unable to load pre-visits" description={error.message} />
       ) : rows.length === 0 ? (
-        <SuperadminState icon={Inbox} title="No pre-visits on this date" description="Choose another date to review pre-visit records." />
+        <SuperadminState icon={Inbox} title="No pre-visits in this range" description="Choose another date range to review pre-visit records." />
       ) : (
         <FilterableDataTable
           columns={[...PREVISIT_COLUMNS]}
           rows={rows}
-          fileName={`pre-visits-${date}.csv`}
+          fileName={`pre-visits-${startDate}-to-${endDate}.csv`}
           title="All Pre-Visit fields from Supabase"
         />
       )}
