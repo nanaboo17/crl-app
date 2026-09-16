@@ -198,7 +198,7 @@ export default function TerritoryManager() {
         <span>·</span>
         <span><strong>{totals.sites.toLocaleString('id-ID')}</strong> active sites</span>
         <span>·</span>
-        <span><strong>{totals.customers.toLocaleString('id-ID')}</strong> active customers</span>
+        <span><strong>{totals.customers.toLocaleString('id-ID')}</strong> customers</span>
         <span>·</span>
         <span><strong>{totals.assigned.toLocaleString('id-ID')}</strong> assigned territories</span>
       </div>
@@ -245,7 +245,7 @@ export default function TerritoryManager() {
                   </div>
                   <div className={styles.metric}>
                     <strong>{Number(row.customer_count || 0).toLocaleString('id-ID')}</strong>
-                    <span>Active customers</span>
+                    <span>Customers</span>
                   </div>
                 </div>
 
