@@ -4,7 +4,7 @@ import { CalendarDays, ChevronLeft, Inbox } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import SuperadminState from '@/components/superadmin/SuperadminState'
-import PreVisitReportButton from './PreVisitReportButton'
+import FilterableDataTable from '@/components/superadmin/FilterableDataTable'
 
 const PREVISIT_COLUMNS = [
   'previsit_id',
@@ -49,12 +49,6 @@ function jakartaToday() {
 
 function validDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
-}
-
-function formatCell(value: unknown) {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
-  return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
 export default async function SuperadminPreVisitsByDatePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -102,7 +96,6 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
         </form>
         <div className="flex flex-wrap gap-2">
           <Link className="dui-btn dui-btn-ghost" href="/superadmin/pre-visits"><ChevronLeft className="size-4" />Change View</Link>
-          <PreVisitReportButton date={date} columns={[...PREVISIT_COLUMNS]} rows={rows} />
         </div>
       </div>
 
@@ -117,28 +110,12 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
       ) : rows.length === 0 ? (
         <SuperadminState icon={Inbox} title="No pre-visits on this date" description="Choose another date to review pre-visit records." />
       ) : (
-        <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-          <div className="border-b border-base-300 px-4 py-3">
-            <h2 className="font-black">All Pre-Visit fields from Supabase</h2>
-            <p className="text-sm text-base-content/60">Scroll horizontally to review all columns.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="dui-table dui-table-zebra min-w-max">
-              <thead>
-                <tr>{PREVISIT_COLUMNS.map((column) => <th key={column} className="whitespace-nowrap">{column}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => (
-                  <tr key={String(row.previsit_id ?? index)}>
-                    {PREVISIT_COLUMNS.map((column) => (
-                      <td key={column} className="max-w-[22rem] whitespace-pre-wrap break-words align-top text-xs">{formatCell(row[column])}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <FilterableDataTable
+          columns={[...PREVISIT_COLUMNS]}
+          rows={rows}
+          fileName={`pre-visits-${date}.csv`}
+          title="All Pre-Visit fields from Supabase"
+        />
       )}
     </div>
   )
