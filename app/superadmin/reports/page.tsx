@@ -15,6 +15,7 @@ import { useI18n } from '@/components/providers/i18n-provider'
 type AgentOption = {
   email: string
   agent_name: string | null
+  organization: string | null
 }
 
 type ReportRow = {
@@ -59,6 +60,7 @@ export default function SuperadminReportsPage() {
   const today = useMemo(() => jakartaDate(), [])
   const [startDate, setStartDate] = useState(`${today.slice(0, 7)}-01`)
   const [endDate, setEndDate] = useState(today)
+  const [organization, setOrganization] = useState('')
   const [agentEmail, setAgentEmail] = useState('')
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [rows, setRows] = useState<ReportRow[]>([])
@@ -72,7 +74,7 @@ export default function SuperadminReportsPage() {
     const [agentResult, reportResult] = await Promise.all([
       supabase
         .from('agents')
-        .select('email,agent_name')
+        .select('email,agent_name,organization')
         .eq('role', 'agent')
         .eq('active', true)
         .order('agent_name'),
@@ -103,7 +105,25 @@ export default function SuperadminReportsPage() {
     void load()
   }, [load])
 
-  const totals = useMemo(() => rows.reduce(
+  const organizations = useMemo(() => Array.from(new Set(
+    agents.map((agent) => (agent.organization || '').trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b)), [agents])
+
+  const filteredAgents = useMemo(() => organization
+    ? agents.filter((agent) => (agent.organization || '').trim() === organization)
+    : agents, [agents, organization])
+
+  const visibleRows = useMemo(() => {
+    if (!organization) return rows
+    const allowed = new Set(
+      agents
+        .filter((agent) => (agent.organization || '').trim() === organization)
+        .map((agent) => agent.email.toLowerCase())
+    )
+    return rows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
+  }, [agents, organization, rows])
+
+  const totals = useMemo(() => visibleRows.reduce(
     (acc, row) => ({
       assigned: acc.assigned + Number(row.assigned_customers || 0),
       paid: acc.paid + Number(row.paid_customers || 0),
@@ -113,12 +133,13 @@ export default function SuperadminReportsPage() {
       attendance: acc.attendance + Number(row.attendance_days || 0),
     }),
     { assigned: 0, paid: 0, unpaid: 0, preVisits: 0, visits: 0, attendance: 0 }
-  ), [rows])
+  ), [visibleRows])
 
   function downloadCsv() {
     const headers = [
       'Agent Name',
       'Agent Email',
+      'Organization',
       'Assigned Customers',
       'Paid Customers',
       'Unpaid Customers',
@@ -137,9 +158,11 @@ export default function SuperadminReportsPage() {
       'Average Worked Minutes',
     ]
 
-    const body = rows.map((row) => [
+    const organizationByEmail = new Map(agents.map((agent) => [agent.email.toLowerCase(), agent.organization || '']))
+    const body = visibleRows.map((row) => [
       row.agent_name,
       row.agent_email,
+      organizationByEmail.get(row.agent_email.toLowerCase()) || '',
       row.assigned_customers,
       row.paid_customers,
       row.unpaid_customers,
@@ -162,6 +185,7 @@ export default function SuperadminReportsPage() {
       [csvCell('CRL Superadmin Report')],
       [csvCell('Start Date'), csvCell(startDate)],
       [csvCell('End Date'), csvCell(endDate)],
+      [csvCell('Organization'), csvCell(organization || 'All Organizations')],
       [csvCell('Agent'), csvCell(agentEmail || 'All Agents')],
       [],
     ].map((line) => line.join(','))
@@ -171,7 +195,7 @@ export default function SuperadminReportsPage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `crl-report-${startDate}-to-${endDate}${agentEmail ? `-${agentEmail.split('@')[0]}` : ''}.csv`
+    link.download = `crl-report-${startDate}-to-${endDate}${organization ? `-${organization.replace(/\s+/g, '-').toLowerCase()}` : ''}${agentEmail ? `-${agentEmail.split('@')[0]}` : ''}.csv`
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -201,7 +225,7 @@ export default function SuperadminReportsPage() {
           <button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={() => window.print()} disabled={loading}>
             <Printer className="h-4 w-4" /> {tx('Print / PDF', 'Cetak / PDF')}
           </button>
-          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={downloadCsv} disabled={loading || rows.length === 0}>
+          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={downloadCsv} disabled={loading || visibleRows.length === 0}>
             <Download className="h-4 w-4" /> {tx('Download CSV', 'Unduh CSV')}
           </button>
         </div>
@@ -210,7 +234,7 @@ export default function SuperadminReportsPage() {
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm print:hidden">
         <div className="dui-card-body gap-4">
           <div className="flex items-center gap-2 font-bold"><CalendarDays className="h-5 w-5" />{tx('Report Filters', 'Filter Laporan')}</div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-5">
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Start date', 'Tanggal mulai')}</span>
               <input type="date" className="dui-input w-full" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -220,10 +244,24 @@ export default function SuperadminReportsPage() {
               <input type="date" className="dui-input w-full" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </label>
             <label className="dui-fieldset">
+              <span className="dui-fieldset-legend">{tx('Organization', 'Organisasi')}</span>
+              <select
+                className="dui-select w-full"
+                value={organization}
+                onChange={(e) => {
+                  setOrganization(e.target.value)
+                  setAgentEmail('')
+                }}
+              >
+                <option value="">{tx('All organizations', 'Semua organisasi')}</option>
+                {organizations.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Agent', 'Agen')}</span>
               <select className="dui-select w-full" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
                 <option value="">{tx('All agents', 'Semua agen')}</option>
-                {agents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name || agent.email}</option>)}
+                {filteredAgents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name || agent.email}</option>)}
               </select>
             </label>
             <div className="flex items-end">
@@ -238,6 +276,7 @@ export default function SuperadminReportsPage() {
 
       <div className="text-sm font-semibold text-base-content/60">
         {tx('Period', 'Periode')}: <span className="text-base-content">{startDate} — {endDate}</span>
+        {organization && <> · {tx('Organization', 'Organisasi')}: <span className="text-base-content">{organization}</span></>}
         {agentEmail && <> · {tx('Agent', 'Agen')}: <span className="text-base-content">{agentEmail}</span></>}
       </div>
 
@@ -259,14 +298,15 @@ export default function SuperadminReportsPage() {
           </div>
           {loading ? (
             <div className="flex justify-center py-16"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></div>
-          ) : rows.length === 0 ? (
+          ) : visibleRows.length === 0 ? (
             <div className="px-5 py-12 text-center text-sm text-base-content/60">{tx('No report data for this period.', 'Tidak ada data laporan untuk periode ini.')}</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="dui-table dui-table-zebra min-w-[1250px] text-xs sm:text-sm">
+              <table className="dui-table dui-table-zebra min-w-[1350px] text-xs sm:text-sm">
                 <thead>
                   <tr>
                     <th>{tx('Agent', 'Agen')}</th>
+                    <th>{tx('Organization', 'Organisasi')}</th>
                     <th>{tx('Assigned', 'Ditugaskan')}</th>
                     <th>{tx('Paid', 'Lunas')}</th>
                     <th>{tx('Unpaid', 'Belum Bayar')}</th>
@@ -282,23 +322,27 @@ export default function SuperadminReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.agent_email}>
-                      <td><div className="font-bold">{row.agent_name || '—'}</div><div className="text-[11px] text-base-content/50">{row.agent_email}</div></td>
-                      <td>{row.assigned_customers}</td>
-                      <td>{row.paid_customers}</td>
-                      <td>{row.unpaid_customers}</td>
-                      <td>{row.p1_customers}</td><td>{row.p2_customers}</td><td>{row.p3_customers}</td><td>{row.p4_customers}</td><td>{row.p5_customers}</td>
-                      <td>{row.pre_visits}</td>
-                      <td>{row.ready_for_visit}</td>
-                      <td>{row.direct_visit}</td>
-                      <td>{row.visits}</td>
-                      <td>{row.paid_conversations}</td>
-                      <td>{row.promise_to_pay}</td>
-                      <td>{row.attendance_days}</td>
-                      <td>{formatMinutes(Number(row.average_worked_minutes || 0), locale)}</td>
-                    </tr>
-                  ))}
+                  {visibleRows.map((row) => {
+                    const agent = agents.find((item) => item.email.toLowerCase() === row.agent_email.toLowerCase())
+                    return (
+                      <tr key={row.agent_email}>
+                        <td><div className="font-bold">{row.agent_name || '—'}</div><div className="text-[11px] text-base-content/50">{row.agent_email}</div></td>
+                        <td>{agent?.organization || '—'}</td>
+                        <td>{row.assigned_customers}</td>
+                        <td>{row.paid_customers}</td>
+                        <td>{row.unpaid_customers}</td>
+                        <td>{row.p1_customers}</td><td>{row.p2_customers}</td><td>{row.p3_customers}</td><td>{row.p4_customers}</td><td>{row.p5_customers}</td>
+                        <td>{row.pre_visits}</td>
+                        <td>{row.ready_for_visit}</td>
+                        <td>{row.direct_visit}</td>
+                        <td>{row.visits}</td>
+                        <td>{row.paid_conversations}</td>
+                        <td>{row.promise_to_pay}</td>
+                        <td>{row.attendance_days}</td>
+                        <td>{formatMinutes(Number(row.average_worked_minutes || 0), locale)}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
