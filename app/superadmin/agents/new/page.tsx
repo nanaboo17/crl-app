@@ -34,6 +34,7 @@ export default function NewAgentPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [salesCode, setSalesCode] = useState('')
+  const [organization, setOrganization] = useState('')
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -70,6 +71,7 @@ export default function NewAgentPage() {
         p_email: cleanEmail,
         p_agent_name: name.trim(),
         p_sales_code: salesCode.trim() || null,
+        p_organization: organization.trim() || null,
         p_role: role,
         p_active: active,
       })
@@ -133,6 +135,11 @@ export default function NewAgentPage() {
             <div className={styles.field}>
               <label htmlFor="sales-code">{t('superadmin.agents.new.salesCodeLabel')}</label>
               <input id="sales-code" type="text" autoComplete="off" placeholder={t('superadmin.agents.new.salesCodePlaceholder')} value={salesCode} onChange={(e) => setSalesCode(e.target.value)} className={styles.input} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="organization">{tx('Organization', 'Organisasi')}</label>
+              <input id="organization" type="text" autoComplete="organization" placeholder={tx('e.g. IOH, Field Agent, vendor', 'contoh: IOH, Field Agent, vendor')} value={organization} onChange={(e) => setOrganization(e.target.value)} className={styles.input} />
             </div>
 
             <div className={styles.field}>
