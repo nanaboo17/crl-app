@@ -28,6 +28,7 @@ export default function EditAgentPage() {
 
   const [name, setName] = useState('')
   const [salesCode, setSalesCode] = useState('')
+  const [organization, setOrganization] = useState('')
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -42,7 +43,7 @@ export default function EditAgentPage() {
       setError('')
       const { data, error: loadError } = await supabase
         .from('agents')
-        .select('agent_name,sales_code,role,active')
+        .select('agent_name,sales_code,organization,role,active')
         .eq('email', email)
         .single()
 
@@ -55,6 +56,7 @@ export default function EditAgentPage() {
 
       setName(data.agent_name || '')
       setSalesCode(data.sales_code ?? '')
+      setOrganization(data.organization ?? '')
       setRole(data.role)
       setActive(data.active)
       setLoading(false)
@@ -78,6 +80,7 @@ export default function EditAgentPage() {
       .update({
         agent_name: name.trim(),
         sales_code: salesCode.trim() || null,
+        organization: organization.trim() || null,
         role,
         active,
       })
@@ -102,7 +105,7 @@ export default function EditAgentPage() {
           { label: name || email },
         ]}
         title={t('superadmin.agents.edit.title')}
-        description={tx('Update account ownership, access level, and field identity.', 'Perbarui identitas akun, tingkat akses, dan status pengguna lapangan.')}
+        description={tx('Update account ownership, access level, organization, and field identity.', 'Perbarui identitas akun, tingkat akses, organisasi, dan status pengguna lapangan.')}
       />
 
       <section className={styles.hero}>
@@ -141,6 +144,11 @@ export default function EditAgentPage() {
             <div className={styles.field}>
               <label htmlFor="sales-code">{t('superadmin.agents.edit.salesCodeLabel')}</label>
               <input id="sales-code" type="text" value={salesCode} onChange={(e) => setSalesCode(e.target.value)} disabled={loading || saving} className={styles.input} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="organization">{tx('Organization', 'Organisasi')}</label>
+              <input id="organization" type="text" autoComplete="organization" placeholder={tx('e.g. IOH, Field Agent, vendor', 'contoh: IOH, Field Agent, vendor')} value={organization} onChange={(e) => setOrganization(e.target.value)} disabled={loading || saving} className={styles.input} />
             </div>
 
             <div className={styles.field}>
