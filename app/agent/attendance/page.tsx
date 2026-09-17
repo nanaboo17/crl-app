@@ -1,8 +1,8 @@
 'use client'
 
-import { ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Camera, CheckCircle2, Clock3, LocateFixed, LogIn, LogOut, Timer, UserRound } from 'lucide-react'
+import { Camera, CheckCircle2, Clock3, LocateFixed, LogIn, LogOut, RefreshCw, Timer, UserRound, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
@@ -29,6 +29,8 @@ type DiagnosticSeverity = 'info' | 'warning' | 'error'
 
 const MIN_WORK_MINUTES = 8 * 60
 const ATTENDANCE_TIMEZONE = 'Asia/Jakarta'
+const PHOTO_MAX_EDGE = 1280
+const PHOTO_QUALITY = 0.72
 
 function attendanceDiagnostic(stage: string, severity: DiagnosticSeverity, message: string, metadata: Record<string, unknown> = {}) {
   if (typeof window === 'undefined') return
@@ -62,6 +64,33 @@ function formatDuration(minutes: number, locale: 'en' | 'id') {
   return locale === 'id' ? `${hours} jam ${mins} menit` : `${hours}h ${mins}m`
 }
 
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality))
+}
+
+async function captureCompressedPhoto(video: HTMLVideoElement) {
+  const sourceWidth = video.videoWidth
+  const sourceHeight = video.videoHeight
+  if (!sourceWidth || !sourceHeight) throw new Error('Camera image is not ready yet.')
+
+  const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
+  const width = Math.max(1, Math.round(sourceWidth * scale))
+  const height = Math.max(1, Math.round(sourceHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Unable to process camera image.')
+  context.drawImage(video, 0, 0, width, height)
+
+  const webp = await canvasBlob(canvas, 'image/webp', PHOTO_QUALITY)
+  if (webp?.type === 'image/webp') return webp
+
+  const jpeg = await canvasBlob(canvas, 'image/jpeg', PHOTO_QUALITY)
+  if (!jpeg) throw new Error('Unable to compress camera image.')
+  return jpeg
+}
+
 export default function AgentAttendancePage() {
   const { locale } = useI18n()
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
@@ -72,7 +101,7 @@ export default function AgentAttendancePage() {
   const [error, setError] = useState('')
   const [email, setEmail] = useState('')
   const [now, setNow] = useState(Date.now())
-  const [files, setFiles] = useState<Record<Action, File | null>>({ in: null, out: null })
+  const [photos, setPhotos] = useState<Record<Action, Blob | null>>({ in: null, out: null })
   const [previews, setPreviews] = useState<Record<Action, string>>({ in: '', out: '' })
 
   async function loadPhoto(path: string | null, action: Action) {
@@ -133,55 +162,54 @@ export default function AgentAttendancePage() {
     })
   }
 
-  function onPhoto(action: Action, event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null
-    setFiles((current) => ({ ...current, [action]: file }))
-    if (file) {
-      attendanceDiagnostic('attendance_photo_selected', 'info', 'Attendance photo selected', {
-        action,
-        file_type: file.type || null,
-        file_size_bytes: file.size,
-        file_extension: file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : null,
-      })
-      const url = URL.createObjectURL(file)
-      setPreviews((current) => ({ ...current, [action]: url }))
-    } else {
-      attendanceDiagnostic('attendance_photo_selected', 'warning', 'Attendance photo selection returned no file', { action })
-    }
+  function onPhoto(action: Action, blob: Blob, previewUrl: string) {
+    setPhotos((current) => ({ ...current, [action]: blob }))
+    setPreviews((current) => ({ ...current, [action]: previewUrl }))
+    attendanceDiagnostic('attendance_photo_captured', 'info', 'Attendance photo captured and compressed', {
+      action,
+      file_type: blob.type,
+      file_size_bytes: blob.size,
+      max_edge_px: PHOTO_MAX_EDGE,
+      quality: PHOTO_QUALITY,
+    })
   }
 
   async function uploadPhoto(action: Action) {
-    const file = files[action]
-    if (!file) {
+    const photo = photos[action]
+    if (!photo) {
       throw new Error(action === 'in'
         ? tx('Check-in photo is required.', 'Foto check-in wajib diambil.')
         : tx('Check-out photo is required.', 'Foto check-out wajib diambil.'))
     }
     if (!email) throw new Error(tx('Agent account is not ready.', 'Akun agen belum siap.'))
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+
+    const extension = photo.type === 'image/webp' ? 'webp' : 'jpg'
+    const contentType = photo.type === 'image/webp' ? 'image/webp' : 'image/jpeg'
     const path = `${email}/${localDateKey()}/${action}-${Date.now()}.${extension}`
-    attendanceDiagnostic('attendance_photo_upload_start', 'info', 'Uploading attendance photo', {
+    attendanceDiagnostic('attendance_photo_upload_start', 'info', 'Uploading compressed attendance photo', {
       action,
-      file_type: file.type || null,
-      file_size_bytes: file.size,
+      file_type: contentType,
+      file_size_bytes: photo.size,
       attendance_date: localDateKey(),
     })
-    const { error } = await supabase.storage.from('attendance-evidence').upload(path, file, {
-      contentType: file.type || 'image/jpeg',
+
+    const { error } = await supabase.storage.from('attendance-evidence').upload(path, photo, {
+      contentType,
+      cacheControl: '31536000',
       upsert: false,
     })
     if (error) {
       attendanceDiagnostic('attendance_photo_upload', 'error', error.message, {
         action,
-        file_type: file.type || null,
-        file_size_bytes: file.size,
+        file_type: contentType,
+        file_size_bytes: photo.size,
       })
       throw error
     }
-    attendanceDiagnostic('attendance_photo_upload', 'info', 'Attendance photo uploaded', {
+    attendanceDiagnostic('attendance_photo_upload', 'info', 'Compressed attendance photo uploaded', {
       action,
-      file_type: file.type || null,
-      file_size_bytes: file.size,
+      file_type: contentType,
+      file_size_bytes: photo.size,
     })
     return path
   }
@@ -251,7 +279,7 @@ export default function AgentAttendancePage() {
       }
       const row = data as Attendance
       setAttendance(row)
-      setFiles((current) => ({ ...current, [action]: null }))
+      setPhotos((current) => ({ ...current, [action]: null }))
       attendanceDiagnostic('attendance_saved', 'info', action === 'in' ? 'Check-in saved successfully' : 'Check-out saved successfully', {
         action,
         attendance_id: row.attendance_id,
@@ -283,7 +311,7 @@ export default function AgentAttendancePage() {
         <div>
           <p className={styles.eyebrow}>{tx('Field attendance', 'Absensi Lapangan')}</p>
           <h1>{tx('Check In / Check Out', 'Check In / Check Out')}</h1>
-          <p className={styles.subtitle}><UserRound size={16} /> {tx('Photo + GPS attendance. Check-in deadline: 08:00 WIB.', 'Absensi menggunakan foto + GPS. Batas check-in: 08.00 WIB.')}</p>
+          <p className={styles.subtitle}><UserRound size={16} /> {tx('Direct camera + GPS attendance. Check-in deadline: 08:00 WIB.', 'Absensi kamera langsung + GPS. Batas check-in: 08.00 WIB.')}</p>
         </div>
         <Link href="/agent" className={styles.backButton}>{tx('Back', 'Kembali')}</Link>
       </header>
@@ -320,13 +348,17 @@ export default function AgentAttendancePage() {
           disabled={saving || checkedIn}
           buttonText={saving && !checkedIn ? tx('Saving…', 'Menyimpan…') : checkedIn ? tx('Checked In', 'Sudah Check In') : tx('Check In Now', 'Check In Sekarang')}
           buttonClass={styles.primaryButton}
-          onPhoto={(event) => onPhoto('in', event)}
+          onPhoto={(blob, url) => onPhoto('in', blob, url)}
           onRun={() => run('in')}
           photoDisabled={checkedIn}
           accuracyLabel={(value) => tx(`GPS accuracy ±${value} m`, `Akurasi GPS ±${value} m`)}
-          requirementText={tx('Photo and GPS location are required.', 'Foto dan lokasi GPS wajib diambil.')}
-          photoText={tx('Take check-in photo', 'Ambil foto check-in')}
+          requirementText={tx('Take a photo directly with the camera. GPS is also required.', 'Ambil foto langsung dari kamera. GPS juga wajib diambil.')}
+          photoText={tx('Open camera for check-in', 'Buka kamera untuk check-in')}
           photoAlt={tx('Check-in evidence', 'Bukti check-in')}
+          captureText={tx('Capture photo', 'Ambil foto')}
+          retakeText={tx('Retake', 'Foto ulang')}
+          cancelText={tx('Cancel camera', 'Batalkan kamera')}
+          cameraErrorText={tx('Camera access is required. Allow camera permission and try again.', 'Akses kamera wajib. Izinkan kamera lalu coba lagi.')}
         />
 
         <AttendanceCard
@@ -345,13 +377,17 @@ export default function AgentAttendancePage() {
                 ? tx('Check Out Now', 'Check Out Sekarang')
                 : tx(`Available in ${formatDuration(remainingMinutes, 'en')}`, `Tersedia dalam ${formatDuration(remainingMinutes, 'id')}`)}
           buttonClass={styles.secondaryButton}
-          onPhoto={(event) => onPhoto('out', event)}
+          onPhoto={(blob, url) => onPhoto('out', blob, url)}
           onRun={() => run('out')}
           photoDisabled={!canCheckOut || checkedOut}
           accuracyLabel={(value) => tx(`GPS accuracy ±${value} m`, `Akurasi GPS ±${value} m`)}
-          requirementText={tx('Photo and GPS location are required.', 'Foto dan lokasi GPS wajib diambil.')}
-          photoText={tx('Take check-out photo', 'Ambil foto check-out')}
+          requirementText={tx('Take a photo directly with the camera. GPS is also required.', 'Ambil foto langsung dari kamera. GPS juga wajib diambil.')}
+          photoText={tx('Open camera for check-out', 'Buka kamera untuk check-out')}
           photoAlt={tx('Check-out evidence', 'Bukti check-out')}
+          captureText={tx('Capture photo', 'Ambil foto')}
+          retakeText={tx('Retake', 'Foto ulang')}
+          cancelText={tx('Cancel camera', 'Batalkan kamera')}
+          cameraErrorText={tx('Camera access is required. Allow camera permission and try again.', 'Akses kamera wajib. Izinkan kamera lalu coba lagi.')}
         />
       </section>
 
@@ -360,13 +396,14 @@ export default function AgentAttendancePage() {
         <strong>{tx('Late', 'Terlambat')}</strong>.
         {' '}{tx('Check-out is unlocked only after at least ', 'Check-out hanya dapat dilakukan setelah minimal ')}
         <strong>{tx('8 hours', '8 jam')}</strong>
-        {tx(' from check-in. Both actions require a photo and GPS.', ' sejak check-in. Kedua proses wajib menggunakan foto dan GPS.')}
+        {tx(' from check-in. Photos are captured directly, compressed to a maximum 1280px edge, and saved as WebP when supported.', ' sejak check-in. Foto diambil langsung, dikompresi maksimal 1280px, dan disimpan sebagai WebP jika didukung.')}
       </div>
     </main>
   )
 }
 
 function AttendanceCard({
+  action,
   title,
   icon,
   time,
@@ -382,6 +419,10 @@ function AttendanceCard({
   requirementText,
   photoText,
   photoAlt,
+  captureText,
+  retakeText,
+  cancelText,
+  cameraErrorText,
 }: {
   action: Action
   title: string
@@ -392,26 +433,120 @@ function AttendanceCard({
   disabled: boolean
   buttonText: string
   buttonClass: string
-  onPhoto: (event: ChangeEvent<HTMLInputElement>) => void
+  onPhoto: (blob: Blob, previewUrl: string) => void
   onRun: () => void
   photoDisabled: boolean
   accuracyLabel: (value: string) => string
   requirementText: string
   photoText: string
   photoAlt: string
+  captureText: string
+  retakeText: string
+  cancelText: string
+  cameraErrorText: string
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraStarting, setCameraStarting] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+    setCameraOpen(false)
+    setCameraStarting(false)
+  }
+
+  useEffect(() => () => stopCamera(), [])
+
+  async function startCamera() {
+    if (photoDisabled) return
+    setCameraError('')
+    setCameraStarting(true)
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error(cameraErrorText)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+      })
+      streamRef.current = stream
+      setCameraOpen(true)
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          void videoRef.current.play().catch(() => undefined)
+        }
+      })
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : cameraErrorText
+      setCameraError(message)
+      attendanceDiagnostic('attendance_camera', 'error', message, { action })
+      stopCamera()
+    } finally {
+      setCameraStarting(false)
+    }
+  }
+
+  async function capture() {
+    if (!videoRef.current) return
+    try {
+      const blob = await captureCompressedPhoto(videoRef.current)
+      const url = URL.createObjectURL(blob)
+      onPhoto(blob, url)
+      attendanceDiagnostic('attendance_camera_capture', 'info', 'Camera photo captured', {
+        action,
+        file_type: blob.type,
+        compressed_size_bytes: blob.size,
+      })
+      stopCamera()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : cameraErrorText
+      setCameraError(message)
+      attendanceDiagnostic('attendance_camera_capture', 'error', message, { action })
+    }
+  }
+
   return (
     <div className={styles.card}>
       <div className={styles.cardTitle}>{icon} {title}</div>
       <strong>{time}</strong>
       <span>{accuracy ? accuracyLabel(accuracy.toFixed(0)) : requirementText}</span>
 
-      <label className={`${styles.photoPicker} ${photoDisabled ? styles.photoDisabled : ''}`}>
-        <input type="file" accept="image/*" capture="environment" onChange={onPhoto} disabled={photoDisabled} />
-        {preview
-          ? <img src={preview} alt={photoAlt} className={styles.photoPreview} />
-          : <div className={styles.photoPlaceholder}><Camera size={24} /><span>{photoText}</span></div>}
-      </label>
+      <div className={`${styles.photoPicker} ${photoDisabled ? styles.photoDisabled : ''}`}>
+        {cameraOpen ? (
+          <div className={styles.cameraStage}>
+            <video ref={videoRef} autoPlay muted playsInline className={styles.photoPreview} aria-label={`${title} camera`} />
+            <div className={styles.cameraControls}>
+              <button type="button" className={styles.cameraCaptureButton} onClick={() => void capture()}>
+                <Camera size={17} /> {captureText}
+              </button>
+              <button type="button" className={styles.cameraCancelButton} onClick={stopCamera} aria-label={cancelText} title={cancelText}>
+                <X size={17} />
+              </button>
+            </div>
+          </div>
+        ) : preview ? (
+          <button type="button" className={styles.photoButton} onClick={() => void startCamera()} disabled={photoDisabled || cameraStarting}>
+            <img src={preview} alt={photoAlt} className={styles.photoPreview} />
+            {!photoDisabled && <span className={styles.retakeBadge}><RefreshCw size={14} /> {retakeText}</span>}
+          </button>
+        ) : (
+          <button type="button" className={styles.photoButton} onClick={() => void startCamera()} disabled={photoDisabled || cameraStarting}>
+            <div className={styles.photoPlaceholder}>
+              <Camera size={24} />
+              <span>{cameraStarting ? 'Opening camera…' : photoText}</span>
+            </div>
+          </button>
+        )}
+      </div>
+
+      {cameraError && <div className={styles.cameraError}>{cameraError}</div>}
 
       <button type="button" disabled={disabled} onClick={onRun} className={buttonClass}>
         <LocateFixed size={17} /> {buttonText}
