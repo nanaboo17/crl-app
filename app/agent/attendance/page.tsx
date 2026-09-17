@@ -64,6 +64,19 @@ function formatDuration(minutes: number, locale: 'en' | 'id') {
   return locale === 'id' ? `${hours} jam ${mins} menit` : `${hours}h ${mins}m`
 }
 
+function formatStampTime() {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: ATTENDANCE_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date()).replace(',', '')
+}
+
 function canvasBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
   return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality))
 }
@@ -88,6 +101,70 @@ async function captureCompressedPhoto(video: HTMLVideoElement) {
 
   const jpeg = await canvasBlob(canvas, 'image/jpeg', PHOTO_QUALITY)
   if (!jpeg) throw new Error('Unable to compress camera image.')
+  return jpeg
+}
+
+function loadBlobImage(blob: Blob) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(blob)
+    const image = new Image()
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Unable to prepare the attendance photo stamp.'))
+    }
+    image.src = url
+  })
+}
+
+async function stampAttendancePhoto(
+  photo: Blob,
+  action: Action,
+  position: GeolocationPosition,
+  email: string
+) {
+  const image = await loadBlobImage(photo)
+  const canvas = document.createElement('canvas')
+  canvas.width = image.naturalWidth
+  canvas.height = image.naturalHeight
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Unable to stamp attendance photo.')
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+  const padding = Math.max(14, Math.round(canvas.width * 0.018))
+  const titleSize = Math.max(18, Math.round(canvas.width * 0.026))
+  const bodySize = Math.max(14, Math.round(canvas.width * 0.019))
+  const lineHeight = Math.round(bodySize * 1.45)
+  const stampHeight = padding * 2 + titleSize + lineHeight * 3
+  const top = Math.max(0, canvas.height - stampHeight)
+
+  context.fillStyle = 'rgba(0, 0, 0, 0.68)'
+  context.fillRect(0, top, canvas.width, stampHeight)
+
+  context.textBaseline = 'top'
+  context.fillStyle = '#ffffff'
+  context.font = `700 ${titleSize}px system-ui, -apple-system, sans-serif`
+  context.fillText(action === 'in' ? 'CRL CHECK IN' : 'CRL CHECK OUT', padding, top + padding)
+
+  context.font = `600 ${bodySize}px system-ui, -apple-system, sans-serif`
+  const bodyTop = top + padding + titleSize + Math.round(bodySize * 0.4)
+  context.fillText(`WIB: ${formatStampTime()}`, padding, bodyTop)
+  context.fillText(
+    `GPS: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)} ±${Math.round(position.coords.accuracy)}m`,
+    padding,
+    bodyTop + lineHeight
+  )
+  context.fillText(`Agent: ${email}`, padding, bodyTop + lineHeight * 2)
+
+  const webp = await canvasBlob(canvas, 'image/webp', PHOTO_QUALITY)
+  if (webp?.type === 'image/webp') return webp
+
+  const jpeg = await canvasBlob(canvas, 'image/jpeg', PHOTO_QUALITY)
+  if (!jpeg) throw new Error('Unable to save stamped attendance photo.')
   return jpeg
 }
 
@@ -174,19 +251,13 @@ export default function AgentAttendancePage() {
     })
   }
 
-  async function uploadPhoto(action: Action) {
-    const photo = photos[action]
-    if (!photo) {
-      throw new Error(action === 'in'
-        ? tx('Check-in photo is required.', 'Foto check-in wajib diambil.')
-        : tx('Check-out photo is required.', 'Foto check-out wajib diambil.'))
-    }
+  async function uploadPhoto(action: Action, photo: Blob) {
     if (!email) throw new Error(tx('Agent account is not ready.', 'Akun agen belum siap.'))
 
     const extension = photo.type === 'image/webp' ? 'webp' : 'jpg'
     const contentType = photo.type === 'image/webp' ? 'image/webp' : 'image/jpeg'
     const path = `${email}/${localDateKey()}/${action}-${Date.now()}.${extension}`
-    attendanceDiagnostic('attendance_photo_upload_start', 'info', 'Uploading compressed attendance photo', {
+    attendanceDiagnostic('attendance_photo_upload_start', 'info', 'Uploading stamped compressed attendance photo', {
       action,
       file_type: contentType,
       file_size_bytes: photo.size,
@@ -206,7 +277,7 @@ export default function AgentAttendancePage() {
       })
       throw error
     }
-    attendanceDiagnostic('attendance_photo_upload', 'info', 'Compressed attendance photo uploaded', {
+    attendanceDiagnostic('attendance_photo_upload', 'info', 'Stamped compressed attendance photo uploaded', {
       action,
       file_type: contentType,
       file_size_bytes: photo.size,
@@ -232,6 +303,14 @@ export default function AgentAttendancePage() {
       setError(message)
       return
     }
+    const capturedPhoto = photos[action]
+    if (!capturedPhoto) {
+      setError(action === 'in'
+        ? tx('Check-in photo is required.', 'Foto check-in wajib diambil.')
+        : tx('Check-out photo is required.', 'Foto check-out wajib diambil.'))
+      return
+    }
+
     setSaving(true)
     setError('')
     let photoPath: string | null = null
@@ -257,7 +336,19 @@ export default function AgentAttendancePage() {
         throw gpsError
       }
 
-      photoPath = await uploadPhoto(action)
+      const stampedPhoto = await stampAttendancePhoto(capturedPhoto, action, position, email)
+      const stampedPreview = URL.createObjectURL(stampedPhoto)
+      setPreviews((current) => ({ ...current, [action]: stampedPreview }))
+      attendanceDiagnostic('attendance_photo_stamped', 'info', 'Attendance photo stamped with timestamp and GPS', {
+        action,
+        file_type: stampedPhoto.type,
+        file_size_bytes: stampedPhoto.size,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy_m: position.coords.accuracy,
+      })
+
+      photoPath = await uploadPhoto(action, stampedPhoto)
       const fn = action === 'in' ? 'agent_check_in' : 'agent_check_out'
       attendanceDiagnostic('attendance_rpc_start', 'info', `Calling ${fn}`, { action })
       const { data, error } = await supabase.rpc(fn, {
@@ -396,7 +487,7 @@ export default function AgentAttendancePage() {
         <strong>{tx('Late', 'Terlambat')}</strong>.
         {' '}{tx('Check-out is unlocked only after at least ', 'Check-out hanya dapat dilakukan setelah minimal ')}
         <strong>{tx('8 hours', '8 jam')}</strong>
-        {tx(' from check-in. Photos are captured directly, compressed to a maximum 1280px edge, and saved as WebP when supported.', ' sejak check-in. Foto diambil langsung, dikompresi maksimal 1280px, dan disimpan sebagai WebP jika didukung.')}
+        {tx(' from check-in. Photos are captured directly, stamped with WIB time, GPS, and agent identity, compressed to a maximum 1280px edge, and saved as WebP when supported.', ' sejak check-in. Foto diambil langsung, diberi stamp waktu WIB, GPS, dan identitas agen, dikompresi maksimal 1280px, dan disimpan sebagai WebP jika didukung.')}
       </div>
     </main>
   )
