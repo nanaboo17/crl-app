@@ -541,6 +541,7 @@ function AttendanceCard({
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
   const [cameraError, setCameraError] = useState('')
+  const [cameraReady, setCameraReady] = useState(false)
 
   function stopCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -548,6 +549,7 @@ function AttendanceCard({
     if (videoRef.current) videoRef.current.srcObject = null
     setCameraOpen(false)
     setCameraStarting(false)
+    setCameraReady(false)
   }
 
   useEffect(() => () => stopCamera(), [])
@@ -585,7 +587,10 @@ function AttendanceCard({
   }
 
   async function capture() {
-    if (!videoRef.current) return
+    if (!videoRef.current || !cameraReady || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
+      setCameraError(cameraErrorText)
+      return
+    }
     try {
       const blob = await captureCompressedPhoto(videoRef.current)
       const url = URL.createObjectURL(blob)
@@ -612,10 +617,10 @@ function AttendanceCard({
       <div className={`${styles.photoPicker} ${photoDisabled ? styles.photoDisabled : ''}`}>
         {cameraOpen ? (
           <div className={styles.cameraStage}>
-            <video ref={videoRef} autoPlay muted playsInline className={styles.photoPreview} aria-label={`${title} camera`} />
+            <video ref={videoRef} autoPlay muted playsInline className={styles.photoPreview} aria-label={`${title} camera`} onLoadedMetadata={() => setCameraReady(true)} onCanPlay={() => setCameraReady(true)} />
             <div className={styles.cameraControls}>
-              <button type="button" className={styles.cameraCaptureButton} onClick={() => void capture()}>
-                <Camera size={17} /> {captureText}
+              <button type="button" className={styles.cameraCaptureButton} onClick={() => void capture()} disabled={!cameraReady}>
+                <Camera size={17} /> {cameraReady ? captureText : 'Preparing camera…'}
               </button>
               <button type="button" className={styles.cameraCancelButton} onClick={stopCamera} aria-label={cancelText} title={cancelText}>
                 <X size={17} />
