@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Camera, CheckCircle2, Clock3, LocateFixed, LogIn, LogOut, RefreshCw, Timer, UserRound, X } from 'lucide-react'
+import { Camera, CheckCircle2, Clock3, LocateFixed, LogIn, LogOut, RefreshCw, Repeat2, Timer, UserRound, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
@@ -542,6 +542,7 @@ function AttendanceCard({
   const [cameraStarting, setCameraStarting] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [cameraReady, setCameraReady] = useState(false)
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment')
 
   function stopCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -554,7 +555,7 @@ function AttendanceCard({
 
   useEffect(() => () => stopCamera(), [])
 
-  async function startCamera() {
+  async function startCamera(mode: 'user' | 'environment' = facingMode) {
     if (photoDisabled) return
     setCameraError('')
     setCameraStarting(true)
@@ -564,12 +565,13 @@ function AttendanceCard({
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: mode },
           width: { ideal: 1280 },
           height: { ideal: 960 },
         },
       })
       streamRef.current = stream
+      setFacingMode(mode)
       setCameraOpen(true)
     } catch (err) {
       const message = err instanceof Error && err.message ? err.message : cameraErrorText
@@ -630,6 +632,18 @@ function AttendanceCard({
     }
   }, [cameraOpen, action, cameraErrorText])
 
+  async function flipCamera() {
+    if (!cameraOpen || cameraStarting) return
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment'
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+    setCameraReady(false)
+    setCameraOpen(false)
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
+    await startCamera(nextMode)
+  }
+
   async function capture() {
     if (!videoRef.current || !cameraReady || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
       setCameraError(cameraErrorText)
@@ -665,6 +679,9 @@ function AttendanceCard({
             <div className={styles.cameraControls}>
               <button type="button" className={styles.cameraCaptureButton} onClick={() => void capture()} disabled={!cameraReady}>
                 <Camera size={17} /> {cameraReady ? captureText : 'Preparing camera…'}
+              </button>
+              <button type="button" className={styles.cameraCancelButton} onClick={() => void flipCamera()} disabled={cameraStarting} aria-label="Flip camera" title="Flip camera">
+                <Repeat2 size={17} />
               </button>
               <button type="button" className={styles.cameraCancelButton} onClick={stopCamera} aria-label={cancelText} title={cancelText}>
                 <X size={17} />
