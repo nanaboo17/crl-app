@@ -570,12 +570,35 @@ function AttendanceCard({
       })
       streamRef.current = stream
       setCameraOpen(true)
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          void videoRef.current.play().catch(() => undefined)
+
+      // The video element is rendered only after cameraOpen becomes true.
+      // Attach the stream after React has mounted that element. This is
+      // especially important on iOS Safari, where the previous single
+      // requestAnimationFrame could run before videoRef existed.
+      let attempts = 0
+      const attachStream = () => {
+        const video = videoRef.current
+        if (!video) {
+          attempts += 1
+          if (attempts < 30) window.setTimeout(attachStream, 50)
+          else {
+            setCameraError(cameraErrorText)
+            attendanceDiagnostic('attendance_camera', 'error', 'Camera preview element did not mount', { action })
+            stopCamera()
+          }
+          return
         }
-      })
+
+        if (video.srcObject !== stream) video.srcObject = stream
+        void video.play()
+          .then(() => {
+            if (video.videoWidth > 0 && video.videoHeight > 0) setCameraReady(true)
+          })
+          .catch((playError) => {
+            attendanceDiagnostic('attendance_camera_play', 'warning', playError instanceof Error ? playError.message : 'Camera play failed', { action })
+          })
+      }
+      window.setTimeout(attachStream, 0)
     } catch (err) {
       const message = err instanceof Error && err.message ? err.message : cameraErrorText
       setCameraError(message)
