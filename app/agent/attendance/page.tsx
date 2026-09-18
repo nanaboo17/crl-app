@@ -558,6 +558,7 @@ function AttendanceCard({
     if (photoDisabled) return
     setCameraError('')
     setCameraStarting(true)
+    setCameraReady(false)
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error(cameraErrorText)
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -570,35 +571,6 @@ function AttendanceCard({
       })
       streamRef.current = stream
       setCameraOpen(true)
-
-      // The video element is rendered only after cameraOpen becomes true.
-      // Attach the stream after React has mounted that element. This is
-      // especially important on iOS Safari, where the previous single
-      // requestAnimationFrame could run before videoRef existed.
-      let attempts = 0
-      const attachStream = () => {
-        const video = videoRef.current
-        if (!video) {
-          attempts += 1
-          if (attempts < 30) window.setTimeout(attachStream, 50)
-          else {
-            setCameraError(cameraErrorText)
-            attendanceDiagnostic('attendance_camera', 'error', 'Camera preview element did not mount', { action })
-            stopCamera()
-          }
-          return
-        }
-
-        if (video.srcObject !== stream) video.srcObject = stream
-        void video.play()
-          .then(() => {
-            if (video.videoWidth > 0 && video.videoHeight > 0) setCameraReady(true)
-          })
-          .catch((playError) => {
-            attendanceDiagnostic('attendance_camera_play', 'warning', playError instanceof Error ? playError.message : 'Camera play failed', { action })
-          })
-      }
-      window.setTimeout(attachStream, 0)
     } catch (err) {
       const message = err instanceof Error && err.message ? err.message : cameraErrorText
       setCameraError(message)
@@ -608,6 +580,55 @@ function AttendanceCard({
       setCameraStarting(false)
     }
   }
+
+  useEffect(() => {
+    if (!cameraOpen) return
+    const video = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream) return
+
+    let cancelled = false
+    const markReady = () => {
+      if (!cancelled && video.videoWidth > 0 && video.videoHeight > 0) {
+        setCameraReady(true)
+        setCameraError('')
+      }
+    }
+
+    video.srcObject = stream
+    video.addEventListener('loadedmetadata', markReady)
+    video.addEventListener('canplay', markReady)
+    video.addEventListener('playing', markReady)
+
+    void video.play()
+      .then(markReady)
+      .catch((playError) => {
+        attendanceDiagnostic(
+          'attendance_camera_play',
+          'warning',
+          playError instanceof Error ? playError.message : 'Camera play failed',
+          { action }
+        )
+      })
+
+    const readyPoll = window.setInterval(markReady, 100)
+    const readyTimeout = window.setTimeout(() => {
+      markReady()
+      if (!cancelled && (!video.videoWidth || !video.videoHeight)) {
+        setCameraError(cameraErrorText)
+        attendanceDiagnostic('attendance_camera', 'error', 'Camera stream opened but no video frames became available', { action })
+      }
+    }, 8000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(readyPoll)
+      window.clearTimeout(readyTimeout)
+      video.removeEventListener('loadedmetadata', markReady)
+      video.removeEventListener('canplay', markReady)
+      video.removeEventListener('playing', markReady)
+    }
+  }, [cameraOpen, action, cameraErrorText])
 
   async function capture() {
     if (!videoRef.current || !cameraReady || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
