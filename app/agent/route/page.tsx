@@ -106,6 +106,7 @@ export default function AgentRoutePage() {
           .from('customers')
           .select('customer_id, customer_name, priority_rank, service_address, city, district, sub_district, given_latitude, given_longitude, visit_status, payment_status, days_left_to_churn')
           .ilike('agent_email', email)
+          .eq('actionable', true)
           .order('priority_rank', { ascending: true })
 
         if (customerError) throw customerError
