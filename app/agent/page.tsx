@@ -71,10 +71,10 @@ export default async function AgentPage() {
   if (agent.role !== 'agent') redirect('/auth/route')
 
   const [customersResult, preVisitsResult, visitsResult, customersList, followupsResult, visitDetailsResult, attendanceResult] = await Promise.all([
-    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('agent_email', email),
+    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('agent_email', email).eq('actionable', true),
     supabase.from('pre_visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
     supabase.from('visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
-    supabase.from('customers').select('customer_id,customer_name,priority_rank,days_left_to_churn,invoice_amount,payment_status,visit_status,city,district,sub_district').eq('agent_email', email),
+    supabase.from('customers').select('customer_id,customer_name,priority_rank,days_left_to_churn,invoice_amount,payment_status,visit_status,city,district,sub_district').eq('agent_email', email).eq('actionable', true),
     supabase.from('customer_followups').select('followup_id,customer_id,due_at,note,status').eq('agent_email', email).eq('status', 'pending').order('due_at', { ascending: true }).limit(5),
     supabase.from('visits').select('visit_id,visit_date,location_match,visit_photo_url,consent_given,conversation_result,updated_phone').eq('agent_email', email).order('visit_date', { ascending: false }),
     supabase.from('agent_attendance').select('attendance_date,check_in_status,check_in_at,check_out_at,worked_minutes').eq('agent_email', email).order('attendance_date', { ascending: false }),
