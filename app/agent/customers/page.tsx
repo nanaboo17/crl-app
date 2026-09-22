@@ -121,6 +121,7 @@ export default function AgentCustomersPage() {
         .from('customers')
         .select('customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
         .eq('agent_email', email)
+        .eq('actionable', true)
         .order('priority_rank', { ascending: true })
 
       if (customerError) setError(customerError.message)
