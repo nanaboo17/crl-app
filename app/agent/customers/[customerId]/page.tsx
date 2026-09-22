@@ -27,7 +27,7 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   if (!agent || !agent.active || agent.role !== 'agent') redirect('/auth/route')
 
   const decodedCustomerId = decodeURIComponent(customerId)
-  const { data: customer, error } = await supabase.from('customers').select('*').eq('customer_id', decodedCustomerId).eq('agent_email', email).maybeSingle()
+  const { data: customer, error } = await supabase.from('customers').select('*').eq('customer_id', decodedCustomerId).eq('agent_email', email).eq('actionable', true).maybeSingle()
   if (error) return <ErrorBlock message={error.message} backHref="/agent/customers" t={t} />
   if (!customer) return <ErrorBlock message={t('agent.customer.notFound')} backHref="/agent/customers" t={t} />
 
