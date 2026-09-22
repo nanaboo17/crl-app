@@ -240,8 +240,8 @@ export const agentMessages = defineMessages({
   'agent.visit.unpaidPlaceholder': { en: 'Select Reason', id: 'Pilih Alasan' },
   'agent.visit.step7': { en: 'Additional Notes', id: 'Catatan Tambahan' },
   'agent.visit.notesHint': {
-    en: 'Optional. Fill in any important customer information, such as data updates or service issues.',
-    id: 'Opsional. Isi jika ada informasi penting dari pelanggan, seperti update data atau kendala layanan.',
+    en: 'Fill in any important customer information, such as data updates or service issues.',
+    id: 'Isi jika ada informasi penting dari pelanggan, seperti update data atau kendala layanan.',
   },
   'agent.visit.fieldNotes': { en: 'Additional Notes', id: 'Catatan Tambahan' },
   'agent.visit.notesPlaceholder': {
