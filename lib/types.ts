@@ -55,6 +55,7 @@ export type Visit = {
   gps_accuracy: number | null
   gps_captured_at: string | null
   visit_photo_url: string | null
+  visit_photo_urls?: string[] | null
   consent_given: boolean
   visit_result: string | null
   visit_summary: string | null
