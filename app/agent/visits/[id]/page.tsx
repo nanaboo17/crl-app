@@ -19,7 +19,7 @@ export default function VisitDetailPage() {
   const id = decodeURIComponent(params.id)
   const [row, setRow] = useState<Visit | null>(null)
   const [customer, setCustomer] = useState<Customer | null>(null)
-  const [photoUrl, setPhotoUrl] = useState('')
+  const [photoUrls, setPhotoUrls] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -37,10 +37,20 @@ export default function VisitDetailPage() {
       const { data: c } = await s.from('customers').select('*').eq('customer_id', data.customer_id).single()
       setCustomer((c || null) as Customer | null)
 
-      if (data.visit_photo_url) {
-        const { data: signed } = await s.storage.from('visit-evidence').createSignedUrl(data.visit_photo_url, 3600)
-        setPhotoUrl(signed?.signedUrl || '')
-      }
+      const photoPaths = Array.isArray(data.visit_photo_urls) && data.visit_photo_urls.length > 0
+        ? data.visit_photo_urls
+        : data.visit_photo_url
+          ? [data.visit_photo_url]
+          : []
+
+      const signedPhotos = await Promise.all(
+        photoPaths.map(async (path: string) => {
+          const { data: signed } = await s.storage.from('visit-evidence').createSignedUrl(path, 3600)
+          return signed?.signedUrl || ''
+        })
+      )
+
+      setPhotoUrls(signedPhotos.filter(Boolean))
       setLoading(false)
     })()
   }, [id])
@@ -106,7 +116,20 @@ export default function VisitDetailPage() {
 
       <section className={styles.photoCard}>
         <div className={styles.cardTitle}><ImageIcon /><div><span>{tx('EVIDENCE', 'BUKTI')}</span><h2>{tx('Visit evidence photo', 'Foto bukti kunjungan')}</h2></div></div>
-        {photoUrl ? <img src={photoUrl} alt={t('agent.visitDetail.evidenceAlt')} className={styles.photo} /> : <div className={styles.noPhoto}><ImageIcon /><strong>{tx('No evidence photo', 'Tidak ada foto bukti')}</strong><span>{tx('No photo was attached to this visit record.', 'Tidak ada foto yang dilampirkan pada catatan kunjungan ini.')}</span></div>}
+        {photoUrls.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {photoUrls.map((url, index) => (
+              <img
+                key={url}
+                src={url}
+                alt={`${t('agent.visitDetail.evidenceAlt')} ${index + 1}`}
+                className={styles.photo}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className={styles.noPhoto}><ImageIcon /><strong>{tx('No evidence photo', 'Tidak ada foto bukti')}</strong><span>{tx('No photo was attached to this visit record.', 'Tidak ada foto yang dilampirkan pada catatan kunjungan ini.')}</span></div>
+        )}
       </section>
 
       <section className={styles.doneCard}><CheckCircle2 /><div><strong>{tx('Visit record saved', 'Catatan kunjungan tersimpan')}</strong><span>{tx('This submitted record is available in your visit history.', 'Catatan yang dikirim ini tersedia di riwayat kunjungan Anda.')}</span></div></section>
