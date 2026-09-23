@@ -27,7 +27,6 @@ type RouteCustomer = Customer & {
   sequence: number
 }
 
-const MAX_ROUTE_DISTANCE_KM = 100
 const MAX_GOOGLE_MAPS_STOPS = 9
 
 function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -52,9 +51,7 @@ function hasValidCoordinates(customer: Customer) {
 }
 
 function needsVisit(customer: Customer) {
-  const visited = customer.visit_status?.trim().toLowerCase() === 'visited'
-  const paid = customer.payment_status?.trim().toLowerCase() === 'paid'
-  return !visited && !paid
+  return customer.visit_status?.trim().toLowerCase() !== 'visited'
 }
 
 export default function AgentRoutePage() {
@@ -159,26 +156,15 @@ export default function AgentRoutePage() {
     [actionableCustomers]
   )
 
-  const availableCustomers = useMemo(() => {
-    if (latitude === null || longitude === null) return []
-    return actionableCustomers.filter((customer) => {
-      if (!hasValidCoordinates(customer)) return false
-      return distanceMeters(latitude, longitude, Number(customer.given_latitude), Number(customer.given_longitude)) <= MAX_ROUTE_DISTANCE_KM * 1000
-    })
-  }, [actionableCustomers, latitude, longitude])
+  const availableCustomers = useMemo(
+    () => actionableCustomers.filter(hasValidCoordinates),
+    [actionableCustomers]
+  )
 
-  const excludedCustomers = useMemo(() => {
-    if (latitude === null || longitude === null) return []
-    return actionableCustomers
-      .filter((customer) => {
-        if (!hasValidCoordinates(customer)) return false
-        return distanceMeters(latitude, longitude, Number(customer.given_latitude), Number(customer.given_longitude)) > MAX_ROUTE_DISTANCE_KM * 1000
-      })
-      .map((customer) => ({
-        ...customer,
-        distanceFromAgent: distanceMeters(latitude, longitude, Number(customer.given_latitude), Number(customer.given_longitude)),
-      }))
-  }, [actionableCustomers, latitude, longitude])
+  const customersWithoutCoordinates = useMemo(
+    () => actionableCustomers.filter((customer) => !hasValidCoordinates(customer)),
+    [actionableCustomers]
+  )
 
   const route = useMemo<RouteCustomer[]>(() => {
     if (latitude === null || longitude === null) return []
@@ -210,6 +196,25 @@ export default function AgentRoutePage() {
 
     return result
   }, [latitude, longitude, availableCustomers])
+
+  const visibleCustomers = useMemo(() => {
+    if (latitude !== null && longitude !== null) {
+      return [
+        ...route,
+        ...customersWithoutCoordinates.map((customer, index) => ({
+          ...customer,
+          sequence: route.length + index + 1,
+          distance_from_previous: Number.NaN,
+        })),
+      ]
+    }
+
+    return actionableCustomers.map((customer, index) => ({
+      ...customer,
+      sequence: index + 1,
+      distance_from_previous: Number.NaN,
+    }))
+  }, [actionableCustomers, customersWithoutCoordinates, latitude, longitude, route])
 
   function openFullRoute() {
     if (latitude === null || longitude === null || route.length === 0) return
@@ -291,22 +296,30 @@ export default function AgentRoutePage() {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <div><p className={styles.eyebrow}><Route size={13} /> {t('agent.route.nearestFirst')}</p><h2>{t('agent.route.recommended')}</h2></div>
-          <span className={styles.countBadge}>{route.length}</span>
+          <span className={styles.countBadge}>{actionableCustomers.length}</span>
         </div>
 
-        {latitude === null || longitude === null ? (
-          <div className={styles.emptyCard}>{t('agent.route.captureFirst')}</div>
-        ) : route.length === 0 ? (
-          <div className={styles.emptyCard}>{tx('No route-ready customers found near your location.', 'Tidak ada pelanggan dengan data rute yang siap di dekat lokasi Anda.')}</div>
+        {visibleCustomers.length === 0 ? (
+          <div className={styles.emptyCard}>{tx('No customers currently need a visit.', 'Tidak ada pelanggan yang saat ini perlu dikunjungi.')}</div>
         ) : (
-          <div className={styles.routeList}>
-            {route.map((customer) => (
+          <>
+            {latitude === null || longitude === null ? (
+              <div className={styles.emptyCard}>{tx('All customers needing a visit are shown below. Capture your location to sort them by nearest first.', 'Semua pelanggan yang perlu dikunjungi ditampilkan di bawah. Ambil lokasi Anda untuk mengurutkan dari yang terdekat.')}</div>
+            ) : null}
+            <div className={styles.routeList}>
+            {visibleCustomers.map((customer) => (
               <article key={customer.customer_id} className={styles.stopCard}>
                 <div className={styles.sequence}>{customer.sequence}</div>
                 <div className={styles.stopContent}>
                   <div className={styles.stopHeader}>
                     <div><h3>{customer.customer_name}</h3><p>{customer.customer_id}</p></div>
-                    <strong className={styles.distance}>{formatDistance(customer.distance_from_previous)}</strong>
+                    <strong className={styles.distance}>
+                      {Number.isFinite(customer.distance_from_previous)
+                        ? formatDistance(customer.distance_from_previous)
+                        : hasValidCoordinates(customer)
+                          ? tx('Waiting for GPS', 'Menunggu GPS')
+                          : tx('No coordinates', 'Tanpa koordinat')}
+                    </strong>
                   </div>
                   <div className={styles.stopInfo}>
                     <span>{t('agent.route.priorityLabel', { value: customer.priority_rank ?? '-' })}</span>
@@ -316,29 +329,17 @@ export default function AgentRoutePage() {
                   <p className={styles.address}><MapPin size={14} /> {customer.service_address || customer.sub_district || customer.district || customer.city || '-'}</p>
                   <div className={styles.actions}>
                     <Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link>
-                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a>
+                    {hasValidCoordinates(customer) && (
+                      <a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a>
+                    )}
                   </div>
                 </div>
               </article>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </section>
-
-      {excludedCustomers.length > 0 && (
-        <section className={styles.warningCard}>
-          <h2>{t('agent.route.warningTitle')}</h2>
-          <p>{t('agent.route.warningBody', { km: MAX_ROUTE_DISTANCE_KM })}</p>
-          <div className={styles.warningList}>
-            {excludedCustomers.map((customer) => (
-              <div key={customer.customer_id} className={styles.warningCustomer}>
-                <div><strong>{customer.customer_name}</strong><span>{customer.customer_id}</span></div>
-                <span>{t('agent.route.kmAway', { km: (customer.distanceFromAgent / 1000).toFixed(1) })}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </main>
   )
 }
