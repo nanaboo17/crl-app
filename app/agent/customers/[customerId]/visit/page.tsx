@@ -103,6 +103,7 @@ export default function VisitPage() {
     if (conversationResult === 'Tidak bertemu pelanggan') {
       setApprovedOffer('Belum ada offer yang disetujui')
       setPlannedPaymentDate('')
+      setUnpaidReason('')
     }
   }, [conversationResult])
 
@@ -455,7 +456,11 @@ export default function VisitPage() {
     if (!conversationResult) return setError(t('agent.visit.err.selectConversation'))
     if (conversationResult !== 'Tidak bertemu pelanggan' && !approvedOffer) return setError(t('agent.visit.err.selectOffer'))
     if (conversationResult === 'Bersedia bayar / Promise to Pay' && !plannedPaymentDate) return setError(t('agent.visit.err.plannedDate'))
-    if (conversationResult !== 'Sudah melakukan pembayaran' && !unpaidReason) return setError(t('agent.visit.err.unpaidReason'))
+    if (
+      conversationResult !== 'Sudah melakukan pembayaran' &&
+      conversationResult !== 'Tidak bertemu pelanggan' &&
+      !unpaidReason
+    ) return setError(t('agent.visit.err.unpaidReason'))
     if (!photo || !stampedPhoto || !photoCapturedAt) return setError(t('agent.visit.err.photoRequired'))
     if (!consentGiven) return setError(t('agent.visit.err.consentRequired'))
 
@@ -492,9 +497,12 @@ export default function VisitPage() {
       consent_given: consentGiven,
       visit_status_kunjungan: visitStatusKunjungan,
       conversation_result: conversationResult,
-      approved_offer: approvedOffer,
-      planned_payment_date: plannedPaymentDate || null,
-      unpaid_reason: unpaidReason,
+      approved_offer: conversationResult === 'Tidak bertemu pelanggan' ? null : (approvedOffer || null),
+      planned_payment_date: conversationResult === 'Bersedia bayar / Promise to Pay' ? (plannedPaymentDate || null) : null,
+      unpaid_reason:
+        conversationResult === 'Sudah melakukan pembayaran' || conversationResult === 'Tidak bertemu pelanggan'
+          ? null
+          : (unpaidReason || null),
       additional_notes: additionalNotes.trim() || null,
     })
     if (visitError) {
