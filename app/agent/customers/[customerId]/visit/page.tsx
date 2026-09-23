@@ -23,6 +23,7 @@ import styles from './page.module.css'
 const LOCATION_LIMIT_METERS = 200
 const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
 const MAX_PHOTO_DIMENSION = 1600
+const MAX_VISIT_PHOTOS = 5
 
 function normalizePhone(value: string | null | undefined) {
   return (value ?? '').replace(/[^0-9]/g, '')
@@ -68,10 +69,12 @@ export default function VisitPage() {
   const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null)
   const [distanceMeters, setDistanceMeters] = useState<number | null>(null)
   const [locationMatch, setLocationMatch] = useState<boolean | null>(null)
-  const [photo, setPhoto] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState('')
-  const [stampedPhoto, setStampedPhoto] = useState<Blob | null>(null)
-  const [photoCapturedAt, setPhotoCapturedAt] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<Array<{
+    file: File
+    stamped: Blob
+    preview: string
+    capturedAt: string
+  }>>([])
   const [consentGiven, setConsentGiven] = useState(false)
   const [loading, setLoading] = useState(true)
   const [gettingGps, setGettingGps] = useState(false)
@@ -240,8 +243,8 @@ export default function VisitPage() {
   ])
 
   useEffect(() => () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-  }, [photoPreview])
+    photos.forEach((item) => URL.revokeObjectURL(item.preview))
+  }, [photos])
 
   useEffect(() => () => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
@@ -394,16 +397,19 @@ export default function VisitPage() {
       setError(t('agent.visit.err.gpsFirstPhoto'))
       return
     }
+    if (photos.length >= MAX_VISIT_PHOTOS) {
+      setError(locale === 'id' ? 'Maksimal 5 foto per kunjungan.' : 'Maximum 5 photos per visit.')
+      return
+    }
     setError('')
     try {
       const capturedAt = new Date().toISOString()
       const stamped = await stampImage(selectedFile, capturedAt)
-      if (photoPreview) URL.revokeObjectURL(photoPreview)
-      const nextPreview = URL.createObjectURL(stamped)
-      setPhoto(selectedFile)
-      setStampedPhoto(stamped)
-      setPhotoCapturedAt(capturedAt)
-      setPhotoPreview(nextPreview)
+      const preview = URL.createObjectURL(stamped)
+      setPhotos((current) => [
+        ...current,
+        { file: selectedFile, stamped, preview, capturedAt },
+      ].slice(0, MAX_VISIT_PHOTOS))
     } catch (err: any) {
       window.dispatchEvent(new CustomEvent('crl-photo-processing-error', {
         detail: {
@@ -415,6 +421,30 @@ export default function VisitPage() {
       }))
       setError(err.message || t('agent.visit.err.cannotProcess'))
     }
+  }
+
+  async function handlePhotoFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+    const remaining = MAX_VISIT_PHOTOS - photos.length
+    const selected = Array.from(fileList).slice(0, remaining)
+
+    if (fileList.length > remaining) {
+      setError(locale === 'id'
+        ? `Maksimal 5 foto. Hanya ${remaining} foto tambahan yang diproses.`
+        : `Maximum 5 photos. Only ${remaining} more photo(s) will be processed.`)
+    }
+
+    for (const file of selected) {
+      await handlePhoto(file)
+    }
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((current) => {
+      const removed = current[index]
+      if (removed) URL.revokeObjectURL(removed.preview)
+      return current.filter((_, itemIndex) => itemIndex !== index)
+    })
   }
 
   async function captureFromCamera() {
@@ -461,22 +491,33 @@ export default function VisitPage() {
       conversationResult !== 'Tidak bertemu pelanggan' &&
       !unpaidReason
     ) return setError(t('agent.visit.err.unpaidReason'))
-    if (!photo || !stampedPhoto || !photoCapturedAt) return setError(t('agent.visit.err.photoRequired'))
+    if (photos.length === 0) return setError(t('agent.visit.err.photoRequired'))
     if (!consentGiven) return setError(t('agent.visit.err.consentRequired'))
 
     setSaving(true)
     const supabase = createClient()
     const correctedPhone = phoneCorrect === false ? normalizePhone(updatedPhone) : null
     const safeCustomerId = customerId.replace(/[^a-zA-Z0-9_-]/g, '_')
-    const filePath = `${agent.email}/${safeCustomerId}/${Date.now()}-stamped.jpg`
+    const uploadBatchId = Date.now()
+    const uploadedPaths: string[] = []
 
-    const { error: uploadError } = await supabase.storage.from('visit-evidence').upload(filePath, stampedPhoto, {
-      contentType: 'image/jpeg', cacheControl: '3600', upsert: false,
-    })
-    if (uploadError) {
-      setError(t('agent.visit.err.uploadFailed', { message: uploadError.message }))
-      setSaving(false)
-      return
+    for (let index = 0; index < photos.length; index++) {
+      const item = photos[index]
+      const filePath = `${agent.email}/${safeCustomerId}/${uploadBatchId}-${index + 1}-stamped.jpg`
+      const { error: uploadError } = await supabase.storage.from('visit-evidence').upload(filePath, item.stamped, {
+        contentType: 'image/jpeg', cacheControl: '3600', upsert: false,
+      })
+
+      if (uploadError) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from('visit-evidence').remove(uploadedPaths)
+        }
+        setError(t('agent.visit.err.uploadFailed', { message: uploadError.message }))
+        setSaving(false)
+        return
+      }
+
+      uploadedPaths.push(filePath)
     }
 
     const { error: visitError } = await supabase.from('visits').insert({
@@ -493,7 +534,8 @@ export default function VisitPage() {
       gps_captured_at: gpsCapturedAt,
       distance_to_customer_meters: distanceMeters,
       location_match: locationMatch,
-      visit_photo_url: filePath,
+      visit_photo_url: uploadedPaths[0] ?? null,
+      visit_photo_urls: uploadedPaths,
       consent_given: consentGiven,
       visit_status_kunjungan: visitStatusKunjungan,
       conversation_result: conversationResult,
@@ -506,7 +548,7 @@ export default function VisitPage() {
       additional_notes: additionalNotes.trim() || null,
     })
     if (visitError) {
-      await supabase.storage.from('visit-evidence').remove([filePath])
+      await supabase.storage.from('visit-evidence').remove(uploadedPaths)
       setError(visitError.message)
       setSaving(false)
       return
@@ -595,14 +637,14 @@ export default function VisitPage() {
         {!gpsCaptured && <div className="dui-alert dui-alert-warning"><AlertTriangle className="h-5 w-5 shrink-0" /><span>{t('agent.visit.photoGpsWarning')}</span></div>}
         {gpsCaptured && !cameraOpen && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" className="dui-btn dui-btn-primary w-full" onClick={startCamera} disabled={cameraStarting}>
+            <button type="button" className="dui-btn dui-btn-primary w-full" onClick={startCamera} disabled={cameraStarting || photos.length >= MAX_VISIT_PHOTOS}>
               <Camera className="h-5 w-5" />
               {cameraStarting ? (locale === 'id' ? 'Membuka kamera…' : 'Opening camera…') : (locale === 'id' ? 'Ambil Foto di Aplikasi' : 'Take Photo In App')}
             </button>
             <label className="dui-btn dui-btn-outline w-full cursor-pointer">
               <Camera className="h-5 w-5" />
               {locale === 'id' ? 'Pilih Foto' : 'Choose Photo'}
-              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)} className="hidden" />
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => { void handlePhotoFiles(e.target.files); e.currentTarget.value = '' }} className="hidden" />
             </label>
           </div>
         )}
@@ -619,13 +661,27 @@ export default function VisitPage() {
           </div>
         )}
         {gpsCaptured && <p className="text-xs text-base-content/60">{locale === 'id' ? 'Gunakan “Ambil Foto di Aplikasi” agar halaman tidak berpindah ke aplikasi kamera dan tidak memuat ulang. “Pilih Foto” tersedia sebagai alternatif.' : 'Use “Take Photo In App” so the page stays open instead of switching to the phone camera app. “Choose Photo” is available as a fallback.'}</p>}
-        {photoPreview && (
-          <div className={styles.photoPreviewCard}>
-            <div className={styles.photoFrame}><img src={photoPreview} alt={t('agent.visit.photoAlt')} /></div>
-            <div className={styles.photoMeta}>
-              <div className={styles.photoMetaTitle}><Camera className="h-4 w-4 shrink-0" />{t('agent.visit.photoStamped')}</div>
-              {photoCapturedAt && <div className={styles.photoTime}>{locale === 'id' ? 'Foto diambil' : 'Photo captured'}: {formatVisitTimestamp(photoCapturedAt)}</div>}
-            </div>
+        {photos.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {photos.map((item, index) => (
+              <div className={styles.photoPreviewCard} key={item.preview}>
+                <div className={styles.photoFrame}><img src={item.preview} alt={`${t('agent.visit.photoAlt')} ${index + 1}`} /></div>
+                <div className={styles.photoMeta}>
+                  <div className={styles.photoMetaTitle}><Camera className="h-4 w-4 shrink-0" />{locale === 'id' ? `Foto ${index + 1} dari ${MAX_VISIT_PHOTOS}` : `Photo ${index + 1} of ${MAX_VISIT_PHOTOS}`}</div>
+                  <div className={styles.photoTime}>{locale === 'id' ? 'Foto diambil' : 'Photo captured'}: {formatVisitTimestamp(item.capturedAt)}</div>
+                  <button type="button" className="dui-btn dui-btn-error dui-btn-xs mt-2" onClick={() => removePhoto(index)} disabled={saving}>
+                    {locale === 'id' ? 'Hapus foto' : 'Remove photo'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {gpsCaptured && (
+          <div className="text-xs text-base-content/60">
+            {locale === 'id'
+              ? `${photos.length}/${MAX_VISIT_PHOTOS} foto dipilih. Minimal 1, maksimal 5 foto.`
+              : `${photos.length}/${MAX_VISIT_PHOTOS} photos selected. Minimum 1, maximum 5 photos.`}
           </div>
         )}
         <label className="flex cursor-pointer items-start gap-3 rounded-box bg-base-200/60 p-3"><input type="checkbox" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} className="dui-checkbox dui-checkbox-primary mt-0.5 shrink-0" /><span className="min-w-0 text-sm leading-relaxed">{t('agent.visit.consentLabel')}</span></label>
