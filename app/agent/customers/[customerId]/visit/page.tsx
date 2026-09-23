@@ -242,9 +242,15 @@ export default function VisitPage() {
     unpaidReason, additionalNotes,
   ])
 
-  useEffect(() => () => {
-    photos.forEach((item) => URL.revokeObjectURL(item.preview))
+  const photosRef = useRef(photos)
+
+  useEffect(() => {
+    photosRef.current = photos
   }, [photos])
+
+  useEffect(() => () => {
+    photosRef.current.forEach((item) => URL.revokeObjectURL(item.preview))
+  }, [])
 
   useEffect(() => () => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
