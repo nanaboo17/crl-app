@@ -76,11 +76,20 @@ export default async function SuperadminVisitDetailPage({
     .eq('customer_id', visit.customer_id)
     .maybeSingle()
 
-  let photoUrl: string | null = null
-  if (visit.visit_photo_url) {
-    const { data } = await supabase.storage.from('visit-evidence').createSignedUrl(visit.visit_photo_url, 60 * 10)
-    photoUrl = data?.signedUrl ?? null
-  }
+  const photoPaths = Array.isArray(visit.visit_photo_urls) && visit.visit_photo_urls.length > 0
+    ? visit.visit_photo_urls
+    : visit.visit_photo_url
+      ? [visit.visit_photo_url]
+      : []
+
+  const photoUrls = (
+    await Promise.all(
+      photoPaths.map(async (path: string) => {
+        const { data } = await supabase.storage.from('visit-evidence').createSignedUrl(path, 60 * 10)
+        return data?.signedUrl ?? null
+      })
+    )
+  ).filter((url): url is string => Boolean(url))
 
   function formatDateTime(value: string | null) {
     if (!value) return '-'
@@ -200,8 +209,17 @@ export default async function SuperadminVisitDetailPage({
 
         <div className={styles.card}>
           <SectionTitle>{t('superadmin.visits.detail.visitPhoto')}</SectionTitle>
-          {photoUrl ? (
-            <img src={photoUrl} alt={t('superadmin.visits.detail.visitEvidence')} className={styles.photo} />
+          {photoUrls.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {photoUrls.map((url, index) => (
+                <img
+                  key={url}
+                  src={url}
+                  alt={`${t('superadmin.visits.detail.visitEvidence')} ${index + 1}`}
+                  className={styles.photo}
+                />
+              ))}
+            </div>
           ) : (
             <div className={styles.noPhoto}>{t('superadmin.visits.detail.photoUnavailable')}</div>
           )}
