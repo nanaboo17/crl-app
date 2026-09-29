@@ -9,7 +9,7 @@ import { useI18n } from '@/components/providers/i18n-provider'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import styles from './page.module.css'
 
-type Agent = { email: string; agent_name: string; sales_code: string | null }
+type Agent = { email: string; agent_name: string }
 
 type FormState = {
   customer_id: string
@@ -67,7 +67,7 @@ export default function NewCustomerPage() {
     async function loadAgents() {
       const { data, error } = await supabase
         .from('agents')
-        .select('email,agent_name,sales_code')
+        .select('email,agent_name')
         .eq('role', 'agent')
         .eq('active', true)
         .order('agent_name')
@@ -194,7 +194,7 @@ export default function NewCustomerPage() {
             <Field label={tx('Days left to churn', 'Hari menuju churn')}><input type="number" min="0" value={form.days_left_to_churn} onChange={(e) => set('days_left_to_churn', e.target.value)} /></Field>
             <Field label={tx('Outstanding amount', 'Outstanding')}><input type="number" min="0" value={form.outstanding_amount} onChange={(e) => set('outstanding_amount', e.target.value)} placeholder="0" /></Field>
             <Field label={tx('Payment status', 'Status pembayaran')}><select value={form.payment_status} onChange={(e) => set('payment_status', e.target.value)}><option value="Unpaid">{tx('Unpaid', 'Belum Dibayar')}</option><option value="Paid">{tx('Paid', 'Lunas')}</option><option value="Not Set">{tx('Not Set', 'Belum Ditentukan')}</option></select></Field>
-            <Field label={tx('Assign agent', 'Tugaskan agen')} full><select value={form.agent_email} disabled={loadingAgents} onChange={(e) => set('agent_email', e.target.value)}><option value="">{loadingAgents ? tx('Loading agents…', 'Memuat agen…') : tx('Leave unassigned', 'Biarkan belum ditugaskan')}</option>{agents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name}{agent.sales_code ? ` · ${agent.sales_code}` : ''}</option>)}</select></Field>
+            <Field label={tx('Assign agent', 'Tugaskan agen')} full><select value={form.agent_email} disabled={loadingAgents} onChange={(e) => set('agent_email', e.target.value)}><option value="">{loadingAgents ? tx('Loading agents…', 'Memuat agen…') : tx('Leave unassigned', 'Biarkan belum ditugaskan')}</option>{agents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name}</option>)}</select></Field>
           </div>
         </section>
 
