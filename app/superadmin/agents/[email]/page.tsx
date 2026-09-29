@@ -27,7 +27,6 @@ export default function EditAgentPage() {
   const email = decodeURIComponent(params.email as string)
 
   const [name, setName] = useState('')
-  const [salesCode, setSalesCode] = useState('')
   const [organization, setOrganization] = useState('')
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
@@ -43,7 +42,7 @@ export default function EditAgentPage() {
       setError('')
       const { data, error: loadError } = await supabase
         .from('agents')
-        .select('agent_name,sales_code,organization,role,active')
+        .select('agent_name,organization,role,active')
         .eq('email', email)
         .single()
 
@@ -55,7 +54,6 @@ export default function EditAgentPage() {
       }
 
       setName(data.agent_name || '')
-      setSalesCode(data.sales_code ?? '')
       setOrganization(data.organization ?? '')
       setRole(data.role)
       setActive(data.active)
@@ -79,7 +77,6 @@ export default function EditAgentPage() {
       .from('agents')
       .update({
         agent_name: name.trim(),
-        sales_code: salesCode.trim() || null,
         organization: organization.trim() || null,
         role,
         active,
@@ -139,11 +136,6 @@ export default function EditAgentPage() {
             <div className={styles.field}>
               <label htmlFor="agent-name">{t('superadmin.agents.edit.nameLabel')}</label>
               <input id="agent-name" type="text" value={name} onChange={(e) => setName(e.target.value)} disabled={loading || saving} className={styles.input} />
-            </div>
-
-            <div className={styles.field}>
-              <label htmlFor="sales-code">{t('superadmin.agents.edit.salesCodeLabel')}</label>
-              <input id="sales-code" type="text" value={salesCode} onChange={(e) => setSalesCode(e.target.value)} disabled={loading || saving} className={styles.input} />
             </div>
 
             <div className={styles.field}>
