@@ -54,7 +54,7 @@ export default function AssignCustomerPage() {
 
       const { data: agentData, error: agentError } = await supabase
         .from('agents')
-        .select('email, agent_name, sales_code')
+        .select('email, agent_name')
         .eq('role', 'agent')
         .eq('active', true)
         .order('agent_name')
@@ -161,7 +161,7 @@ export default function AssignCustomerPage() {
               {t('superadmin.customerDetail.assignedAgent')}
               <select className={styles.select} value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
                 <option value="">{t('superadmin.customerDetail.notAssignedOption')}</option>
-                {agents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name}{agent.sales_code ? ` - ${agent.sales_code}` : ''}</option>)}
+                {agents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name}</option>)}
               </select>
             </label>
             {error && <div className={styles.error}>{error}</div>}
