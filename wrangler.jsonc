@@ -19,5 +19,13 @@
   },
   "observability": {
     "enabled": true
+  },
+  "env": {
+    "staging": {
+      "workers_dev": true,
+      "vars": {
+        "APP_ENV": "staging"
+      }
+    }
   }
 }
