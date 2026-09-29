@@ -75,7 +75,6 @@ export default async function AdminPreVisitDetailPage({
       .select(`
         email,
         agent_name,
-        sales_code
       `)
       .eq('email', decodedEmail)
       .maybeSingle()
@@ -249,13 +248,6 @@ export default async function AdminPreVisitDetailPage({
             label={t('admin.preVisitDetail.agentName')}
             value={
               agent?.agent_name
-            }
-          />
-
-          <Detail
-            label={t('admin.preVisitDetail.salesCode')}
-            value={
-              agent?.sales_code
             }
           />
 
