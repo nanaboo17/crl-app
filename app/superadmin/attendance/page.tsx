@@ -9,7 +9,7 @@ const CACHE_TTL = 60
 const TIMEZONE = 'Asia/Jakarta'
 const PHOTO_URL_TTL = 60 * 60
 
-type Agent = { email: string; agent_name: string | null; sales_code: string | null; active: boolean | null; organization: string | null }
+type Agent = { email: string; agent_name: string | null; active: boolean | null; organization: string | null }
 type VisitActivity = { agent_email: string | null; visit_date: string | null }
 type PreVisitActivity = { agent_email: string | null; created_at: string | null }
 type AttendanceRecord = {
@@ -89,7 +89,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
   const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v5:${selectedDate}`, CACHE_TTL, async () => {
     const [agentsResult, visitsResult, preVisitsResult, attendanceResult] = await Promise.all([
-      supabase.from('agents').select('email, agent_name, sales_code, active, organization').eq('role', 'agent').order('agent_name'),
+      supabase.from('agents').select('email, agent_name, active, organization').eq('role', 'agent').order('agent_name'),
       supabase.from('visits').select('agent_email, visit_date'),
       supabase.from('pre_visits').select('agent_email, created_at'),
       supabase
@@ -222,7 +222,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                   <div className="min-w-0">
                     <div className="truncate font-bold">{row.agent_name || '—'}</div>
                     <div className="break-all text-xs text-base-content/50">{row.email}</div>
-                    <div className="mt-1 text-xs text-base-content/60">{row.sales_code || 'No sales code'} · {row.organization || 'No organization'}</div>
+                    <div className="mt-1 text-xs text-base-content/60">{row.organization || 'No organization'}</div>
                   </div>
                   <span className={`dui-badge shrink-0 ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.present ? 'Checked In' : 'Not Checked In'}</span>
                 </div>
@@ -251,7 +251,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
         <div className="hidden overflow-x-auto md:block">
           <table className="dui-table">
-            <thead><tr><th>Agent</th><th>Organization</th><th>Sales code</th><th>Account</th><th>Pre-visits</th><th>Visits</th><th>Attendance</th><th>Check in</th><th>Check out</th><th>Photo</th></tr></thead>
+            <thead><tr><th>Agent</th><th>Organization</th><th>Account</th><th>Pre-visits</th><th>Visits</th><th>Attendance</th><th>Check in</th><th>Check out</th><th>Photo</th></tr></thead>
             <tbody>
               {filteredRows.map((row) => {
                 const statusLabel = attendanceStatusLabel(row.checkInStatus)
@@ -259,7 +259,6 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                   <tr key={row.email}>
                     <td><div className="font-semibold">{row.agent_name || '—'}</div><div className="text-xs text-base-content/50">{row.email}</div></td>
                     <td>{row.organization || '—'}</td>
-                    <td>{row.sales_code || '—'}</td>
                     <td>{row.active ? 'Active' : 'Inactive'}</td>
                     <td>{row.preVisits}</td>
                     <td>{row.visits}</td>
