@@ -58,7 +58,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
 
   let agentsQuery = supabase
     .from('agents')
-    .select('email, agent_name, role, active, organization, region, lead_email', { count: 'exact' })
+    .select('email, agent_name, phone_num, role, active, organization, region, lead_email', { count: 'exact' })
     .order('agent_name')
 
   if (selectedOrganization) agentsQuery = agentsQuery.eq('organization', selectedOrganization)
@@ -197,7 +197,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
             <div className={styles.tableCard}>
               <div className={styles.tableScroll}>
                 <table className={styles.table}>
-                  <thead><tr><th>{t('superadmin.agents.thAgent')}</th><th>{tx('Organization', 'Organisasi')}</th><th>{tx('Region', 'Region')}</th><th>{tx('Lead Email', 'Email Lead')}</th><th>{t('superadmin.agents.thRole')}</th><th>{t('superadmin.agents.thStatus')}</th><th aria-label={t('superadmin.agents.thActions')} /></tr></thead>
+                  <thead><tr><th>{t('superadmin.agents.thAgent')}</th><th>{tx('Phone Number', 'Nomor Telepon')}</th><th>{tx('Organization', 'Organisasi')}</th><th>{tx('Region', 'Region')}</th><th>{tx('Lead Email', 'Email Lead')}</th><th>{t('superadmin.agents.thRole')}</th><th>{t('superadmin.agents.thStatus')}</th><th aria-label={t('superadmin.agents.thActions')} /></tr></thead>
                   <tbody>
                     {agents.map((agent, index) => (
                       <tr key={agent.email}>
@@ -207,6 +207,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
                             <span className={styles.agentIdentity}><span className={styles.agentName}>{agent.agent_name || '—'}</span><span className={styles.agentEmail}>{agent.email}</span></span>
                           </Link>
                         </td>
+                        <td>{agent.phone_num || '—'}</td>
                         <td>{agent.organization || '—'}</td>
                         <td>{agent.region || '—'}</td>
                         <td>{agent.lead_email || '—'}</td>
@@ -230,7 +231,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
                     </div>
                     <span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span>
                   </div>
-                  <div className={styles.mobileMeta}><div><span>{tx('Organization', 'Organisasi')}</span><strong>{agent.organization || '—'}</strong></div><div><span>{tx('Region', 'Region')}</span><strong>{agent.region || '—'}</strong></div><div><span>{tx('Lead Email', 'Email Lead')}</span><strong>{agent.lead_email || '—'}</strong></div><div><span>{t('superadmin.agents.thRole')}</span><strong>{agent.role}</strong></div></div>
+                  <div className={styles.mobileMeta}><div><span>{tx('Phone Number', 'Nomor Telepon')}</span><strong>{agent.phone_num || '—'}</strong></div><div><span>{tx('Organization', 'Organisasi')}</span><strong>{agent.organization || '—'}</strong></div><div><span>{tx('Region', 'Region')}</span><strong>{agent.region || '—'}</strong></div><div><span>{tx('Lead Email', 'Email Lead')}</span><strong>{agent.lead_email || '—'}</strong></div><div><span>{t('superadmin.agents.thRole')}</span><strong>{agent.role}</strong></div></div>
                   <div className={styles.mobileAction}><Link href={`/superadmin/agents/${encodeURIComponent(agent.email)}`} className={styles.viewButton}><Pencil aria-hidden="true" className="size-4" />{t('superadmin.agents.editTitle')}</Link></div>
                 </article>
               ))}
