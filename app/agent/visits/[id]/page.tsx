@@ -20,6 +20,11 @@ export default function VisitDetailPage() {
   const [row, setRow] = useState<Visit | null>(null)
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
+  const [optionalPhotoUrls, setOptionalPhotoUrls] = useState<{
+    payment: string
+    speedTest: string
+    other: string
+  }>({ payment: '', speedTest: '', other: '' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -51,6 +56,25 @@ export default function VisitDetailPage() {
       )
 
       setPhotoUrls(signedPhotos.filter(Boolean))
+
+      const optionalPaths = {
+        payment: data.payment_photo_url || '',
+        speedTest: data.speed_test_photo_url || '',
+        other: data.other_photo_url || '',
+      }
+      const signedOptionalEntries = await Promise.all(
+        Object.entries(optionalPaths).map(async ([key, path]) => {
+          if (!path) return [key, ''] as const
+          const { data: signed } = await s.storage.from('visit-evidence').createSignedUrl(path, 3600)
+          return [key, signed?.signedUrl || ''] as const
+        })
+      )
+      setOptionalPhotoUrls(Object.fromEntries(signedOptionalEntries) as {
+        payment: string
+        speedTest: string
+        other: string
+      })
+
       setLoading(false)
     })()
   }, [id])
@@ -131,6 +155,28 @@ export default function VisitDetailPage() {
           <div className={styles.noPhoto}><ImageIcon /><strong>{tx('No evidence photo', 'Tidak ada foto bukti')}</strong><span>{tx('No photo was attached to this visit record.', 'Tidak ada foto yang dilampirkan pada catatan kunjungan ini.')}</span></div>
         )}
       </section>
+
+      {(optionalPhotoUrls.payment || optionalPhotoUrls.speedTest || optionalPhotoUrls.other) && (
+        <section className={styles.photoCard}>
+          <div className={styles.cardTitle}><ImageIcon /><div><span>{tx('ADDITIONAL PHOTOS', 'FOTO TAMBAHAN')}</span><h2>{tx('Payment, speed test, and other photos', 'Foto pembayaran, speed test, dan lainnya')}</h2></div></div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              { label: tx('Payment Photo', 'Foto Pembayaran'), url: optionalPhotoUrls.payment },
+              { label: tx('Speed Test Photo', 'Foto Speed Test'), url: optionalPhotoUrls.speedTest },
+              { label: tx('Other Photo', 'Foto Lainnya'), url: optionalPhotoUrls.other },
+            ].map(({ label, url }) => (
+              <div key={label} className="rounded-box border border-base-300 p-3">
+                <div className="mb-2 text-sm font-semibold">{label}</div>
+                {url ? (
+                  <img src={url} alt={label} className={styles.photo} />
+                ) : (
+                  <div className="text-sm text-base-content/50">{tx('Not uploaded', 'Tidak diunggah')}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className={styles.doneCard}><CheckCircle2 /><div><strong>{tx('Visit record saved', 'Catatan kunjungan tersimpan')}</strong><span>{tx('This submitted record is available in your visit history.', 'Catatan yang dikirim ini tersedia di riwayat kunjungan Anda.')}</span></div></section>
     </main>
