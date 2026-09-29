@@ -32,7 +32,7 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const { data: agent } = await supabase.from('agents').select('email, agent_name, sales_code').eq('email', decodedEmail).maybeSingle()
+  const { data: agent } = await supabase.from('agents').select('email, agent_name').eq('email', decodedEmail).maybeSingle()
   if (!agent) return <main className={styles.page}><div className={styles.errorCard}>{tx('Agent not found.', 'Agen tidak ditemukan.')}</div></main>
 
   const startDate = `${date}T00:00:00+07:00`
@@ -97,7 +97,7 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
           { label: dayLabel, icon: CalendarDays },
         ]}
         title={agent.agent_name}
-        description={`${dayLabel} · ${agent.sales_code || decodedEmail}`}
+        description={`${dayLabel} · ${decodedEmail}`}
       />
 
       <section className={styles.hero}>
