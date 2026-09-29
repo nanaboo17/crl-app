@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff, Loader2, LockKeyhole, MapPin, Phone, ClipboardList } from 'lucide-react'
-import { createClient } from '@/lib/supabase-browser'
 
 type Props = {
   customerId: string
@@ -27,12 +26,17 @@ export default function SensitiveCustomerData({ customerId, agentEmail, locale, 
     setUnlocking(true)
     setError('')
     try {
-      const supabase = createClient()
-      const { error } = await supabase.from('customer_data_unlocks').insert({
-        customer_id: customerId,
-        agent_email: agentEmail,
+      const response = await fetch('/api/customer-data-unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customerId }),
       })
-      if (error) throw error
+
+      const result = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(result?.error || tx('Unable to unlock customer data.', 'Tidak dapat membuka data pelanggan.'))
+      }
+
       setUnlocked(true)
     } catch (err: any) {
       setError(err?.message || tx('Unable to unlock customer data.', 'Tidak dapat membuka data pelanggan.'))
