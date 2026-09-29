@@ -32,7 +32,7 @@ export default async function AgentDailyPreVisitsPage({ params }: { params: Prom
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || !['admin', 'superadmin'].includes(currentUser.role)) redirect('/auth/route')
 
-  const { data: agent } = await supabase.from('agents').select('email, agent_name, sales_code').eq('email', decodedEmail).maybeSingle()
+  const { data: agent } = await supabase.from('agents').select('email, agent_name').eq('email', decodedEmail).maybeSingle()
   if (!agent) return <main className={styles.page}><div className={styles.errorCard}>{t('superadmin.preVisits.daily.notFound')}</div></main>
 
   const startDate = `${date}T00:00:00+07:00`
