@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   AlertTriangle,
@@ -465,7 +465,7 @@ export default function VisitPage() {
 
   async function handleOptionalPhoto(
     selectedFile: File | null,
-    setter: React.Dispatch<React.SetStateAction<OptionalVisitPhoto | null>>,
+    setter: Dispatch<SetStateAction<OptionalVisitPhoto | null>>,
     current: OptionalVisitPhoto | null,
   ) {
     if (!selectedFile) return
@@ -487,7 +487,7 @@ export default function VisitPage() {
 
   function clearOptionalPhoto(
     photo: OptionalVisitPhoto | null,
-    setter: React.Dispatch<React.SetStateAction<OptionalVisitPhoto | null>>,
+    setter: Dispatch<SetStateAction<OptionalVisitPhoto | null>>,
   ) {
     if (photo) URL.revokeObjectURL(photo.preview)
     setter(null)
