@@ -6,6 +6,7 @@ import {
   Building2,
   ChevronRight,
   ClipboardList,
+  ExternalLink,
   MapPin,
   RotateCcw,
   Search,
@@ -43,6 +44,7 @@ type AgentRow = {
 }
 
 const PAGE_SIZE = 5
+const COMPLAINT_LOOKUP_URL = 'https://script.google.com/macros/s/AKfycbyabtLgljqwdIpSNMRVGfz7OsuEipiiUw3Rxjb_Cd-5oqR-stNL7j3RfPAtkgSmhnat/exec'
 
 const PRIORITY_STYLES: Record<number, { badge: string; ring: string }> = {
   1: { badge: 'dui-badge-error dui-badge-soft', ring: 'border-error/30' },
@@ -87,6 +89,7 @@ export default function AgentCustomersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [complaintCustomerId, setComplaintCustomerId] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [sort, setSort] = useState('priority')
@@ -231,6 +234,48 @@ export default function AgentCustomersPage() {
             <div className="dui-stat-value">{value}</div>
           </div>
         ))}
+      </section>
+
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-3">
+          <div>
+            <h2 className="text-base font-bold">Search Complaint ID</h2>
+            <p className="mt-1 text-sm text-base-content/60">
+              Enter the Customer ID to open the complaint lookup tool with the customer already filled in.
+            </p>
+          </div>
+          <form
+            className="flex flex-col gap-2 sm:flex-row"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const customerId = complaintCustomerId.trim()
+              if (!customerId) return
+              const url = `${COMPLAINT_LOOKUP_URL}?customer_id=${encodeURIComponent(customerId)}`
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }}
+          >
+            <label className="dui-input flex flex-1 items-center gap-2">
+              <Search className="h-4 w-4 shrink-0 text-base-content/40" aria-hidden="true" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={complaintCustomerId}
+                onChange={(event) => setComplaintCustomerId(event.target.value)}
+                placeholder="Customer ID"
+                aria-label="Customer ID for complaint lookup"
+                className="grow"
+              />
+            </label>
+            <button
+              type="submit"
+              className="dui-btn dui-btn-primary gap-2"
+              disabled={!complaintCustomerId.trim()}
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              Search Complaint ID
+            </button>
+          </form>
+        </div>
       </section>
 
       <section
