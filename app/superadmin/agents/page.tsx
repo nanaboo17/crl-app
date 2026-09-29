@@ -24,9 +24,8 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
 
   const { data: organizationRows } = await supabase
     .from('agents')
-    .select('organization, region, lead_email')
-    .not('organization', 'is', null)
-    .order('organization')
+    .select('email, agent_name, organization, region, lead_email')
+    .order('agent_name')
 
   const organizations = Array.from(new Set(
     (organizationRows ?? [])
@@ -43,6 +42,19 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
       .map((row) => (row.lead_email || '').trim())
       .filter(Boolean)
   ))
+
+  const leadNameByEmail = new Map(
+    (organizationRows ?? [])
+      .filter((row) => row.email)
+      .map((row) => [row.email.trim().toLowerCase(), row.agent_name?.trim() || row.email.trim()])
+  )
+
+  const leadOptions = leadEmails
+    .map((email) => ({
+      email,
+      name: leadNameByEmail.get(email.toLowerCase()) || email,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   let agentsQuery = supabase
     .from('agents')
@@ -132,10 +144,10 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
           </select>
         </label>
         <label className="grid gap-1 text-sm font-semibold">
-          <span>{tx('Lead Email', 'Email Lead')}</span>
+          <span>{tx('Lead', 'Lead')}</span>
           <select name="lead_email" defaultValue={selectedLeadEmail} className="dui-select dui-select-bordered w-full">
             <option value="">{tx('All leads', 'Semua lead')}</option>
-            {leadEmails.map((leadEmail) => <option key={leadEmail} value={leadEmail}>{leadEmail}</option>)}
+            {leadOptions.map((lead) => <option key={lead.email} value={lead.email}>{lead.name}</option>)}
           </select>
         </label>
         <button type="submit" className="dui-btn dui-btn-primary">{tx('Apply filter', 'Terapkan filter')}</button>
