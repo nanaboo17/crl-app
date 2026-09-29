@@ -69,7 +69,6 @@ export default function NewAgentPage() {
       const { error } = await supabase.rpc('superadmin_create_agent', {
         p_email: cleanEmail,
         p_agent_name: name.trim(),
-        p_sales_code: null,
         p_organization: organization.trim() || null,
         p_role: role,
         p_active: active,
