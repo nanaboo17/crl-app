@@ -54,7 +54,6 @@ export default function AdminVisitsPage() {
           .select(`
             email,
             agent_name,
-            sales_code,
             active
           `)
           .eq('role', 'agent')
@@ -119,9 +118,6 @@ export default function AdminVisitsPage() {
           ?.toLowerCase()
           .includes(q) ||
         agent.email
-          ?.toLowerCase()
-          .includes(q) ||
-        agent.sales_code
           ?.toLowerCase()
           .includes(q)
 
@@ -228,11 +224,6 @@ export default function AdminVisitsPage() {
           >
             <div>
               <h2>{agent.agent_name}</h2>
-
-              <p>
-                {agent.sales_code || '-'}
-              </p>
-
               <small>
                 {agent.email}
               </small>
