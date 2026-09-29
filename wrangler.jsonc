@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "crl-app",
+  "name": "crl-staging",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-28",
   "compatibility_flags": [
@@ -19,13 +19,4 @@
   },
   "observability": {
     "enabled": true
-  },
-  "env": {
-    "staging": {
-      "workers_dev": true,
-      "vars": {
-        "APP_ENV": "staging"
-      }
-    }
-  }
-}
+  }}
