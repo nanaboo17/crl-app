@@ -38,7 +38,7 @@ export default async function SuperadminVisitDetailPage({
 
   const { data: agent } = await supabase
     .from('agents')
-    .select('email, agent_name, sales_code')
+    .select('email, agent_name')
     .eq('email', decodedEmail)
     .maybeSingle()
 
@@ -153,7 +153,6 @@ export default async function SuperadminVisitDetailPage({
           <SectionTitle>{t('superadmin.visits.detail.agentSection')}</SectionTitle>
           <div className={styles.grid}>
             <Detail label={t('superadmin.visits.detail.agentName')} value={agent?.agent_name} />
-            <Detail label={t('superadmin.visits.detail.salesCode')} value={agent?.sales_code} />
             <Detail label={t('superadmin.visits.detail.agentEmail')} value={decodedEmail} full />
           </div>
         </div>
