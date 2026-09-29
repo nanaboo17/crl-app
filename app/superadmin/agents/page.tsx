@@ -15,6 +15,8 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
   const selectedOrganization = typeof params.organization === 'string' ? params.organization.trim() : ''
+  const selectedRegion = typeof params.region === 'string' ? params.region.trim() : ''
+  const selectedLeadEmail = typeof params.lead_email === 'string' ? params.lead_email.trim() : ''
   const locale = await getLocale()
   const t = (key: string, values?: Record<string, string | number>) => translate(locale, allMessages, key, values)
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
@@ -22,7 +24,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
 
   const { data: organizationRows } = await supabase
     .from('agents')
-    .select('organization')
+    .select('organization, region, lead_email')
     .not('organization', 'is', null)
     .order('organization')
 
@@ -31,13 +33,25 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
       .map((row) => (row.organization || '').trim())
       .filter(Boolean)
   ))
+  const regions = Array.from(new Set(
+    (organizationRows ?? [])
+      .map((row) => (row.region || '').trim())
+      .filter(Boolean)
+  ))
+  const leadEmails = Array.from(new Set(
+    (organizationRows ?? [])
+      .map((row) => (row.lead_email || '').trim())
+      .filter(Boolean)
+  ))
 
   let agentsQuery = supabase
     .from('agents')
-    .select('email, agent_name, sales_code, role, active, organization', { count: 'exact' })
+    .select('email, agent_name, role, active, organization, region, lead_email', { count: 'exact' })
     .order('agent_name')
 
   if (selectedOrganization) agentsQuery = agentsQuery.eq('organization', selectedOrganization)
+  if (selectedRegion) agentsQuery = agentsQuery.eq('region', selectedRegion)
+  if (selectedLeadEmail) agentsQuery = agentsQuery.eq('lead_email', selectedLeadEmail)
 
   const { data: agents, error, count } = await agentsQuery
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
@@ -57,6 +71,8 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
     .select('*', { count: 'exact', head: true })
     .eq('active', true)
   if (selectedOrganization) activeQuery = activeQuery.eq('organization', selectedOrganization)
+  if (selectedRegion) activeQuery = activeQuery.eq('region', selectedRegion)
+  if (selectedLeadEmail) activeQuery = activeQuery.eq('lead_email', selectedLeadEmail)
   const { count: activeCount } = await activeQuery
 
   let fieldAgentQuery = supabase
@@ -65,13 +81,18 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
     .eq('active', true)
     .eq('role', 'agent')
   if (selectedOrganization) fieldAgentQuery = fieldAgentQuery.eq('organization', selectedOrganization)
+  if (selectedRegion) fieldAgentQuery = fieldAgentQuery.eq('region', selectedRegion)
+  if (selectedLeadEmail) fieldAgentQuery = fieldAgentQuery.eq('lead_email', selectedLeadEmail)
   const { count: fieldAgentCount } = await fieldAgentQuery
 
   const total = count ?? 0
   const inactiveCount = Math.max(total - (activeCount ?? 0), 0)
-  const paginationBasePath = selectedOrganization
-    ? `/superadmin/agents?organization=${encodeURIComponent(selectedOrganization)}`
-    : '/superadmin/agents'
+  const filterParams = new URLSearchParams()
+  if (selectedOrganization) filterParams.set('organization', selectedOrganization)
+  if (selectedRegion) filterParams.set('region', selectedRegion)
+  if (selectedLeadEmail) filterParams.set('lead_email', selectedLeadEmail)
+  const filterQuery = filterParams.toString()
+  const paginationBasePath = filterQuery ? `/superadmin/agents?${filterQuery}` : '/superadmin/agents'
 
   return (
     <div className={styles.page}>
@@ -95,16 +116,30 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
         </div>
       </section>
 
-      <form method="get" className="flex flex-col gap-2 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:flex-row sm:items-end">
-        <label className="grid flex-1 gap-1 text-sm font-semibold">
+      <form method="get" className="grid gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto_auto] lg:items-end">
+        <label className="grid gap-1 text-sm font-semibold">
           <span>{tx('Organization', 'Organisasi')}</span>
           <select name="organization" defaultValue={selectedOrganization} className="dui-select dui-select-bordered w-full">
             <option value="">{tx('All organizations', 'Semua organisasi')}</option>
             {organizations.map((organization) => <option key={organization} value={organization}>{organization}</option>)}
           </select>
         </label>
+        <label className="grid gap-1 text-sm font-semibold">
+          <span>{tx('Region', 'Region')}</span>
+          <select name="region" defaultValue={selectedRegion} className="dui-select dui-select-bordered w-full">
+            <option value="">{tx('All regions', 'Semua region')}</option>
+            {regions.map((region) => <option key={region} value={region}>{region}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-semibold">
+          <span>{tx('Lead Email', 'Email Lead')}</span>
+          <select name="lead_email" defaultValue={selectedLeadEmail} className="dui-select dui-select-bordered w-full">
+            <option value="">{tx('All leads', 'Semua lead')}</option>
+            {leadEmails.map((leadEmail) => <option key={leadEmail} value={leadEmail}>{leadEmail}</option>)}
+          </select>
+        </label>
         <button type="submit" className="dui-btn dui-btn-primary">{tx('Apply filter', 'Terapkan filter')}</button>
-        {selectedOrganization ? <Link href="/superadmin/agents" className="dui-btn dui-btn-ghost">{tx('Clear', 'Hapus')}</Link> : null}
+        {filterQuery ? <Link href="/superadmin/agents" className="dui-btn dui-btn-ghost">{tx('Clear', 'Hapus')}</Link> : null}
       </form>
 
       <section className={styles.statsGrid} aria-label={tx('Agent summary', 'Ringkasan agen')}>
@@ -150,7 +185,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
             <div className={styles.tableCard}>
               <div className={styles.tableScroll}>
                 <table className={styles.table}>
-                  <thead><tr><th>{t('superadmin.agents.thAgent')}</th><th>{tx('Organization', 'Organisasi')}</th><th>{t('superadmin.agents.thSalesCode')}</th><th>{t('superadmin.agents.thRole')}</th><th>{t('superadmin.agents.thStatus')}</th><th aria-label={t('superadmin.agents.thActions')} /></tr></thead>
+                  <thead><tr><th>{t('superadmin.agents.thAgent')}</th><th>{tx('Organization', 'Organisasi')}</th><th>{tx('Region', 'Region')}</th><th>{tx('Lead Email', 'Email Lead')}</th><th>{t('superadmin.agents.thRole')}</th><th>{t('superadmin.agents.thStatus')}</th><th aria-label={t('superadmin.agents.thActions')} /></tr></thead>
                   <tbody>
                     {agents.map((agent, index) => (
                       <tr key={agent.email}>
@@ -161,7 +196,8 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
                           </Link>
                         </td>
                         <td>{agent.organization || '—'}</td>
-                        <td className={styles.code}>{agent.sales_code || '—'}</td>
+                        <td>{agent.region || '—'}</td>
+                        <td>{agent.lead_email || '—'}</td>
                         <td><span className={styles.roleBadge}>{agent.role}</span></td>
                         <td><span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span></td>
                         <td className={styles.actions}><Link href={`/superadmin/agents/${encodeURIComponent(agent.email)}`} aria-label={t('superadmin.agents.editAria', { name: agent.agent_name || agent.email })} title={t('superadmin.agents.editTitle')} className={styles.editButton}><Pencil aria-hidden="true" className="size-4" /></Link></td>
@@ -182,7 +218,7 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
                     </div>
                     <span className={`${styles.badge} ${agent.active ? styles.active : styles.inactive}`}>{agent.active ? t('superadmin.status.active') : t('superadmin.status.inactive')}</span>
                   </div>
-                  <div className={styles.mobileMeta}><div><span>{tx('Organization', 'Organisasi')}</span><strong>{agent.organization || '—'}</strong></div><div><span>{t('superadmin.agents.thSalesCode')}</span><strong>{agent.sales_code || '—'}</strong></div><div><span>{t('superadmin.agents.thRole')}</span><strong>{agent.role}</strong></div></div>
+                  <div className={styles.mobileMeta}><div><span>{tx('Organization', 'Organisasi')}</span><strong>{agent.organization || '—'}</strong></div><div><span>{tx('Region', 'Region')}</span><strong>{agent.region || '—'}</strong></div><div><span>{tx('Lead Email', 'Email Lead')}</span><strong>{agent.lead_email || '—'}</strong></div><div><span>{t('superadmin.agents.thRole')}</span><strong>{agent.role}</strong></div></div>
                   <div className={styles.mobileAction}><Link href={`/superadmin/agents/${encodeURIComponent(agent.email)}`} className={styles.viewButton}><Pencil aria-hidden="true" className="size-4" />{t('superadmin.agents.editTitle')}</Link></div>
                 </article>
               ))}
