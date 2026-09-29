@@ -47,7 +47,7 @@ export default function LoginPage() {
       <aside className="auth-context" aria-label={t('auth.shell.ariaLabel')}>
         <div className="auth-brand">
           <Image
-            src="/logo/logo2.png"
+            src="/assets/card-icon.jpg"
             alt={t('auth.logo.alt')}
             width={66}
             height={44}
