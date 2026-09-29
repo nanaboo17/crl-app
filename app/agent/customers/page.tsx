@@ -38,7 +38,6 @@ type CustomerRow = {
 
 type AgentRow = {
   agent_name: string
-  sales_code: string | null
   role: AppRole
   active: boolean
 }
@@ -108,7 +107,7 @@ export default function AgentCustomersPage() {
       const email = user.email.trim().toLowerCase()
       const { data: agentData, error: agentError } = await supabase
         .from('agents')
-        .select('agent_name, sales_code, role, active')
+        .select('agent_name, role, active')
         .eq('email', email)
         .maybeSingle()
 
@@ -208,9 +207,6 @@ export default function AgentCustomersPage() {
           agent
             ? t('agent.customers.descriptionWithName', {
                 name: agent.agent_name,
-                code: agent.sales_code
-                  ? `${t('agent.customers.codeSep')}${agent.sales_code}`
-                  : '',
               })
             : t('agent.customers.description')
         }
