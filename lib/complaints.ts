@@ -25,17 +25,19 @@ export async function getComplaintTickets(billingIds: string[]): Promise<Complai
 
   if (ids.length === 0) return []
 
-  const url = new URL(process.env.COMPLAINT_API_URL || DEFAULT_COMPLAINT_API_URL)
-  url.searchParams.set('api', 'tickets')
-  url.searchParams.set('billingIds', ids.join(','))
+  const url = process.env.COMPLAINT_API_URL || DEFAULT_COMPLAINT_API_URL
+  const apiKey = process.env.COMPLAINT_API_KEY?.trim() || ''
 
-  const apiKey = process.env.COMPLAINT_API_KEY?.trim()
-  if (apiKey) url.searchParams.set('key', apiKey)
-
-  const response = await fetch(url.toString(), {
-    method: 'GET',
+  const response = await fetch(url, {
+    method: 'POST',
     cache: 'no-store',
     redirect: 'follow',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      api: 'tickets',
+      billingIds: ids,
+      key: apiKey,
+    }),
   })
 
   if (!response.ok) {
