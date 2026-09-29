@@ -69,7 +69,6 @@ export default function AgentPreVisitDaysPage() {
         .select(`
           email,
           agent_name,
-          sales_code
         `)
         .eq('email', decodedEmail)
         .maybeSingle()
@@ -275,8 +274,7 @@ export default function AgentPreVisitDaysPage() {
           </h1>
 
           <p>
-            {agent.sales_code ||
-              '-'}{' '}
+{' '}
             · {agent.email}
           </p>
         </div>
