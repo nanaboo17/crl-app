@@ -55,7 +55,6 @@ export default async function AdminVisitDetailPage({
     .select(`
       email,
       agent_name,
-      sales_code
     `)
     .eq('email', decodedEmail)
     .maybeSingle()
@@ -192,11 +191,6 @@ export default async function AdminVisitDetailPage({
           <Detail
             label={t('admin.visitDetail.agentName')}
             value={agent?.agent_name}
-          />
-
-          <Detail
-            label={t('admin.visitDetail.salesCode')}
-            value={agent?.sales_code}
           />
 
           <Detail
