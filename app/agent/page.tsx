@@ -13,6 +13,7 @@ import {
   Sparkles,
   Target,
   Trophy,
+  TicketCheck,
   UserRound,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
@@ -20,6 +21,7 @@ import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { getLocale } from '@/lib/i18n/server'
 import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
+import { getComplaintTickets } from '@/lib/complaints'
 import styles from './page.module.css'
 
 const LEVEL_XP = 250
@@ -70,7 +72,7 @@ export default async function AgentPage() {
   if (!agent.active) return <div className={styles.page}><div className="dui-alert dui-alert-error">{t('agent.dashboard.accountInactive')}</div></div>
   if (agent.role !== 'agent') redirect('/auth/route')
 
-  const [customersResult, preVisitsResult, visitsResult, customersList, followupsResult, visitDetailsResult, attendanceResult] = await Promise.all([
+  const [customersResult, preVisitsResult, visitsResult, customersList, followupsResult, visitDetailsResult, attendanceResult, complaintCustomersResult] = await Promise.all([
     supabase.from('customers').select('*', { count: 'exact', head: true }).eq('agent_email', email).eq('actionable', true),
     supabase.from('pre_visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
     supabase.from('visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
@@ -78,7 +80,20 @@ export default async function AgentPage() {
     supabase.from('customer_followups').select('followup_id,customer_id,due_at,note,status').eq('agent_email', email).eq('status', 'pending').order('due_at', { ascending: true }).limit(5),
     supabase.from('visits').select('visit_id,visit_date,location_match,visit_photo_url,consent_given,conversation_result,updated_phone').eq('agent_email', email).order('visit_date', { ascending: false }),
     supabase.from('agent_attendance').select('attendance_date,check_in_status,check_in_at,check_out_at,worked_minutes').eq('agent_email', email).order('attendance_date', { ascending: false }),
+    supabase.from('customers').select('customer_id,customer_name').eq('agent_email', email),
   ])
+
+  let complaintTickets: Awaited<ReturnType<typeof getComplaintTickets>> = []
+  let complaintLoadError = ''
+  try {
+    complaintTickets = await getComplaintTickets((complaintCustomersResult.data || []).map((row: any) => row.customer_id))
+  } catch (complaintError) {
+    complaintLoadError = complaintError instanceof Error ? complaintError.message : String(complaintError)
+  }
+
+  const complaintCustomerMap = new Map(
+    (complaintCustomersResult.data || []).map((row: any) => [String(row.customer_id), row.customer_name || ''])
+  )
 
   const firstName = agent.agent_name?.trim().split(/\s+/)[0] ?? 'Agent'
   const stats = [
@@ -86,6 +101,7 @@ export default async function AgentPage() {
     { href: '/agent/route', label: t('agent.dashboard.statRoute'), count: (customersList.data || []).filter((c: any) => (c.visit_status ?? '').toLowerCase() !== 'visited').length, icon: Route },
     { href: '/agent/pre-visits', label: t('agent.dashboard.statPreVisits'), count: preVisitsResult.count ?? 0, icon: ClipboardList },
     { href: '/agent/visits', label: t('agent.dashboard.statVisits'), count: visitsResult.count ?? 0, icon: MapPin },
+    { href: '/agent/complaints', label: tx('Complaint Tickets', 'Tiket Keluhan'), count: complaintTickets.length, icon: TicketCheck },
   ]
 
   const allVisits = visitDetailsResult.data ?? []
@@ -237,6 +253,35 @@ export default async function AgentPage() {
             <div className={styles.statFooter}>{t('agent.dashboard.manage', { name: label.toLowerCase() })}</div>
           </Link>
         ))}
+      </section>
+
+      <section className={styles.panel} aria-label={tx('Complaint tickets', 'Tiket keluhan')}>
+        <div className={styles.panelHeader}>
+          <div>
+            <h2>{tx('Complaint Tickets', 'Tiket Keluhan')}</h2>
+            <p>{tx('Tickets matched to your assigned customers by Billing ID (BA).', 'Tiket yang cocok dengan pelanggan yang ditugaskan berdasarkan Billing ID (BA).')}</p>
+          </div>
+          <Link href="/agent/complaints">{tx('View all', 'Lihat semua')}</Link>
+        </div>
+        {complaintLoadError ? (
+          <div className={styles.empty}>{tx('Complaint data is temporarily unavailable.', 'Data keluhan sementara tidak tersedia.')}</div>
+        ) : complaintTickets.length === 0 ? (
+          <div className={styles.empty}>{tx('No complaint tickets for your assigned customers.', 'Tidak ada tiket keluhan untuk pelanggan yang ditugaskan.')}</div>
+        ) : (
+          <div className={styles.followupList}>
+            {complaintTickets.slice(0, 5).map((ticket: any, index: number) => (
+              <Link
+                key={`${ticket.billingId}-${ticket.ticketNumber}-${ticket.no}-${index}`}
+                href={`/agent/complaints#ticket-${encodeURIComponent(ticket.billingId)}-${index}`}
+                className={styles.followupItem}
+              >
+                <strong>{complaintCustomerMap.get(ticket.billingId) || ticket.custName || ticket.billingId}</strong>
+                <span>{ticket.ticketNumber || tx('No ticket number', 'Belum ada nomor tiket')} · {ticket.status || tx('No status', 'Belum ada status')}</span>
+                <span>{ticket.billingId}{ticket.issueType ? ` · ${ticket.issueType}` : ''}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className={styles.sectionGrid}>
