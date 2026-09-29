@@ -119,7 +119,7 @@ export default function VisitPage() {
 
       const { data: agentData } = await supabase
         .from('agents')
-        .select('email, agent_name, sales_code, role, active')
+        .select('email, agent_name, role, active')
         .eq('email', email)
         .maybeSingle()
       if (!agentData || !agentData.active || agentData.role !== 'agent') return router.replace('/auth/route')
@@ -529,7 +529,6 @@ export default function VisitPage() {
     const { error: visitError } = await supabase.from('visits').insert({
       customer_id: customerId,
       agent_email: agent.email,
-      sales_code: agent.sales_code,
       visit_result: conversationResult,
       customer_phone: customer.phone_number,
       updated_phone: correctedPhone,
