@@ -10,7 +10,7 @@ export async function getCurrentProfile(): Promise<Agent> {
 
   const { data, error } = await supabase
     .from('agents')
-    .select('email,agent_name,sales_code,role,active')
+    .select('email,agent_name,role,active')
     .eq('email', user.email)
     .eq('active', true)
     .single()
