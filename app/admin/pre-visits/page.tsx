@@ -41,7 +41,6 @@ export default async function AdminPreVisitsPage() {
     .select(`
       email,
       agent_name,
-      sales_code,
       active
     `)
     .eq('role', 'agent')
@@ -113,11 +112,6 @@ export default async function AdminPreVisitsPage() {
           >
             <div>
               <h2>{agent.agent_name}</h2>
-
-              <p>
-                {agent.sales_code || '-'}
-              </p>
-
               <small>
                 {agent.email}
               </small>
