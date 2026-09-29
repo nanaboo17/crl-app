@@ -25,6 +25,13 @@ const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
 const MAX_PHOTO_DIMENSION = 1600
 const MAX_VISIT_PHOTOS = 5
 
+type OptionalVisitPhoto = {
+  file: File
+  stamped: Blob
+  preview: string
+  capturedAt: string
+}
+
 function normalizePhone(value: string | null | undefined) {
   return (value ?? '').replace(/[^0-9]/g, '')
 }
@@ -75,6 +82,9 @@ export default function VisitPage() {
     preview: string
     capturedAt: string
   }>>([])
+  const [paymentPhoto, setPaymentPhoto] = useState<OptionalVisitPhoto | null>(null)
+  const [speedTestPhoto, setSpeedTestPhoto] = useState<OptionalVisitPhoto | null>(null)
+  const [otherPhoto, setOtherPhoto] = useState<OptionalVisitPhoto | null>(null)
   const [consentGiven, setConsentGiven] = useState(false)
   const [loading, setLoading] = useState(true)
   const [gettingGps, setGettingGps] = useState(false)
@@ -453,6 +463,36 @@ export default function VisitPage() {
     })
   }
 
+  async function handleOptionalPhoto(
+    selectedFile: File | null,
+    setter: React.Dispatch<React.SetStateAction<OptionalVisitPhoto | null>>,
+    current: OptionalVisitPhoto | null,
+  ) {
+    if (!selectedFile) return
+    if (latitude === null || longitude === null || !gpsCapturedAt) {
+      setError(t('agent.visit.err.gpsFirstPhoto'))
+      return
+    }
+    setError('')
+    try {
+      const capturedAt = new Date().toISOString()
+      const stamped = await stampImage(selectedFile, capturedAt)
+      const preview = URL.createObjectURL(stamped)
+      if (current) URL.revokeObjectURL(current.preview)
+      setter({ file: selectedFile, stamped, preview, capturedAt })
+    } catch (err: any) {
+      setError(err?.message || t('agent.visit.err.cannotProcess'))
+    }
+  }
+
+  function clearOptionalPhoto(
+    photo: OptionalVisitPhoto | null,
+    setter: React.Dispatch<React.SetStateAction<OptionalVisitPhoto | null>>,
+  ) {
+    if (photo) URL.revokeObjectURL(photo.preview)
+    setter(null)
+  }
+
   async function captureFromCamera() {
     const video = videoRef.current
     if (!video || !video.videoWidth || !video.videoHeight) {
@@ -506,6 +546,7 @@ export default function VisitPage() {
     const safeCustomerId = customerId.replace(/[^a-zA-Z0-9_-]/g, '_')
     const uploadBatchId = Date.now()
     const uploadedPaths: string[] = []
+    const optionalUploadedPaths: string[] = []
 
     for (let index = 0; index < photos.length; index++) {
       const item = photos[index]
@@ -526,6 +567,32 @@ export default function VisitPage() {
       uploadedPaths.push(filePath)
     }
 
+    async function uploadOptionalPhoto(photo: OptionalVisitPhoto | null, suffix: string) {
+      if (!photo) return null
+      const filePath = `${agent.email}/${safeCustomerId}/${uploadBatchId}-${suffix}-stamped.jpg`
+      const { error: uploadError } = await supabase.storage.from('visit-evidence').upload(filePath, photo.stamped, {
+        contentType: 'image/jpeg', cacheControl: '3600', upsert: false,
+      })
+      if (uploadError) throw uploadError
+      optionalUploadedPaths.push(filePath)
+      return filePath
+    }
+
+    let paymentPhotoUrl: string | null = null
+    let speedTestPhotoUrl: string | null = null
+    let otherPhotoUrl: string | null = null
+
+    try {
+      paymentPhotoUrl = await uploadOptionalPhoto(paymentPhoto, 'payment')
+      speedTestPhotoUrl = await uploadOptionalPhoto(speedTestPhoto, 'speed-test')
+      otherPhotoUrl = await uploadOptionalPhoto(otherPhoto, 'other')
+    } catch (optionalUploadError: any) {
+      await supabase.storage.from('visit-evidence').remove([...uploadedPaths, ...optionalUploadedPaths])
+      setError(t('agent.visit.err.uploadFailed', { message: optionalUploadError?.message || 'Optional photo upload failed' }))
+      setSaving(false)
+      return
+    }
+
     const { error: visitError } = await supabase.from('visits').insert({
       customer_id: customerId,
       agent_email: agent.email,
@@ -541,6 +608,9 @@ export default function VisitPage() {
       location_match: locationMatch,
       visit_photo_url: uploadedPaths[0] ?? null,
       visit_photo_urls: uploadedPaths,
+      payment_photo_url: paymentPhotoUrl,
+      speed_test_photo_url: speedTestPhotoUrl,
+      other_photo_url: otherPhotoUrl,
       consent_given: consentGiven,
       visit_status_kunjungan: visitStatusKunjungan,
       conversation_result: conversationResult,
@@ -553,7 +623,7 @@ export default function VisitPage() {
       additional_notes: additionalNotes.trim() || null,
     })
     if (visitError) {
-      await supabase.storage.from('visit-evidence').remove(uploadedPaths)
+      await supabase.storage.from('visit-evidence').remove([...uploadedPaths, ...optionalUploadedPaths])
       setError(visitError.message)
       setSaving(false)
       return
@@ -689,6 +759,78 @@ export default function VisitPage() {
               : `${photos.length}/${MAX_VISIT_PHOTOS} photos selected. Minimum 1, maximum 5 photos.`}
           </div>
         )}
+
+        <div className="divider my-1" />
+        <div>
+          <div className="font-bold">{locale === 'id' ? 'Foto tambahan (opsional)' : 'Additional photos (optional)'}</div>
+          <p className="mt-1 text-xs text-base-content/60">
+            {locale === 'id'
+              ? 'Unggah foto pembayaran, hasil speed test, atau foto lain bila tersedia.'
+              : 'Upload payment, speed test, or other photos when available.'}
+          </p>
+        </div>
+
+        {[
+          {
+            key: 'payment',
+            label: locale === 'id' ? 'Foto Pembayaran' : 'Payment Photo',
+            photo: paymentPhoto,
+            setter: setPaymentPhoto,
+          },
+          {
+            key: 'speed-test',
+            label: locale === 'id' ? 'Foto Speed Test' : 'Speed Test Photo',
+            photo: speedTestPhoto,
+            setter: setSpeedTestPhoto,
+          },
+          {
+            key: 'other',
+            label: locale === 'id' ? 'Foto Lainnya' : 'Other Photo',
+            photo: otherPhoto,
+            setter: setOtherPhoto,
+          },
+        ].map(({ key, label, photo, setter }) => (
+          <div key={key} className="rounded-box border border-base-300 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">{label}</span>
+              <span className="dui-badge dui-badge-ghost dui-badge-sm">{locale === 'id' ? 'Opsional' : 'Optional'}</span>
+            </div>
+            {photo ? (
+              <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+                <div className={styles.photoFrame}><img src={photo.preview} alt={label} /></div>
+                <div className="flex flex-col justify-center gap-2">
+                  <div className="text-xs text-base-content/60">
+                    {locale === 'id' ? 'Foto dipilih' : 'Photo selected'}: {formatVisitTimestamp(photo.capturedAt)}
+                  </div>
+                  <button
+                    type="button"
+                    className="dui-btn dui-btn-error dui-btn-sm w-fit"
+                    onClick={() => clearOptionalPhoto(photo, setter)}
+                    disabled={saving}
+                  >
+                    {locale === 'id' ? 'Hapus foto' : 'Remove photo'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className={`dui-btn dui-btn-outline w-full cursor-pointer ${!gpsCaptured ? 'dui-btn-disabled' : ''}`}>
+                <Camera className="h-5 w-5" />
+                {locale === 'id' ? 'Pilih Foto' : 'Choose Photo'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={!gpsCaptured || saving}
+                  onChange={(e) => {
+                    void handleOptionalPhoto(e.target.files?.[0] || null, setter, photo)
+                    e.currentTarget.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+        ))}
+
         <label className="flex cursor-pointer items-start gap-3 rounded-box bg-base-200/60 p-3"><input type="checkbox" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} className="dui-checkbox dui-checkbox-primary mt-0.5 shrink-0" /><span className="min-w-0 text-sm leading-relaxed">{t('agent.visit.consentLabel')}</span></label>
       </StepCard>
 
