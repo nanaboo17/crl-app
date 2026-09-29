@@ -68,7 +68,7 @@ export default function AgentPreVisitDaysPage() {
         .from('agents')
         .select(`
           email,
-          agent_name,
+          agent_name
         `)
         .eq('email', decodedEmail)
         .maybeSingle()
