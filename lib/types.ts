@@ -54,6 +54,9 @@ export type Visit = {
   gps_captured_at: string | null
   visit_photo_url: string | null
   visit_photo_urls?: string[] | null
+  payment_photo_url?: string | null
+  speed_test_photo_url?: string | null
+  other_photo_url?: string | null
   consent_given: boolean
   visit_result: string | null
   visit_summary: string | null
