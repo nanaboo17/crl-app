@@ -87,7 +87,7 @@ export default async function AgentComplaintsPage() {
             const customerName = customerMap.get(ticket.billingId) || ticket.custName || 'Customer'
             const trackUrl = `${COMPLAINT_WEB_URL}?billingId=${encodeURIComponent(ticket.billingId)}`
             return (
-              <article key={`${ticket.billingId}-${ticket.ticketNumber}-${ticket.no}-${index}`} className="rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
+              <article id={`ticket-${ticket.billingId}-${index}`} key={`${ticket.billingId}-${ticket.ticketNumber}-${ticket.no}-${index}`} className="scroll-mt-24 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
