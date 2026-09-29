@@ -241,7 +241,7 @@ export default function AgentCustomersPage() {
           <div>
             <h2 className="text-base font-bold">Search Complaint ID</h2>
             <p className="mt-1 text-sm text-base-content/60">
-              Enter the Customer ID to open the complaint lookup tool with the customer already filled in.
+              Enter the Billing ID to open the complaint lookup tool with the billing ID already filled in.
             </p>
           </div>
           <form
@@ -250,7 +250,7 @@ export default function AgentCustomersPage() {
               event.preventDefault()
               const customerId = complaintCustomerId.trim()
               if (!customerId) return
-              const url = `${COMPLAINT_LOOKUP_URL}?customer_id=${encodeURIComponent(customerId)}`
+              const url = `${COMPLAINT_LOOKUP_URL}?billingId=${encodeURIComponent(customerId)}`
               window.open(url, '_blank', 'noopener,noreferrer')
             }}
           >
@@ -261,8 +261,8 @@ export default function AgentCustomersPage() {
                 inputMode="numeric"
                 value={complaintCustomerId}
                 onChange={(event) => setComplaintCustomerId(event.target.value)}
-                placeholder="Customer ID"
-                aria-label="Customer ID for complaint lookup"
+                placeholder="Billing ID"
+                aria-label="Billing ID for complaint lookup"
                 className="grow"
               />
             </label>
