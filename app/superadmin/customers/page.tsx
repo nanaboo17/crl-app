@@ -100,23 +100,56 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     return `/superadmin/customers?${query.toString()}`
   }
 
+  const loadFilterOptions = async () => {
+    const rows: { region: string | null; lead_email: string | null }[] = []
+    const chunkSize = 1000
+
+    for (let from = 0; ; from += chunkSize) {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('region, lead_email')
+        .order('customer_id')
+        .range(from, from + chunkSize - 1)
+
+      if (error) throw error
+
+      const chunk = data ?? []
+      rows.push(...chunk)
+
+      if (chunk.length < chunkSize) break
+    }
+
+    const regions = Array.from(new Set(
+      rows
+        .map((item) => item.region?.trim())
+        .filter((value): value is string => Boolean(value))
+    )).sort((a, b) => a.localeCompare(b))
+
+    const leadEmails = Array.from(new Set(
+      rows
+        .map((item) => item.lead_email?.trim())
+        .filter((value): value is string => Boolean(value))
+    )).sort((a, b) => a.localeCompare(b))
+
+    return { regions, leadEmails }
+  }
+
   const loadPage = async (page: number): Promise<CustomerCache> => {
     const filteredCountQuery = applyFilters(
       supabase.from('customers').select('customer_id', { count: 'exact', head: true })
     )
 
-    const [totalResult, assignedResult, visitedResult, paidResult, unassignedResult, filteredResult, regionResult, leadResult] = await Promise.all([
+    const [totalResult, assignedResult, visitedResult, paidResult, unassignedResult, filteredResult, filterOptions] = await Promise.all([
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).not('agent_email', 'is', null),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).or('customer_status.ilike.%visited%,visit_status.ilike.visited'),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).or('payment_status.eq.paid,customer_status.ilike.paid'),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).is('agent_email', null),
       filteredCountQuery,
-      supabase.from('customers').select('region').not('region', 'is', null).order('region'),
-      supabase.from('customers').select('lead_email').not('lead_email', 'is', null).order('lead_email'),
+      loadFilterOptions(),
     ])
 
-    const countError = totalResult.error || assignedResult.error || visitedResult.error || paidResult.error || unassignedResult.error || filteredResult.error || regionResult.error || leadResult.error
+    const countError = totalResult.error || assignedResult.error || visitedResult.error || paidResult.error || unassignedResult.error || filteredResult.error
     if (countError) throw countError
 
     const baseDataQuery = supabase
@@ -127,9 +160,6 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
     if (dataResult.error) throw dataResult.error
 
-    const regions = Array.from(new Set((regionResult.data ?? []).map((item) => item.region?.trim()).filter((value): value is string => Boolean(value))))
-    const leadEmails = Array.from(new Set((leadResult.data ?? []).map((item) => item.lead_email?.trim()).filter((value): value is string => Boolean(value))))
-
     return {
       totalAll: totalResult.count ?? 0,
       assigned: assignedResult.count ?? 0,
@@ -138,8 +168,8 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
       unassigned: unassignedResult.count ?? 0,
       filteredTotal: filteredResult.count ?? 0,
       customers: dataResult.data ?? [],
-      regions,
-      leadEmails,
+      regions: filterOptions.regions,
+      leadEmails: filterOptions.leadEmails,
     }
   }
 
@@ -148,7 +178,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     const cacheRegion = encodeURIComponent(region.toLowerCase())
     const cacheLead = encodeURIComponent(leadEmail.toLowerCase())
     const cacheSearch = encodeURIComponent(safeSearch.toLowerCase())
-    payload = await cacheGetOrSet(`crl:superadmin:customers:v5:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
+    payload = await cacheGetOrSet(`crl:superadmin:customers:v6:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
   } catch (error) {
     console.error('superadmin/customers:', error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} /></div>
