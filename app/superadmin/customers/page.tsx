@@ -41,6 +41,7 @@ type CustomerCache = {
   filteredTotal: number
   customers: CustomerRow[]
   regions: string[]
+  leadEmails: string[]
 }
 
 export default async function ManageCustomersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -49,6 +50,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const requestedStatus = typeof params.status === 'string' ? params.status.toLowerCase() : 'all'
   const status: StatusFilter = STATUS_FILTERS.includes(requestedStatus as StatusFilter) ? requestedStatus as StatusFilter : 'all'
   const region = typeof params.region === 'string' && params.region.trim() ? params.region.trim() : 'all'
+  const leadEmail = typeof params.lead_email === 'string' && params.lead_email.trim() ? params.lead_email.trim() : 'all'
   const rawSearch = typeof params.q === 'string' ? params.q.trim() : ''
   const search = rawSearch.slice(0, 100)
   const safeSearch = search.replace(/[,%()]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -71,6 +73,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const applyFilters = <T extends { is: Function; not: Function; neq: Function; or: Function; eq: Function }>(query: T): T => {
     let next = applyStatus(query)
     if (region !== 'all') next = next.eq('region', region) as T
+    if (leadEmail !== 'all') next = next.eq('lead_email', leadEmail) as T
     if (safeSearch) {
       const pattern = `%${safeSearch}%`
       next = next.or([
@@ -78,6 +81,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
         `customer_name.ilike.${pattern}`,
         `phone_number.ilike.${pattern}`,
         `agent_email.ilike.${pattern}`,
+        `lead_email.ilike.${pattern}`,
         `region.ilike.${pattern}`,
         `city.ilike.${pattern}`,
         `district.ilike.${pattern}`,
@@ -86,10 +90,11 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     return next
   }
 
-  const buildCustomersHref = (nextStatus: StatusFilter = status, nextPage = 1, nextRegion = region, nextSearch = search) => {
+  const buildCustomersHref = (nextStatus: StatusFilter = status, nextPage = 1, nextRegion = region, nextLeadEmail = leadEmail, nextSearch = search) => {
     const query = new URLSearchParams()
     query.set('status', nextStatus)
     if (nextRegion && nextRegion !== 'all') query.set('region', nextRegion)
+    if (nextLeadEmail && nextLeadEmail !== 'all') query.set('lead_email', nextLeadEmail)
     if (nextSearch) query.set('q', nextSearch)
     query.set('page', String(nextPage))
     return `/superadmin/customers?${query.toString()}`
@@ -100,7 +105,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
       supabase.from('customers').select('customer_id', { count: 'exact', head: true })
     )
 
-    const [totalResult, assignedResult, visitedResult, paidResult, unassignedResult, filteredResult, regionResult] = await Promise.all([
+    const [totalResult, assignedResult, visitedResult, paidResult, unassignedResult, filteredResult, regionResult, leadResult] = await Promise.all([
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).not('agent_email', 'is', null),
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).or('customer_status.ilike.%visited%,visit_status.ilike.visited'),
@@ -108,9 +113,10 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
       supabase.from('customers').select('customer_id', { count: 'exact', head: true }).is('agent_email', null),
       filteredCountQuery,
       supabase.from('customers').select('region').not('region', 'is', null).order('region'),
+      supabase.from('customers').select('lead_email').not('lead_email', 'is', null).order('lead_email'),
     ])
 
-    const countError = totalResult.error || assignedResult.error || visitedResult.error || paidResult.error || unassignedResult.error || filteredResult.error || regionResult.error
+    const countError = totalResult.error || assignedResult.error || visitedResult.error || paidResult.error || unassignedResult.error || filteredResult.error || regionResult.error || leadResult.error
     if (countError) throw countError
 
     const baseDataQuery = supabase
@@ -122,6 +128,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     if (dataResult.error) throw dataResult.error
 
     const regions = Array.from(new Set((regionResult.data ?? []).map((item) => item.region?.trim()).filter((value): value is string => Boolean(value))))
+    const leadEmails = Array.from(new Set((leadResult.data ?? []).map((item) => item.lead_email?.trim()).filter((value): value is string => Boolean(value))))
 
     return {
       totalAll: totalResult.count ?? 0,
@@ -132,14 +139,16 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
       filteredTotal: filteredResult.count ?? 0,
       customers: dataResult.data ?? [],
       regions,
+      leadEmails,
     }
   }
 
   let payload: CustomerCache
   try {
     const cacheRegion = encodeURIComponent(region.toLowerCase())
+    const cacheLead = encodeURIComponent(leadEmail.toLowerCase())
     const cacheSearch = encodeURIComponent(safeSearch.toLowerCase())
-    payload = await cacheGetOrSet(`crl:superadmin:customers:v4:${status}:${cacheRegion}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
+    payload = await cacheGetOrSet(`crl:superadmin:customers:v5:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
   } catch (error) {
     console.error('superadmin/customers:', error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} /></div>
@@ -147,7 +156,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
 
   const totalPages = Math.max(1, Math.ceil(payload.filteredTotal / PAGE_SIZE))
   const page = Math.min(requestedPage, totalPages)
-  if (payload.filteredTotal > 0 && requestedPage !== page) redirect(buildCustomersHref(status, page, region, search))
+  if (payload.filteredTotal > 0 && requestedPage !== page) redirect(buildCustomersHref(status, page, region, leadEmail, search))
 
   const summaries = [
     { label: tx('All Customers', 'Semua Pelanggan'), value: payload.totalAll, icon: UsersRound, tone: 'purple' },
@@ -163,12 +172,29 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     { key: 'paid', label: tx('Paid', 'Sudah Bayar'), count: payload.paid },
   ]
 
+  const leadNameByEmail = new Map<string, string>()
+  if (payload.leadEmails.length > 0) {
+    const { data: leadAgents } = await supabase
+      .from('agents')
+      .select('email, agent_name')
+      .in('email', payload.leadEmails)
+
+    for (const agent of leadAgents ?? []) {
+      if (agent.email) leadNameByEmail.set(agent.email.toLowerCase(), agent.agent_name?.trim() || agent.email)
+    }
+  }
+
+  const leadOptions = payload.leadEmails
+    .map((email) => ({ email, name: leadNameByEmail.get(email.toLowerCase()) || email }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   const paginationParams = new URLSearchParams()
   paginationParams.set('status', status)
   if (region !== 'all') paginationParams.set('region', region)
+  if (leadEmail !== 'all') paginationParams.set('lead_email', leadEmail)
   if (search) paginationParams.set('q', search)
   const paginationBasePath = `/superadmin/customers?${paginationParams.toString()}`
-  const hasExtraFilters = region !== 'all' || Boolean(search)
+  const hasExtraFilters = region !== 'all' || leadEmail !== 'all' || Boolean(search)
 
   return <div className={styles.page}>
     <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('View the complete CRL customer base and filter by assignment, visit, payment status, and region.', 'Lihat seluruh basis pelanggan CRL dan filter berdasarkan status penugasan, kunjungan, pembayaran, dan region.')} actions={<Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link>} />
@@ -184,10 +210,14 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
             <option value="all">{tx('All regions', 'Semua region')}</option>
             {payload.regions.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
+          <select name="lead_email" defaultValue={leadEmail} className={styles.regionSelect} aria-label={tx('Filter by lead', 'Filter berdasarkan lead')}>
+            <option value="all">{tx('All leads', 'Semua lead')}</option>
+            {leadOptions.map((lead) => <option key={lead.email} value={lead.email}>{lead.name}</option>)}
+          </select>
           <button type="submit" className={styles.applyButton}>{tx('Apply', 'Terapkan')}</button>
-          {hasExtraFilters && <Link href={buildCustomersHref(status, 1, 'all', '')} className={styles.clearButton}>{tx('Clear', 'Reset')}</Link>}
+          {hasExtraFilters && <Link href={buildCustomersHref(status, 1, 'all', 'all', '')} className={styles.clearButton}>{tx('Clear', 'Reset')}</Link>}
         </form>
-        <div className={styles.filterBar}>{filters.map((item) => <Link key={item.key} href={buildCustomersHref(item.key, 1, region, search)} className={`${styles.filterPill} ${status === item.key ? styles.filterPillActive : ''}`}>{item.label}<span>{item.count.toLocaleString('id-ID')}</span></Link>)}</div>
+        <div className={styles.filterBar}>{filters.map((item) => <Link key={item.key} href={buildCustomersHref(item.key, 1, region, leadEmail, search)} className={`${styles.filterPill} ${status === item.key ? styles.filterPillActive : ''}`}>{item.label}<span>{item.count.toLocaleString('id-ID')}</span></Link>)}</div>
       </div>
       <div className={styles.sectionHeader}><div><h2>{tx('Customer List', 'Daftar Pelanggan')}</h2><p>{tx('Open a customer to review details and field history.', 'Buka pelanggan untuk melihat detail dan riwayat lapangan.')}</p></div><span>{payload.filteredTotal.toLocaleString('id-ID')} {tx('customers', 'pelanggan')}</span></div>
       {payload.customers.length === 0 ? <SuperadminState icon={Inbox} title={tx('No customers match these filters', 'Tidak ada pelanggan yang sesuai filter')} description={tx('Try another status, region, or search keyword.', 'Coba status, region, atau kata pencarian lain.')} /> : <>
