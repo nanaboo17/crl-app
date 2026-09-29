@@ -3,7 +3,6 @@ export type AppRole = 'agent' | 'admin' | 'superadmin'
 export type Agent = {
   email: string
   agent_name: string
-  sales_code: string | null
   role: AppRole
   active: boolean
 }
@@ -45,7 +44,6 @@ export type Visit = {
   visit_id: string
   customer_id: string
   agent_email: string
-  sales_code: string | null
   visit_date: string
   customer_phone: string | null
   updated_phone: string | null
