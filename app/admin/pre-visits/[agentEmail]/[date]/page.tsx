@@ -63,7 +63,6 @@ export default async function AgentDailyPreVisitsPage({
     .select(`
       email,
       agent_name,
-      sales_code
     `)
     .eq('email', decodedEmail)
     .maybeSingle()
