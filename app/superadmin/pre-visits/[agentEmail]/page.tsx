@@ -35,7 +35,7 @@ export default async function AgentPreVisitDaysPage({ params, searchParams }: { 
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || !['admin', 'superadmin'].includes(currentUser.role)) redirect('/auth/route')
 
-  const { data: agent } = await supabase.from('agents').select('email, agent_name, sales_code').eq('email', decodedEmail).maybeSingle()
+  const { data: agent } = await supabase.from('agents').select('email, agent_name').eq('email', decodedEmail).maybeSingle()
   if (!agent) return <main className={styles.page}><div className={styles.errorCard}>{t('superadmin.preVisits.agentDays.notFound')}</div></main>
 
   const { data: allPreVisits, error } = await supabase.from('pre_visits').select('previsit_id,customer_id,contact_attempt_date,previsit_status,contact_result').eq('agent_email', decodedEmail).order('contact_attempt_date', { ascending: false })
@@ -85,7 +85,7 @@ export default async function AgentPreVisitDaysPage({ params, searchParams }: { 
           { label: agent.agent_name || agent.email, icon: UserRound },
         ]}
         title={agent.agent_name || tx('Agent Pre-Visits', 'Pra-Kunjungan Agen')}
-        description={`${agent.sales_code || tx('No sales code', 'Tanpa sales code')} · ${agent.email} · ${filterLabel}`}
+        description={`${agent.email} · ${filterLabel}`}
       />
 
       <section className={styles.hero}>
