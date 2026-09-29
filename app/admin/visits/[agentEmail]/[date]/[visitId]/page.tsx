@@ -54,7 +54,7 @@ export default async function AdminVisitDetailPage({
     .from('agents')
     .select(`
       email,
-      agent_name,
+      agent_name
     `)
     .eq('email', decodedEmail)
     .maybeSingle()
