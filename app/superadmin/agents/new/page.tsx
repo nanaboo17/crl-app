@@ -33,7 +33,6 @@ export default function NewAgentPage() {
 
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
-  const [salesCode, setSalesCode] = useState('')
   const [organization, setOrganization] = useState('')
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
@@ -70,7 +69,7 @@ export default function NewAgentPage() {
       const { error } = await supabase.rpc('superadmin_create_agent', {
         p_email: cleanEmail,
         p_agent_name: name.trim(),
-        p_sales_code: salesCode.trim() || null,
+        p_sales_code: null,
         p_organization: organization.trim() || null,
         p_role: role,
         p_active: active,
@@ -130,11 +129,6 @@ export default function NewAgentPage() {
               <label htmlFor="agent-name">{t('superadmin.agents.new.nameLabel')} <span className={styles.required}>*</span></label>
               <input id="agent-name" type="text" autoComplete="name" placeholder={t('superadmin.agents.new.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} className={`${styles.input} ${errors.agent_name ? styles.inputError : ''}`} aria-invalid={!!errors.agent_name} />
               {errors.agent_name && <p className={styles.fieldError}>{errors.agent_name}</p>}
-            </div>
-
-            <div className={styles.field}>
-              <label htmlFor="sales-code">{t('superadmin.agents.new.salesCodeLabel')}</label>
-              <input id="sales-code" type="text" autoComplete="off" placeholder={t('superadmin.agents.new.salesCodePlaceholder')} value={salesCode} onChange={(e) => setSalesCode(e.target.value)} className={styles.input} />
             </div>
 
             <div className={styles.field}>
