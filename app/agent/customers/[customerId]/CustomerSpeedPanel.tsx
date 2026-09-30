@@ -56,13 +56,11 @@ export default function CustomerSpeedPanel({
     }
 
     const supabase = createClient()
-    const { error: updateError } = await supabase
-      .from('customers')
-      .update({
-        speed_test_download_mbps: downloadValue,
-        speed_test_upload_mbps: uploadValue,
-      })
-      .eq('customer_id', customerId)
+    const { error: updateError } = await supabase.rpc('save_assigned_customer_speed_test', {
+      p_customer_id: customerId,
+      p_download_mbps: downloadValue,
+      p_upload_mbps: uploadValue,
+    })
 
     if (updateError) {
       setError(updateError.message)
