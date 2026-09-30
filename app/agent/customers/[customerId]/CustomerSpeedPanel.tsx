@@ -75,11 +75,26 @@ export default function CustomerSpeedPanel({
   if (isDetail) {
     return (
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
-        <div className="dui-card-body">
-          <div className="space-y-1.5">
-            <div className="text-sm font-semibold">Speed Current</div>
-            <div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40 font-medium">
-              {formatMbps(currentSpeed)}
+        <div className="dui-card-body gap-4">
+          <h2 className="text-base font-bold">Speed Information</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <div className="text-sm font-semibold">Speed Current</div>
+              <div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40 font-medium">
+                {formatMbps(currentSpeed)}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-sm font-semibold">Speed Test Download</div>
+              <div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40 font-medium">
+                {formatMbps(initialDownload)}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-sm font-semibold">Speed Test Upload</div>
+              <div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40 font-medium">
+                {formatMbps(initialUpload)}
+              </div>
             </div>
           </div>
         </div>
