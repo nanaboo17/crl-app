@@ -44,7 +44,7 @@ type AgentRow = {
 }
 
 const PAGE_SIZE = 5
-const COMPLAINT_LOOKUP_URL = 'https://script.google.com/macros/s/AKfycbyjo6ii7NTISz_arwp2xuqi_OQ7mUn9ui6K2tqBBIovm-5r02bgTKFejq_veWmfv-ue/exec'
+const COMPLAINT_LOOKUP_URL = 'https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec'
 
 const PRIORITY_STYLES: Record<number, { badge: string; ring: string }> = {
   1: { badge: 'dui-badge-error dui-badge-soft', ring: 'border-error/30' },

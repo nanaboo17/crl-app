@@ -8,6 +8,7 @@ import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import FollowUpPanel from './FollowUpPanel'
 import SensitiveCustomerData from './SensitiveCustomerData'
+import CustomerSpeedPanel from './CustomerSpeedPanel'
 import styles from './page.module.css'
 
 const TIMEZONE = 'Asia/Jakarta'
@@ -68,6 +69,13 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
       {visit ? <div className="dui-alert dui-alert-success"><CheckCircle2 className="h-5 w-5 shrink-0" /><span>{t('agent.customer.visitComplete')}{visit.visit_date ? ` · ${formatWibDateTime(visit.visit_date)}` : ''}{visit.visit_status_kunjungan ? ` · ${visit.visit_status_kunjungan}` : ''}</span></div> : <div className="dui-alert dui-alert-info"><MapPin className="h-5 w-5 shrink-0" /><span>{t('agent.customer.visitTimeDue')}</span></div>}
       <section className={styles.timelineCard}><div className={styles.sectionHeading}><BellRing /><div><h2>{tx('Customer timeline', 'Linimasa pelanggan')}</h2><p>{tx('Assignment, pre-visit, visit and follow-up activity in one place.', 'Penugasan, pre-visit, kunjungan, dan tindak lanjut dalam satu tempat.')}</p></div></div><div className={styles.timeline}>{timeline.map((item, index) => <div className={styles.timelineItem} key={`${item.at}-${index}`}><div className={styles.timelineRail}><span className={styles.timelineDot} />{index < timeline.length - 1 && <span className={styles.timelineLine} />}</div><div className={styles.timelineContent}><strong>{item.title}</strong><span>{formatWibDateTime(item.at)}</span>{item.detail && <span>{item.detail}</span>}</div></div>)}</div></section>
       <FollowUpPanel customerId={customer.customer_id} agentEmail={email} initialRows={(followups || []).map((row: any) => ({ followup_id: row.followup_id, due_at: row.due_at, note: row.note, status: row.status }))} locale={locale} />
+
+      <CustomerSpeedPanel
+        customerId={customer.customer_id}
+        currentSpeed={customer.speed == null ? null : Number(customer.speed)}
+        initialDownload={customer.speed_test_download_mbps == null ? null : Number(customer.speed_test_download_mbps)}
+        initialUpload={customer.speed_test_upload_mbps == null ? null : Number(customer.speed_test_upload_mbps)}
+      />
 
       <SensitiveCustomerData
         customerId={customer.customer_id}
