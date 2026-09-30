@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarClock, CheckCircle2, Image as ImageIcon, MapPin, Navigation, NotebookText, Pencil, ShieldCheck } from 'lucide-react'
+import { CalendarClock, CheckCircle2, Gauge, Image as ImageIcon, MapPin, Navigation, NotebookText, Pencil, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { Visit, Customer } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -11,6 +11,11 @@ import PageTop from '@/components/PageTop'
 import Loading from '@/components/Loading'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
+
+function formatMbps(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—'
+  return `${Number(value).toLocaleString('id-ID', { maximumFractionDigits: 2 })} Mbps`
+}
 
 export default function VisitDetailPage() {
   const { t, locale } = useI18n()
@@ -113,6 +118,15 @@ export default function VisitDetailPage() {
         <article className={`${styles.summaryCard} ${styles.tonePurple}`}><CalendarClock /><div><span>{t('agent.visitDetail.visitTime')}</span><strong>{dateTime(row.visit_date)}</strong></div></article>
         <article className={`${styles.summaryCard} ${styles.toneGreen}`}><ShieldCheck /><div><span>{t('agent.visitDetail.consent')}</span><strong>{row.consent_given ? t('agent.visitDetail.yes') : t('agent.visitDetail.no')}</strong></div></article>
         <article className={`${styles.summaryCard} ${styles.toneBlue}`}><MapPin /><div><span>{tx('GPS location', 'Lokasi GPS')}</span><strong>{locationLabel}</strong></div></article>
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.cardTitle}><Gauge /><div><span>{tx('SPEED TEST', 'SPEED TEST')}</span><h2>{tx('Speed test result', 'Hasil speed test')}</h2></div></div>
+        <div className={styles.coordinateGrid}>
+          <div><span>{tx('Current speed', 'Speed saat ini')}</span><strong>{formatMbps(customer?.speed)}</strong></div>
+          <div><span>Download</span><strong>{formatMbps(row.speed_test_download_mbps)}</strong></div>
+          <div><span>Upload</span><strong>{formatMbps(row.speed_test_upload_mbps)}</strong></div>
+        </div>
       </section>
 
       <section className={styles.contentGrid}>
