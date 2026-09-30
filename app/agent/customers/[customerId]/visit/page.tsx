@@ -667,16 +667,6 @@ export default function VisitPage() {
         ]}
         title={t('agent.visit.title')}
         description={t('agent.visit.description')}
-        actions={
-          <a
-            href={`https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec?billingId=${encodeURIComponent(customerId)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="dui-btn dui-btn-outline dui-btn-sm"
-          >
-            {locale === 'id' ? 'Komplain' : 'Complaint'}
-          </a>
-        }
       />
 
       {draftRestored && (
@@ -689,6 +679,15 @@ export default function VisitPage() {
       <section className="dui-card dui-card-border bg-base-100 shadow-sm">
         <div className="dui-card-body"><div className="flex items-center gap-3"><div className="dui-avatar dui-avatar-placeholder"><div className="w-12 rounded-full bg-primary/10 font-black text-primary">{(customer?.customer_name ?? 'P').slice(0, 2).toUpperCase()}</div></div><div className="min-w-0"><div className="truncate text-lg font-bold">{customer?.customer_name}</div><div className="truncate text-sm text-base-content/60">{customer?.customer_id}</div></div></div></div>
       </section>
+
+      <a
+        href={`https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec?billingId=${encodeURIComponent(customerId)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="dui-btn dui-btn-primary w-full gap-2 text-base font-bold shadow-sm"
+      >
+        {locale === 'id' ? 'Buat / Cek Komplain Pelanggan' : 'Create / Check Customer Complaint'}
+      </a>
 
       <StepCard t={t} step="1" title={t('agent.visit.step1')}>
         <Field label={t('agent.visit.fieldAddress')}><textarea value={visitAddress} onChange={(e) => setVisitAddress(e.target.value)} className="dui-textarea w-full" rows={3} /></Field>
