@@ -667,6 +667,16 @@ export default function VisitPage() {
         ]}
         title={t('agent.visit.title')}
         description={t('agent.visit.description')}
+        actions={
+          <a
+            href={`https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec?billingId=${encodeURIComponent(customerId)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="dui-btn dui-btn-outline dui-btn-sm"
+          >
+            {locale === 'id' ? 'Komplain' : 'Complaint'}
+          </a>
+        }
       />
 
       {draftRestored && (
