@@ -76,11 +76,13 @@ export default function CustomerSpeedPanel({
 
   if (isDetail) {
     return (
-      <section className="mx-auto mt-4 w-full max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-1.5">
-          <div className="text-sm font-semibold">Speed Current</div>
-          <div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40 font-medium">
-            {formatMbps(currentSpeed)}
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body">
+          <div className="space-y-1.5">
+            <div className="text-sm font-semibold">Speed Current</div>
+            <div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40 font-medium">
+              {formatMbps(currentSpeed)}
+            </div>
           </div>
         </div>
       </section>
@@ -88,7 +90,7 @@ export default function CustomerSpeedPanel({
   }
 
   return (
-    <section className="mx-auto mt-4 w-full max-w-3xl px-4 sm:px-6 lg:px-8">
+    <div className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <div className="text-sm font-semibold">Speed Current</div>
@@ -138,7 +140,7 @@ export default function CustomerSpeedPanel({
         </label>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={saveSpeedTest}
@@ -151,6 +153,6 @@ export default function CustomerSpeedPanel({
         {saved && <span className="text-xs font-semibold text-success">Speed test result saved.</span>}
         {error && <span className="text-xs font-semibold text-error">{error}</span>}
       </div>
-    </section>
+    </div>
   )
 }
