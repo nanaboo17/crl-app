@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Gauge, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 
 export default function EditVisitPage() {
@@ -10,6 +10,7 @@ export default function EditVisitPage() {
   const router = useRouter()
   const id = decodeURIComponent(params.id)
   const [row, setRow] = useState<any>(null)
+  const [currentSpeed, setCurrentSpeed] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -22,6 +23,8 @@ export default function EditVisitPage() {
     additional_notes: '',
     visit_address: '',
     updated_phone: '',
+    speed_test_download_mbps: '',
+    speed_test_upload_mbps: '',
   })
 
   useEffect(() => {
@@ -43,6 +46,14 @@ export default function EditVisitPage() {
         return
       }
 
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('speed')
+        .eq('customer_id', data.customer_id)
+        .ilike('agent_email', user.email.trim())
+        .maybeSingle()
+
+      setCurrentSpeed(customerData?.speed == null ? null : Number(customerData.speed))
       setRow(data)
       setForm({
         visit_status_kunjungan: data.visit_status_kunjungan || '',
@@ -53,6 +64,8 @@ export default function EditVisitPage() {
         additional_notes: data.additional_notes || '',
         visit_address: data.visit_address || '',
         updated_phone: data.updated_phone || '',
+        speed_test_download_mbps: data.speed_test_download_mbps == null ? '' : String(data.speed_test_download_mbps),
+        speed_test_upload_mbps: data.speed_test_upload_mbps == null ? '' : String(data.speed_test_upload_mbps),
       })
       setLoading(false)
     })()
@@ -63,6 +76,16 @@ export default function EditVisitPage() {
     if (!row) return
     if (!form.visit_status_kunjungan || !form.conversation_result) {
       setError('Visit status and conversation result are required.')
+      return
+    }
+
+    const downloadValue = form.speed_test_download_mbps.trim() === '' ? null : Number(form.speed_test_download_mbps)
+    const uploadValue = form.speed_test_upload_mbps.trim() === '' ? null : Number(form.speed_test_upload_mbps)
+    if (
+      (downloadValue !== null && (!Number.isFinite(downloadValue) || downloadValue < 0)) ||
+      (uploadValue !== null && (!Number.isFinite(uploadValue) || uploadValue < 0))
+    ) {
+      setError('Speed test values must be valid non-negative numbers.')
       return
     }
 
@@ -79,29 +102,43 @@ export default function EditVisitPage() {
       additional_notes: form.additional_notes.trim() || null,
       visit_address: form.visit_address.trim() || null,
       updated_phone: form.updated_phone.trim() || null,
+      speed_test_download_mbps: downloadValue,
+      speed_test_upload_mbps: uploadValue,
     }
 
-    const { error } = await supabase.from('visits').update(payload).eq('visit_id', id)
-    if (error) {
-      setError(error.message)
+    const { data: updatedVisit, error: visitError } = await supabase
+      .from('visits')
+      .update(payload)
+      .eq('visit_id', id)
+      .select('visit_id')
+      .maybeSingle()
+
+    if (visitError || !updatedVisit) {
+      setError(visitError?.message || 'Visit could not be updated.')
       setSaving(false)
       return
     }
 
-    const customerUpdate: Record<string, string> = {
-      visit_status: 'Visited',
-      customer_status: '5. Visited',
-      payment_status: form.conversation_result === 'Sudah melakukan pembayaran' ? 'paid' : 'unpaid',
-    }
-    if (form.updated_phone.trim()) customerUpdate.phone_number = form.updated_phone.trim()
+    const { error: speedError } = await supabase.rpc('save_assigned_customer_speed_test', {
+      p_customer_id: row.customer_id,
+      p_download_mbps: downloadValue,
+      p_upload_mbps: uploadValue,
+    })
 
-    const { error: customerError } = await supabase
-      .from('customers')
-      .update(customerUpdate)
-      .eq('customer_id', row.customer_id)
+    if (speedError) {
+      setError(`Visit saved, but customer speed test could not be synchronized: ${speedError.message}`)
+      setSaving(false)
+      return
+    }
+
+    const { error: customerError } = await supabase.rpc('sync_assigned_customer_after_visit_edit', {
+      p_customer_id: row.customer_id,
+      p_payment_status: form.conversation_result === 'Sudah melakukan pembayaran' ? 'paid' : 'unpaid',
+      p_phone_number: form.updated_phone.trim() || null,
+    })
 
     if (customerError) {
-      setError(customerError.message)
+      setError(`Visit saved, but customer status could not be synchronized: ${customerError.message}`)
       setSaving(false)
       return
     }
@@ -130,6 +167,18 @@ export default function EditVisitPage() {
             <label className="dui-form-control"><span className="dui-label-text font-semibold">Conversation result</span><select className="dui-select dui-select-bordered w-full" value={form.conversation_result} onChange={(e) => setForm({ ...form, conversation_result: e.target.value })}><option value="">Select result</option><option value="Sudah melakukan pembayaran">Sudah melakukan pembayaran</option><option value="Bersedia bayar / Promise to Pay">Bersedia bayar / Promise to Pay</option><option value="Masih mempertimbangkan">Masih mempertimbangkan</option><option value="Tidak bersedia melanjutkan layanan">Tidak bersedia melanjutkan layanan</option><option value="Tidak bertemu pelanggan">Tidak bertemu pelanggan</option></select></label>
             <label className="dui-form-control"><span className="dui-label-text font-semibold">Visit address</span><textarea className="dui-textarea dui-textarea-bordered min-h-24" value={form.visit_address} onChange={(e) => setForm({ ...form, visit_address: e.target.value })} /></label>
             <label className="dui-form-control"><span className="dui-label-text font-semibold">Updated phone</span><input className="dui-input dui-input-bordered w-full" value={form.updated_phone} onChange={(e) => setForm({ ...form, updated_phone: e.target.value })} /></label>
+          </div></div>
+
+          <div className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body gap-4">
+            <h2 className="flex items-center gap-2 text-base font-bold"><Gauge className="h-5 w-5 text-primary" /> Speed Information</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="dui-form-control"><span className="dui-label-text font-semibold">Speed Current</span><div className="dui-input dui-input-bordered flex w-full items-center bg-base-200/40">{currentSpeed == null ? '—' : `${currentSpeed} Mbps`}</div></label>
+              <label className="dui-form-control"><span className="dui-label-text font-semibold">Speed Test Download</span><label className="dui-input dui-input-bordered flex w-full items-center gap-2"><input type="number" min="0" step="0.01" inputMode="decimal" className="grow" value={form.speed_test_download_mbps} onChange={(e) => setForm({ ...form, speed_test_download_mbps: e.target.value })} /><span className="text-xs font-semibold opacity-60">Mbps</span></label></label>
+              <label className="dui-form-control"><span className="dui-label-text font-semibold">Speed Test Upload</span><label className="dui-input dui-input-bordered flex w-full items-center gap-2"><input type="number" min="0" step="0.01" inputMode="decimal" className="grow" value={form.speed_test_upload_mbps} onChange={(e) => setForm({ ...form, speed_test_upload_mbps: e.target.value })} /><span className="text-xs font-semibold opacity-60">Mbps</span></label></label>
+            </div>
+          </div></div>
+
+          <div className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body gap-4">
             <label className="dui-form-control"><span className="dui-label-text font-semibold">Approved offer</span><input className="dui-input dui-input-bordered w-full" value={form.approved_offer} onChange={(e) => setForm({ ...form, approved_offer: e.target.value })} /></label>
             <label className="dui-form-control"><span className="dui-label-text font-semibold">Planned payment date</span><input type="date" className="dui-input dui-input-bordered w-full" value={form.planned_payment_date} onChange={(e) => setForm({ ...form, planned_payment_date: e.target.value })} /></label>
             <label className="dui-form-control"><span className="dui-label-text font-semibold">Unpaid reason</span><input className="dui-input dui-input-bordered w-full" value={form.unpaid_reason} onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })} /></label>
