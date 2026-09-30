@@ -8,7 +8,6 @@ import styles from './TerritoryManager.module.css'
 type Agent = {
   email: string
   agent_name: string
-  sales_code: string | null
 }
 
 type CoverageRow = {
@@ -49,7 +48,7 @@ export default function TerritoryManager() {
     const [agentsResult, coverageResult] = await Promise.all([
       supabase
         .from('agents')
-        .select('email,agent_name,sales_code')
+        .select('email,agent_name')
         .eq('role', 'agent')
         .eq('active', true)
         .order('agent_name'),
@@ -274,7 +273,7 @@ export default function TerritoryManager() {
                     <option value="">Unassigned</option>
                     {agents.map((agent) => (
                       <option key={agent.email} value={agent.email}>
-                        {agent.agent_name} · {agent.sales_code || agent.email}
+                        {agent.agent_name} · {agent.email}
                       </option>
                     ))}
                   </select>
