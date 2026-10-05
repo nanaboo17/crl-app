@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BadgeCheck, BellRing, Building2, CheckCircle2, ClipboardList, MapPin, Sparkles, Store, UserRound } from 'lucide-react'
+import { BadgeCheck, BellRing, Building2, CheckCircle2, ClipboardList, ExternalLink, MapPin, Sparkles, Store, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { getLocale } from '@/lib/i18n/server'
@@ -12,6 +12,7 @@ import CustomerSpeedPanel from './CustomerSpeedPanel'
 import styles from './page.module.css'
 
 const TIMEZONE = 'Asia/Jakarta'
+const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec'
 
 export default async function AgentCustomerDetailPage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params
@@ -45,6 +46,17 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   const days = customer.days_left_to_churn
   const area = customer.sub_district || customer.district || customer.city || '-'
   const preVisitHref = `/agent/customers/${encodeURIComponent(customer.customer_id)}/pre-visit`
+
+  const complaintParams = new URLSearchParams({
+    billingId: String(customer.customer_id || ''),
+    customerName: String(customer.customer_name || ''),
+    name: String(customer.customer_name || ''),
+    city: String(customer.city || ''),
+    phone: String(customer.phone_number || ''),
+    phoneNum: String(customer.phone_number || ''),
+    locale,
+  })
+  const complaintHref = `${COMPLAINT_WEB_URL}?${complaintParams.toString()}`
 
   const preVisitTimeline = (preVisits || []).flatMap((row: any) => {
     const items = []
@@ -99,7 +111,20 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
         initiallyUnlocked={Boolean(preVisit)}
       />
 
-      <InfoCard title={t('agent.customer.cardSales')} icon={Store}><InfoGrid t={t} items={[[t('agent.customer.aeName'), customer.ae_name],[t('agent.customer.tlName'), customer.tl_name],[t('agent.customer.smName'), customer.sm_name],[t('agent.customer.salesChannel'), customer.sales_channel],[t('agent.customer.billingCycle'), customer.billing_cycle]]} /></InfoCard>
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-3">
+          <div>
+            <h2 className="text-base font-bold">{tx('Customer Complaint', 'Komplain Pelanggan')}</h2>
+            <p className="text-sm text-base-content/60">{tx('Name, city, BA ID and phone number will be prefilled in the complaint form.', 'Nama, kota, BA ID, dan nomor telepon akan terisi otomatis di form komplain.')}</p>
+          </div>
+          <a href={complaintHref} target="_blank" rel="noreferrer" className="dui-btn dui-btn-primary w-full gap-2">
+            <ExternalLink className="h-5 w-5" />
+            {tx('Create / Check Customer Complaint', 'Buat / Cek Komplain Pelanggan')}
+          </a>
+        </div>
+      </section>
+
+      <InfoCard title={t('agent.customer.cardSales')} icon={Store}><InfoGrid t={t} items={[[tx('Package Name', 'Nama Paket'), customer.product],[t('agent.customer.aeName'), customer.ae_name],[t('agent.customer.tlName'), customer.tl_name],[t('agent.customer.smName'), customer.sm_name],[t('agent.customer.salesChannel'), customer.sales_channel],[t('agent.customer.billingCycle'), customer.billing_cycle]]} /></InfoCard>
       <InfoCard title={t('agent.customer.cardBilling')} icon={Building2}><InfoGrid t={t} items={[[t('agent.customer.invoiceDate'), formatDate(customer.invoice_date)],[t('agent.customer.dueDate'), formatDate(customer.payment_due_date)],[t('agent.customer.suspensionDate'), formatDate(customer.suspension_date)],[t('agent.customer.estimatedChurn'), formatDate(customer.estimated_churn_date)],[t('agent.customer.invoiceAmount'), formatMoney(customer.invoice_amount)],[t('agent.customer.paymentStatus'), customer.payment_status ? customer.payment_status.toUpperCase() : t('agent.customer.notSet')],[t('agent.customer.tenure'), customer.customer_tenure],[t('agent.customer.visitStatus'), customer.visit_status || t('agent.customer.notStarted')]]} /></InfoCard>
       <InfoCard title={t('agent.customer.cardOffer')} icon={Sparkles}><InfoGrid t={t} items={[[t('agent.customer.recommendedOffer'), customer.recommended_offer],[t('agent.customer.maximumOffer'), customer.maximum_offer]]} /></InfoCard>
 
