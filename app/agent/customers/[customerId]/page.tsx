@@ -12,7 +12,7 @@ import CustomerSpeedPanel from './CustomerSpeedPanel'
 import styles from './page.module.css'
 
 const TIMEZONE = 'Asia/Jakarta'
-const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec'
+const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxMAlz_VZHT4Bn-ZmEaJKlSwY8YXQjibc2RdggPq6XOhlEisOcoD7f1p4VHuebX3vNS/exec'
 
 export default async function AgentCustomerDetailPage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params
