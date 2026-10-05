@@ -81,7 +81,8 @@ function paymentBadge(status: string | null) {
 }
 
 export default function AgentCustomersPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const supabase = createClient()
 
   const [customers, setCustomers] = useState<CustomerRow[]>([])
@@ -239,9 +240,12 @@ export default function AgentCustomersPage() {
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
         <div className="dui-card-body gap-3">
           <div>
-            <h2 className="text-base font-bold">Search Complaint ID</h2>
+            <h2 className="text-base font-bold">{tx('Search Complaint ID', 'Cari ID Komplain')}</h2>
             <p className="mt-1 text-sm text-base-content/60">
-              Enter the Billing ID to open the complaint lookup tool with the billing ID already filled in.
+              {tx(
+                'Enter the Billing ID to open the complaint tool. Name, city, BA ID, and phone number will be prefilled automatically when the customer is assigned to you.',
+                'Masukkan Billing ID untuk membuka form komplain. Nama, kota, BA ID, dan nomor telepon akan terisi otomatis jika pelanggan ditugaskan kepada Anda.'
+              )}
             </p>
           </div>
           <form
@@ -250,7 +254,22 @@ export default function AgentCustomersPage() {
               event.preventDefault()
               const customerId = complaintCustomerId.trim()
               if (!customerId) return
-              const url = `${COMPLAINT_LOOKUP_URL}?billingId=${encodeURIComponent(customerId)}`
+
+              const customer = customers.find(
+                (row) => String(row.customer_id).trim() === customerId
+              )
+
+              const params = new URLSearchParams({
+                billingId: customerId,
+                customerName: customer?.customer_name || '',
+                name: customer?.customer_name || '',
+                city: customer?.city || '',
+                phone: customer?.phone_number || '',
+                phoneNum: customer?.phone_number || '',
+                locale,
+              })
+
+              const url = `${COMPLAINT_LOOKUP_URL}?${params.toString()}`
               window.open(url, '_blank', 'noopener,noreferrer')
             }}
           >
@@ -261,8 +280,8 @@ export default function AgentCustomersPage() {
                 inputMode="numeric"
                 value={complaintCustomerId}
                 onChange={(event) => setComplaintCustomerId(event.target.value)}
-                placeholder="Billing ID"
-                aria-label="Billing ID for complaint lookup"
+                placeholder="Billing ID / BA ID"
+                aria-label={tx('Billing ID for complaint lookup', 'Billing ID untuk pencarian komplain')}
                 className="grow"
               />
             </label>
@@ -272,7 +291,7 @@ export default function AgentCustomersPage() {
               disabled={!complaintCustomerId.trim()}
             >
               <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              Search Complaint ID
+              {tx('Open Complaint', 'Buka Komplain')}
             </button>
           </form>
         </div>
