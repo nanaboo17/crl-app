@@ -24,6 +24,7 @@ const LOCATION_LIMIT_METERS = 200
 const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
 const MAX_PHOTO_DIMENSION = 1600
 const MAX_VISIT_PHOTOS = 5
+const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxMAlz_VZHT4Bn-ZmEaJKlSwY8YXQjibc2RdggPq6XOhlEisOcoD7f1p4VHuebX3vNS/exec'
 
 type OptionalVisitPhoto = {
   file: File
@@ -101,6 +102,7 @@ export default function VisitPage() {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
   const [capturingPhoto, setCapturingPhoto] = useState(false)
+  const [showComplaintModal, setShowComplaintModal] = useState(false)
 
   const alternativePhones = useMemo(
     () => [customer?.alternative_phone_1, customer?.alternative_phone_2, customer?.alternative_phone_3]
@@ -644,14 +646,39 @@ export default function VisitPage() {
     }
     try { sessionStorage.removeItem(draftKey) } catch {}
     stopCamera()
-    router.replace(`/agent/customers/${encodeURIComponent(customerId)}`)
-    router.refresh()
+    setSaving(false)
+    setShowComplaintModal(true)
   }
 
   if (loading) return <div className="mx-auto w-full max-w-3xl p-4 sm:p-6 lg:p-8"><div className="mx-auto flex justify-center py-20"><span className="dui-loading dui-loading-spinner dui-loading-lg text-primary" /></div></div>
 
   const gpsCaptured = latitude !== null && longitude !== null
   const backHref = `/agent/customers/${encodeURIComponent(customerId)}`
+  const effectivePhone = phoneCorrect === false && isValidPhone(updatedPhone)
+    ? normalizePhone(updatedPhone)
+    : normalizePhone(customer?.phone_number)
+  const complaintParams = new URLSearchParams({
+    billingId: customerId,
+    customerName: customer?.customer_name || '',
+    name: customer?.customer_name || '',
+    city: customer?.city || '',
+    phone: effectivePhone,
+    phoneNum: effectivePhone,
+    locale,
+  })
+  const complaintSubmitHref = `${COMPLAINT_WEB_URL}?${complaintParams.toString()}`
+  const complaintCheckHref = `${COMPLAINT_WEB_URL}?billingId=${encodeURIComponent(customerId)}&locale=${encodeURIComponent(locale)}`
+
+  function finishVisit() {
+    setShowComplaintModal(false)
+    router.replace(backHref)
+    router.refresh()
+  }
+
+  function openComplaintAfterVisit() {
+    window.open(complaintSubmitHref, '_blank', 'noopener,noreferrer')
+    finishVisit()
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 p-4 pb-32 sm:p-6 lg:p-8">
@@ -681,12 +708,12 @@ export default function VisitPage() {
       </section>
 
       <a
-        href={`https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec?billingId=${encodeURIComponent(customerId)}`}
+        href={complaintCheckHref}
         target="_blank"
         rel="noreferrer"
-        className="dui-btn dui-btn-primary w-full gap-2 text-base font-bold shadow-sm"
+        className="dui-btn dui-btn-outline w-full gap-2 text-base font-bold shadow-sm"
       >
-        {locale === 'id' ? 'Buat / Cek Komplain Pelanggan' : 'Create / Check Customer Complaint'}
+        {locale === 'id' ? 'Cek Komplain Pelanggan' : 'Check Customer Complaint'}
       </a>
 
       <StepCard t={t} step="1" title={t('agent.visit.step1')}>
@@ -858,7 +885,38 @@ export default function VisitPage() {
       <StepCard t={t} step="7" title={t('agent.visit.step7')}><p className="text-sm text-base-content/60">{t('agent.visit.notesHint')}</p><Field label={t('agent.visit.fieldNotes')}><textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} className="dui-textarea w-full" rows={3} placeholder={t('agent.visit.notesPlaceholder')} /></Field></StepCard>
 
       {error && <div className="dui-alert dui-alert-error" role="alert"><XCircle className="h-5 w-5 shrink-0" /><span>{error}</span></div>}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-3xl gap-2"><button type="button" className="dui-btn flex-1" onClick={() => { stopCamera(); router.push(backHref) }} disabled={saving}>{t('agent.visit.cancel')}</button><button type="button" className="dui-btn dui-btn-primary flex-1" disabled={saving || cameraOpen} onClick={submitVisit}>{saving ? <><span className="dui-loading dui-loading-spinner dui-loading-sm" />{t('agent.visit.saving')}</> : <><Save className="h-5 w-5" />{t('agent.visit.submit')}</>}</button></div></div>
+
+      {showComplaintModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="visit-complete-title">
+          <section className="dui-card w-full max-w-md border border-base-300 bg-base-100 shadow-2xl">
+            <div className="dui-card-body gap-4">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-success/15 text-success">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <div className="text-center">
+                <h2 id="visit-complete-title" className="text-xl font-black">
+                  {locale === 'id' ? 'Kunjungan berhasil disimpan' : 'Visit submitted successfully'}
+                </h2>
+                <p className="mt-2 text-sm text-base-content/65">
+                  {locale === 'id'
+                    ? 'Apakah Anda ingin mengirim komplain untuk pelanggan ini sekarang? Nama, kota, BA ID, dan nomor telepon akan terisi otomatis.'
+                    : 'Would you like to submit a complaint for this customer now? Name, city, BA ID, and phone number will be prefilled automatically.'}
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <button type="button" className="dui-btn dui-btn-primary w-full" onClick={openComplaintAfterVisit}>
+                  {locale === 'id' ? 'Submit Komplain' : 'Submit Complaint'}
+                </button>
+                <button type="button" className="dui-btn dui-btn-ghost w-full" onClick={finishVisit}>
+                  {locale === 'id' ? 'Tidak, Selesai' : 'No, Finish'}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-3xl gap-2"><button type="button" className="dui-btn flex-1" onClick={() => { stopCamera(); router.push(backHref) }} disabled={saving || showComplaintModal}>{t('agent.visit.cancel')}</button><button type="button" className="dui-btn dui-btn-primary flex-1" disabled={saving || cameraOpen || showComplaintModal} onClick={submitVisit}>{saving ? <><span className="dui-loading dui-loading-spinner dui-loading-sm" />{t('agent.visit.saving')}</> : <><Save className="h-5 w-5" />{t('agent.visit.submit')}</>}</button></div></div>
     </div>
   )
 }

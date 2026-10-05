@@ -94,6 +94,7 @@ export const agentConfig: ShellConfig = {
       { href: '/agent/route', labelKey: 'nav.route', icon: Route },
       { href: '/agent/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
       { href: '/agent/visits', labelKey: 'nav.visits', icon: MapPin },
+      { href: '/agent/attendance/weekly', labelKey: 'nav.attendance', icon: CalendarCheck2 },
     ]),
   ],
 }
