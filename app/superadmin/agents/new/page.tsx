@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, Mail, UserPlus } from 'lucide-react'
@@ -10,20 +10,38 @@ import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import styles from './page.module.css'
 
 const ROLES = ['agent', 'admin', 'superadmin'] as const
+const REGIONS = ['CJ', 'EJ', 'JABO 1', 'JABO 2', 'WJ'] as const
+
 type Role = (typeof ROLES)[number]
+type Region = (typeof REGIONS)[number]
 
 type FormErrors = {
   email?: string
   agent_name?: string
   role?: string
+  phone_num?: string
+  lead_email?: string
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^(?:0|62)\d{8,13}$/
+
+const REGION_LEAD_MAP: Record<Region, string> = {
+  CJ: 'xlckesawa@gmail.com',
+  EJ: 'xlckesawa@gmail.com',
+  'JABO 1': 'hidjrah.umami@gmail.com',
+  'JABO 2': 'hidjrah.umami@gmail.com',
+  WJ: 'hidjrah.umami@gmail.com',
+}
 
 function roleLabelKey(role: Role): string {
   if (role === 'admin') return 'superadmin.agents.new.roleAdmin'
   if (role === 'superadmin') return 'superadmin.agents.new.roleSuperadmin'
   return 'superadmin.agents.new.roleAgent'
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/[^0-9]/g, '')
 }
 
 export default function NewAgentPage() {
@@ -34,17 +52,44 @@ export default function NewAgentPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [organization, setOrganization] = useState('')
+  const [phoneNum, setPhoneNum] = useState('')
+  const [region, setRegion] = useState<Region | ''>('')
+  const [leadEmail, setLeadEmail] = useState('')
   const [role, setRole] = useState<Role>('agent')
   const [active, setActive] = useState(true)
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
+  const expectedLeadEmail = useMemo(
+    () => (region ? REGION_LEAD_MAP[region] : ''),
+    [region]
+  )
+
+  function handleRegionChange(value: string) {
+    const nextRegion = value as Region | ''
+    setRegion(nextRegion)
+    setLeadEmail(nextRegion ? REGION_LEAD_MAP[nextRegion] : '')
+  }
+
   function validate(): FormErrors {
     const next: FormErrors = {}
     if (!email.trim()) next.email = t('superadmin.agents.new.emailRequired')
     else if (!EMAIL_RE.test(email.trim())) next.email = t('superadmin.agents.new.emailInvalid')
     if (!name.trim()) next.agent_name = t('superadmin.agents.new.nameRequired')
+
+    const normalizedPhone = normalizePhone(phoneNum)
+    if (phoneNum.trim() && !PHONE_RE.test(normalizedPhone)) {
+      next.phone_num = tx(
+        'Use 10–15 digits starting with 0 or 62.',
+        'Gunakan 10–15 digit yang diawali 0 atau 62.'
+      )
+    }
+
+    if (leadEmail.trim() && !EMAIL_RE.test(leadEmail.trim())) {
+      next.lead_email = tx('Enter a valid lead email.', 'Masukkan email lead yang valid.')
+    }
+
     return next
   }
 
@@ -66,12 +111,15 @@ export default function NewAgentPage() {
         return
       }
 
-      const { error } = await supabase.rpc('superadmin_create_agent', {
+      const { error } = await supabase.rpc('superadmin_create_agent_v2', {
         p_email: cleanEmail,
         p_agent_name: name.trim(),
         p_organization: organization.trim() || null,
         p_role: role,
         p_active: active,
+        p_phone_num: normalizePhone(phoneNum) || null,
+        p_region: region || null,
+        p_lead_email: leadEmail.trim().toLowerCase() || null,
       })
       if (error) throw error
       router.push('/superadmin/agents')
@@ -131,8 +179,53 @@ export default function NewAgentPage() {
             </div>
 
             <div className={styles.field}>
+              <label htmlFor="phone-num">{tx('Phone Number', 'Nomor Telepon')}</label>
+              <input
+                id="phone-num"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="08xxxxxxxxxx / 62xxxxxxxxxxx"
+                value={phoneNum}
+                onChange={(e) => setPhoneNum(e.target.value)}
+                className={`${styles.input} ${errors.phone_num ? styles.inputError : ''}`}
+                aria-invalid={!!errors.phone_num}
+              />
+              {errors.phone_num && <p className={styles.fieldError}>{errors.phone_num}</p>}
+            </div>
+
+            <div className={styles.field}>
               <label htmlFor="organization">{tx('Organization', 'Organisasi')}</label>
               <input id="organization" type="text" autoComplete="organization" placeholder={tx('e.g. IOH, Field Agent, vendor', 'contoh: IOH, Field Agent, vendor')} value={organization} onChange={(e) => setOrganization(e.target.value)} className={styles.input} />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="region">{tx('Region', 'Region')}</label>
+              <select id="region" value={region} onChange={(e) => handleRegionChange(e.target.value)} className={styles.select}>
+                <option value="">{tx('Select region', 'Pilih region')}</option>
+                {REGIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="lead-email">{tx('Lead Email', 'Email Lead')}</label>
+              <input
+                id="lead-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder={expectedLeadEmail || 'lead@example.com'}
+                value={leadEmail}
+                onChange={(e) => setLeadEmail(e.target.value)}
+                className={`${styles.input} ${errors.lead_email ? styles.inputError : ''}`}
+                aria-invalid={!!errors.lead_email}
+              />
+              {region && (
+                <p className="text-xs text-base-content/55">
+                  {tx('Auto-filled from selected region.', 'Terisi otomatis berdasarkan region yang dipilih.')}
+                </p>
+              )}
+              {errors.lead_email && <p className={styles.fieldError}>{errors.lead_email}</p>}
             </div>
 
             <div className={styles.field}>
