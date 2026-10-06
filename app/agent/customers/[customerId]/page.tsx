@@ -61,6 +61,7 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
     city: String(customer.city || ''),
     phone: String(customer.phone_number || ''),
     phoneNum: String(customer.phone_number || ''),
+    caseDetail: 'CRL - ',
     locale,
   })
   const complaintHref = `${COMPLAINT_WEB_URL}?${complaintParams.toString()}`
