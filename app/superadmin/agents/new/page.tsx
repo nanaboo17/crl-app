@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Mail, UserPlus } from 'lucide-react'
+import { AlertCircle, ChevronDown, Mail, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
@@ -180,17 +180,7 @@ export default function NewAgentPage() {
 
             <div className={styles.field}>
               <label htmlFor="phone-num">{tx('Phone Number', 'Nomor Telepon')}</label>
-              <input
-                id="phone-num"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="08xxxxxxxxxx / 62xxxxxxxxxxx"
-                value={phoneNum}
-                onChange={(e) => setPhoneNum(e.target.value)}
-                className={`${styles.input} ${errors.phone_num ? styles.inputError : ''}`}
-                aria-invalid={!!errors.phone_num}
-              />
+              <input id="phone-num" type="tel" inputMode="tel" autoComplete="tel" placeholder="08xxxxxxxxxx / 62xxxxxxxxxxx" value={phoneNum} onChange={(e) => setPhoneNum(e.target.value)} className={`${styles.input} ${errors.phone_num ? styles.inputError : ''}`} aria-invalid={!!errors.phone_num} />
               {errors.phone_num && <p className={styles.fieldError}>{errors.phone_num}</p>}
             </div>
 
@@ -201,38 +191,31 @@ export default function NewAgentPage() {
 
             <div className={styles.field}>
               <label htmlFor="region">{tx('Region', 'Region')}</label>
-              <select id="region" value={region} onChange={(e) => handleRegionChange(e.target.value)} className={styles.select}>
-                <option value="">{tx('Select region', 'Pilih region')}</option>
-                {REGIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
+              <div className={styles.selectWrap}>
+                <select id="region" value={region} onChange={(e) => handleRegionChange(e.target.value)} className={styles.select}>
+                  <option value="">{tx('Select region', 'Pilih region')}</option>
+                  {REGIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+                <ChevronDown className={styles.selectIcon} aria-hidden="true" />
+              </div>
             </div>
 
             <div className={styles.field}>
               <label htmlFor="lead-email">{tx('Lead Email', 'Email Lead')}</label>
-              <input
-                id="lead-email"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder={expectedLeadEmail || 'lead@example.com'}
-                value={leadEmail}
-                onChange={(e) => setLeadEmail(e.target.value)}
-                className={`${styles.input} ${errors.lead_email ? styles.inputError : ''}`}
-                aria-invalid={!!errors.lead_email}
-              />
-              {region && (
-                <p className="text-xs text-base-content/55">
-                  {tx('Auto-filled from selected region.', 'Terisi otomatis berdasarkan region yang dipilih.')}
-                </p>
-              )}
+              <input id="lead-email" type="email" inputMode="email" autoComplete="email" placeholder={expectedLeadEmail || 'lead@example.com'} value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} className={`${styles.input} ${errors.lead_email ? styles.inputError : ''}`} aria-invalid={!!errors.lead_email} />
+              {region && <p className="text-xs text-base-content/55">{tx('Auto-filled from selected region.', 'Terisi otomatis berdasarkan region yang dipilih.')}</p>}
               {errors.lead_email && <p className={styles.fieldError}>{errors.lead_email}</p>}
             </div>
 
             <div className={styles.field}>
               <label htmlFor="agent-role">{t('superadmin.agents.new.roleLabel')} <span className={styles.required}>*</span></label>
-              <select id="agent-role" value={role} onChange={(e) => setRole(e.target.value as Role)} className={styles.select}>
-                {ROLES.map((option) => <option key={option} value={option}>{t(roleLabelKey(option))}</option>)}
-              </select>
+              <div className={styles.selectWrap}>
+                <select id="agent-role" value={role} onChange={(e) => setRole(e.target.value as Role)} className={styles.select}>
+                  {ROLES.map((option) => <option key={option} value={option}>{t(roleLabelKey(option))}</option>)}
+                </select>
+                <ChevronDown className={styles.selectIcon} aria-hidden="true" />
+              </div>
+              <p className={styles.fieldHint}>{tx('Choose the access level for this account.', 'Pilih hak akses untuk akun ini.')}</p>
             </div>
           </div>
 
