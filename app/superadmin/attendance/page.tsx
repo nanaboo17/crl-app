@@ -80,6 +80,9 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const today = jakartaDate(new Date())
   const selectedDate = validDate(params.date) ? String(params.date) : today
   const selectedOrganization = typeof params.organization === 'string' ? params.organization.trim() : ''
+  const selectedDayStart = `${selectedDate}T00:00:00+07:00`
+  const selectedDayEndDate = new Date(new Date(selectedDayStart).getTime() + 24 * 60 * 60 * 1000)
+  const selectedDayEnd = `${jakartaDate(selectedDayEndDate)}T00:00:00+07:00`
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -87,11 +90,19 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v5:${selectedDate}`, CACHE_TTL, async () => {
+  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v6:${selectedDate}`, CACHE_TTL, async () => {
     const [agentsResult, visitsResult, preVisitsResult, attendanceResult] = await Promise.all([
       supabase.from('agents').select('email, agent_name, active, organization').eq('role', 'agent').order('agent_name'),
-      supabase.from('visits').select('agent_email, visit_date'),
-      supabase.from('pre_visits').select('agent_email, created_at'),
+      supabase
+        .from('visits')
+        .select('agent_email, visit_date')
+        .gte('visit_date', selectedDayStart)
+        .lt('visit_date', selectedDayEnd),
+      supabase
+        .from('pre_visits')
+        .select('agent_email, created_at')
+        .gte('created_at', selectedDayStart)
+        .lt('created_at', selectedDayEnd),
       supabase
         .from('agent_attendance')
         .select('agent_email, attendance_date, check_in_at, check_out_at, check_in_photo_path, check_out_photo_path, check_in_status, worked_minutes')
