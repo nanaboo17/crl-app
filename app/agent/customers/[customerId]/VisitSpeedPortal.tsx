@@ -7,6 +7,7 @@ import CustomerSpeedPanel from './CustomerSpeedPanel'
 
 type Props = {
   customerId: string
+  crlId: string
   routeId: string
   currentSpeed: number | null
   initialDownload: number | null
