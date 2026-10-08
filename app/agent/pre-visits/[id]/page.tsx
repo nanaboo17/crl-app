@@ -51,7 +51,7 @@ export default function PreVisitDetailPage() {
         return
       }
       setRow(data as PreVisit)
-      const { data: c } = await s.from('customers').select('*').eq('customer_id', data.customer_id).single()
+      const { data: c } = await s.from('customers').select('*').eq('crl_id', data.crl_id).single()
       setCustomer((c || null) as Customer | null)
       setLoading(false)
     })()
@@ -175,7 +175,7 @@ export default function PreVisitDetailPage() {
       {canStartVisit && (
         <section className={styles.actionCard}>
           <div><span>{tx('READY TO CONTINUE', 'SIAP MELANJUTKAN')}</span><strong>{tx('Start the customer visit from this pre-visit record.', 'Mulai kunjungan pelanggan dari catatan pra-kunjungan ini.')}</strong></div>
-          <Link className={styles.startButton} href={`/agent/customers/${encodeURIComponent(row.customer_id)}/visit`}><CheckCircle2 /> {t('agent.preVisitDetail.startVisit')}</Link>
+          <Link className={styles.startButton} href={`/agent/customers/${encodeURIComponent(row.crl_id || row.customer_id)}/visit`}><CheckCircle2 /> {t('agent.preVisitDetail.startVisit')}</Link>
         </section>
       )}
     </main>
