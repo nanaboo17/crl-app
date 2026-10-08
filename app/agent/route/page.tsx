@@ -309,7 +309,7 @@ export default function AgentRoutePage() {
             ) : null}
             <div className={styles.routeList}>
             {visibleCustomers.map((customer) => (
-              <article key={customer.crl_id || customer.customer_id} className={styles.stopCard}>
+              <article key={customer.crl_id} className={styles.stopCard}>
                 <div className={styles.sequence}>{customer.sequence}</div>
                 <div className={styles.stopContent}>
                   <div className={styles.stopHeader}>
@@ -329,7 +329,7 @@ export default function AgentRoutePage() {
                   </div>
                   <p className={styles.address}><MapPin size={14} /> {customer.service_address || customer.sub_district || customer.district || customer.city || '-'}</p>
                   <div className={styles.actions}>
-                    <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link>
+                    <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link>
                     {hasValidCoordinates(customer) && (
                       <a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a>
                     )}
