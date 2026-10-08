@@ -155,6 +155,38 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<string[][]> {
   return result.filter((r) => r.some((value) => String(value).trim()))
 }
 
+
+function formatCaseMonthPreview(value: string, locale: string) {
+  const raw = String(value || '').trim()
+  if (!raw) return '—'
+
+  let date: Date | null = null
+
+  const serial = Number(raw)
+  if (Number.isFinite(serial) && serial >= 20000 && serial <= 80000) {
+    const excelEpoch = Date.UTC(1899, 11, 30)
+    date = new Date(excelEpoch + Math.floor(serial) * 86400000)
+  } else {
+    const iso = raw.match(/^(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?$/)
+    if (iso) {
+      date = new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3] || 1)))
+    } else {
+      const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+      if (dmy) {
+        date = new Date(Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1])))
+      }
+    }
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return raw
+
+  return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)
+}
+
 function buildRawRows(matrix: string[][]) {
   if (matrix.length < 2) return { headers: [] as string[], rows: [] as RawRow[] }
   const headers = matrix[0].map((value, index) => String(value || `Column ${index + 1}`).trim())
@@ -261,7 +293,7 @@ export default function UploadCustomersPage() {
       {preview.length > 0 && (
         <section className={styles.card}>
           <div className={styles.stepHead}><span>3</span><div><h2>{tx('Preview & validate', 'Preview & validasi')}</h2><p>{tx('Previewing the first 8 rows. Validation checks required fields, coordinates, duplicate Customer ID + CRL Month cases, and assigned agents.', 'Menampilkan 8 baris pertama. Validasi memeriksa field wajib, koordinat, duplikasi Customer ID + Bulan CRL, dan agen yang ditugaskan.')}</p></div></div>
-          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{row.case_month || '—'}</td><td>{row.customer_name || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
+          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
           <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx('Validate Data', 'Validasi Data')}</button></div>
         </section>
       )}
