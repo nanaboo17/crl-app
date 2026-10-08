@@ -7,6 +7,8 @@ import CustomerSpeedPanel from './CustomerSpeedPanel'
 
 type Props = {
   customerId: string
+  crlId: string
+  routeId: string
   currentSpeed: number | null
   initialDownload: number | null
   initialUpload: number | null
@@ -14,7 +16,7 @@ type Props = {
 
 export default function VisitSpeedPortal(props: Props) {
   const pathname = usePathname()
-  const visitPath = `/agent/customers/${encodeURIComponent(props.customerId)}/visit`
+  const visitPath = `/agent/customers/${encodeURIComponent(props.routeId)}/visit`
   const [host, setHost] = useState<HTMLDivElement | null>(null)
 
   useEffect(() => {
