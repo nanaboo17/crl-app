@@ -44,7 +44,7 @@ export default function VisitDetailPage() {
       }
 
       setRow(data as Visit)
-      const { data: c } = await s.from('customers').select('*').eq('customer_id', data.customer_id).single()
+      const { data: c } = await s.from('customers').select('*').eq('crl_id', data.crl_id).single()
       setCustomer((c || null) as Customer | null)
 
       const photoPaths = Array.isArray(data.visit_photo_urls) && data.visit_photo_urls.length > 0
@@ -103,7 +103,7 @@ export default function VisitDetailPage() {
         <div className={styles.heroCopy}>
           <span>{tx('VISIT RECORD', 'CATATAN KUNJUNGAN')}</span>
           <h1>{customer?.customer_name || row.customer_id}</h1>
-          <p>{row.visit_id} · {row.customer_id}</p>
+          <p>{row.visit_id} · {row.customer_id} · {row.crl_id}</p>
         </div>
         <span className={styles.status}>{row.visit_result || t('agent.visitDetail.submitted')}</span>
       </section>
