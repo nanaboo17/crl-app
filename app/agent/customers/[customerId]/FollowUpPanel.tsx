@@ -27,11 +27,13 @@ function googleCalendarUrl(row: FollowUp, customerId: string) {
 
 export default function FollowUpPanel({
   customerId,
+  crlId,
   agentEmail,
   initialRows,
   locale,
 }: {
   customerId: string
+  crlId: string
   agentEmail: string
   initialRows: FollowUp[]
   locale: string
@@ -55,6 +57,7 @@ export default function FollowUpPanel({
       .from('customer_followups')
       .insert({
         customer_id: customerId,
+        crl_id: crlId,
         agent_email: agentEmail,
         due_at: new Date(dueAt).toISOString(),
         note: note.trim(),
