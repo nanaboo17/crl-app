@@ -597,6 +597,7 @@ export default function VisitPage() {
 
     const { error: visitError } = await supabase.from('visits').insert({
       customer_id: customerId,
+      crl_id: customer.crl_id,
       agent_email: agent.email,
       visit_result: conversationResult,
       customer_phone: customer.phone_number,
