@@ -72,8 +72,8 @@ export default async function SuperadminVisitDetailPage({
 
   const { data: customer } = await supabase
     .from('customers')
-    .select('customer_id,customer_name,phone_number,service_address,city,district,sub_district,given_latitude,given_longitude,payment_status,visit_status')
-    .eq('customer_id', visit.customer_id)
+    .select('crl_id,customer_id,customer_name,phone_number,service_address,city,district,sub_district,given_latitude,given_longitude,payment_status,visit_status')
+    .eq('crl_id', visit.crl_id)
     .maybeSingle()
 
   const photoPaths = Array.isArray(visit.visit_photo_urls) && visit.visit_photo_urls.length > 0
