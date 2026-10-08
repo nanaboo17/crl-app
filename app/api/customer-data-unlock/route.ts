@@ -5,8 +5,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null)
     const customerId = typeof body?.customer_id === 'string' ? body.customer_id.trim() : ''
+    const crlId = typeof body?.crl_id === 'string' ? body.crl_id.trim() : ''
 
-    if (!customerId) {
+    if (!customerId && !crlId) {
       return NextResponse.json({ error: 'Customer ID is required.' }, { status: 400 })
     }
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       supabase
         .from('customers')
         .select('customer_id, crl_id, agent_email')
-        .eq('customer_id', customerId)
+        .eq(crlId ? 'crl_id' : 'customer_id', crlId || customerId)
         .ilike('agent_email', email)
         .maybeSingle(),
     ])
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     const { error: insertError } = await supabase
       .from('customer_data_unlocks')
       .insert({
-        customer_id: customerId,
+        customer_id: customer.customer_id,
         crl_id: customer.crl_id,
         agent_email: email,
       })
