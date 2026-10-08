@@ -31,6 +31,52 @@ const priority = (value: unknown) => {
 }
 const payment = (value: unknown) => text(value).toLowerCase() === 'paid' ? 'paid' : 'unpaid'
 
+function normalizeDate(value: unknown) {
+  const raw = text(value)
+  if (!raw) return null
+
+  const iso = raw.match(/^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})$/)
+  if (iso) {
+    const year = Number(iso[1])
+    const month = Number(iso[2])
+    const day = Number(iso[3])
+    const date = new Date(Date.UTC(year, month - 1, day))
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    }
+  }
+
+  const dmy = raw.match(/^(\\d{1,2})[-/](\\d{1,2})[-/](\\d{4})$/)
+  if (dmy) {
+    const day = Number(dmy[1])
+    const month = Number(dmy[2])
+    const year = Number(dmy[3])
+    const date = new Date(Date.UTC(year, month - 1, day))
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    }
+  }
+
+  const serial = Number(raw)
+  if (Number.isFinite(serial) && serial >= 20000 && serial <= 80000) {
+    const excelEpoch = Date.UTC(1899, 11, 30)
+    const date = new Date(excelEpoch + Math.floor(serial) * 86400000)
+    if (!Number.isNaN(date.getTime())) {
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+    }
+  }
+
+  return null
+}
+
 function normalizeCaseMonth(value: unknown) {
   const raw = text(value)
   if (!raw) return ''
@@ -155,6 +201,8 @@ async function validateRows(supabase: any, rows: InputRow[]) {
     const lat = numberOrNull(row.given_latitude)
     const lng = numberOrNull(row.given_longitude)
     const agentEmail = text(row.agent_email).toLowerCase()
+    const rawEstimatedChurnDate = text(row.estimated_churn_date)
+    const estimatedChurnDate = normalizeDate(row.estimated_churn_date)
     const key = customerId && caseMonth ? caseKey(customerId, caseMonth) : ''
     const existing = Boolean(key && existingKeys.has(key))
 
@@ -167,6 +215,7 @@ async function validateRows(supabase: any, rows: InputRow[]) {
     if (lat !== null && (lat < -90 || lat > 90)) messages.push('Latitude must be between -90 and 90.')
     if (lng !== null && (lng < -180 || lng > 180)) messages.push('Longitude must be between -180 and 180.')
     if (agentEmail && !validAgents.has(agentEmail)) messages.push('Assigned agent is not an active agent.')
+    if (rawEstimatedChurnDate && !estimatedChurnDate) messages.push('Estimated Churn Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
 
     const hasError = messages.length > 0
     const assigned = agentEmail && validAgents.has(agentEmail) ? agentEmail : null
@@ -182,7 +231,7 @@ async function validateRows(supabase: any, rows: InputRow[]) {
       payment_status: payment(row.payment_status),
       priority_rank: priority(row.priority_rank),
       days_left_to_churn: numberOrNull(row.days_left_to_churn),
-      estimated_churn_date: nullable(row.estimated_churn_date),
+      estimated_churn_date: estimatedChurnDate,
       region: nullable(row.region),
       city: nullable(row.city),
       district: nullable(row.district),
@@ -258,9 +307,13 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('customer import failed', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unable to process customer import.' },
-      { status: 400 }
-    )
+    const message =
+      error instanceof Error
+        ? error.message
+        : (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string')
+          ? String((error as { message: string }).message)
+          : 'Unable to process customer import.'
+
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }
