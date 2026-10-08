@@ -24,7 +24,7 @@ const LOCATION_LIMIT_METERS = 200
 const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
 const MAX_PHOTO_DIMENSION = 1600
 const MAX_VISIT_PHOTOS = 5
-const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxttere4OHOIDIj9jE5TJ5Ay9Rljps51QqiIjFFD0Bq6B8NAHaN_F7tLXlGHMXfYjaS/exec'
+const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxMAlz_VZHT4Bn-ZmEaJKlSwY8YXQjibc2RdggPq6XOhlEisOcoD7f1p4VHuebX3vNS/exec'
 
 type OptionalVisitPhoto = {
   file: File
@@ -136,10 +136,11 @@ export default function VisitPage() {
         .maybeSingle()
       if (!agentData || !agentData.active || agentData.role !== 'agent') return router.replace('/auth/route')
 
+      const customerLookupColumn = /^CRL\d{8}$/.test(customerId) ? 'crl_id' : 'customer_id'
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('*')
-        .eq('customer_id', customerId)
+        .eq(customerLookupColumn, customerId)
         .eq('agent_email', email)
         .maybeSingle()
       if (customerError) {
@@ -156,7 +157,7 @@ export default function VisitPage() {
       const { data: preVisit } = await supabase
         .from('pre_visits')
         .select('previsit_status')
-        .eq('customer_id', customerId)
+        .eq('crl_id', customerData.crl_id)
         .eq('agent_email', email)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -170,7 +171,7 @@ export default function VisitPage() {
       const { data: existingVisit } = await supabase
         .from('visits')
         .select('visit_id')
-        .eq('customer_id', customerId)
+        .eq('crl_id', customerData.crl_id)
         .maybeSingle()
       if (existingVisit) {
         try { sessionStorage.removeItem(draftKey) } catch {}
@@ -596,7 +597,7 @@ export default function VisitPage() {
     }
 
     const { error: visitError } = await supabase.from('visits').insert({
-      customer_id: customerId,
+      customer_id: customer.customer_id,
       crl_id: customer.crl_id,
       agent_email: agent.email,
       visit_result: conversationResult,
@@ -639,7 +640,7 @@ export default function VisitPage() {
     }
     if (correctedPhone) customerUpdate.phone_number = correctedPhone
 
-    const { error: customerUpdateError } = await supabase.from('customers').update(customerUpdate).eq('customer_id', customerId)
+    const { error: customerUpdateError } = await supabase.from('customers').update(customerUpdate).eq('crl_id', customer.crl_id)
     if (customerUpdateError) {
       setError(t('agent.visit.err.customerUpdate', { message: customerUpdateError.message }))
       setSaving(false)
@@ -665,7 +666,6 @@ export default function VisitPage() {
     city: customer?.city || '',
     phone: effectivePhone,
     phoneNum: effectivePhone,
-    caseDetail: 'CRL - ',
     locale,
   })
   const complaintSubmitHref = `${COMPLAINT_WEB_URL}?${complaintParams.toString()}`
