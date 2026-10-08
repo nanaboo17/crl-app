@@ -288,6 +288,7 @@ export default function PreVisitForm() {
 
       const payload = {
         customer_id: customerId,
+        crl_id: customer?.crl_id,
         agent_email: p.email,
         previous_previsit_id: previousPreVisitId,
         contact_attempt_date: new Date().toISOString(),
