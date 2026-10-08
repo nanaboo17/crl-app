@@ -37,17 +37,17 @@ export default async function AgentDailyPreVisitsPage({ params }: { params: Prom
 
   const startDate = `${date}T00:00:00+07:00`
   const endDate = `${date}T23:59:59.999+07:00`
-  const { data: preVisits, error } = await supabase.from('pre_visits').select('previsit_id,customer_id,contact_attempt_date,contact_confirmed,address_confirmed,appointment_confirmed,appointment_date,contact_result,previsit_status,confirmed_address,landmark,previsit_notes').eq('agent_email', decodedEmail).gte('contact_attempt_date', startDate).lte('contact_attempt_date', endDate).order('contact_attempt_date', { ascending: false })
+  const { data: preVisits, error } = await supabase.from('pre_visits').select('previsit_id,crl_id,customer_id,contact_attempt_date,contact_confirmed,address_confirmed,appointment_confirmed,appointment_date,contact_result,previsit_status,confirmed_address,landmark,previsit_notes').eq('agent_email', decodedEmail).gte('contact_attempt_date', startDate).lte('contact_attempt_date', endDate).order('contact_attempt_date', { ascending: false })
   if (error) return <main className={styles.page}><div className={styles.errorCard}>{error.message}</div></main>
 
-  const customerIds = [...new Set((preVisits ?? []).map((item) => item.customer_id))]
+  const crlIds = [...new Set((preVisits ?? []).map((item) => item.crl_id).filter(Boolean))]
   let customers: any[] = []
-  if (customerIds.length > 0) {
-    const { data } = await supabase.from('customers').select('customer_id,customer_name,phone_number,city,district,sub_district,service_address,customer_status,visit_status').in('customer_id', customerIds)
+  if (crlIds.length > 0) {
+    const { data } = await supabase.from('customers').select('crl_id,customer_id,customer_name,phone_number,city,district,sub_district,service_address,customer_status,visit_status').in('crl_id', crlIds)
     customers = data ?? []
   }
 
-  const customerMap = new Map(customers.map((customer) => [customer.customer_id, customer]))
+  const customerMap = new Map(customers.map((customer) => [customer.crl_id, customer]))
   const total = preVisits?.length ?? 0
   const readyCount = preVisits?.filter((item) => item.previsit_status === 'Ready for Visit').length ?? 0
   const followUpCount = preVisits?.filter((item) => item.previsit_status === 'Need Follow-up').length ?? 0
@@ -86,11 +86,11 @@ export default async function AgentDailyPreVisitsPage({ params }: { params: Prom
         <div className={styles.sectionHeader}><div><span>{tx('CUSTOMER PREPARATION', 'PERSIAPAN PELANGGAN')}</span><h2>{tx('Pre-visit records', 'Catatan pra-kunjungan')}</h2></div><p>{tx('Open a customer record to review the full pre-visit details.', 'Buka catatan pelanggan untuk melihat detail pra-kunjungan lengkap.')}</p></div>
         <div className={styles.list}>
           {preVisits && preVisits.length > 0 ? preVisits.map((preVisit) => {
-            const customer = customerMap.get(preVisit.customer_id)
+            const customer = customerMap.get(preVisit.crl_id)
             const statusKey = previsitStatusKey(preVisit.previsit_status)
             return (
               <Link key={preVisit.previsit_id} href={`/superadmin/pre-visits/${encodeURIComponent(decodedEmail)}/${date}/${encodeURIComponent(preVisit.previsit_id)}`} className={styles.preVisitCard}>
-                <div className={styles.cardTop}><div><span className={styles.preVisitId}>{preVisit.previsit_id}</span><h2>{customer?.customer_name || preVisit.customer_id}</h2><p>{preVisit.customer_id} · {customer?.sub_district || customer?.district || customer?.city || '-'}</p></div><span className={styles.arrow}>›</span></div>
+                <div className={styles.cardTop}><div><span className={styles.preVisitId}>{preVisit.previsit_id}</span><h2>{customer?.customer_name || preVisit.customer_id}</h2><p>{preVisit.customer_id} · {preVisit.crl_id || '-'} · {customer?.sub_district || customer?.district || customer?.city || '-'}</p></div><span className={styles.arrow}>›</span></div>
                 <div className={styles.infoGrid}>
                   <div><span>{t('superadmin.preVisits.daily.contactResult')}</span><strong>{preVisit.contact_result || '-'}</strong></div>
                   <div><span>{t('superadmin.preVisits.daily.preVisitStatus')}</span><strong>{statusKey ? t(statusKey) : preVisit.previsit_status || '-'}</strong></div>
