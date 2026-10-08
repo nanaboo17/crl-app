@@ -13,6 +13,7 @@ type Agent = { email: string; agent_name: string }
 
 type FormState = {
   customer_id: string
+  case_month: string
   customer_name: string
   phone_number: string
   service_address: string
@@ -28,8 +29,12 @@ type FormState = {
   agent_email: string
 }
 
+const now = new Date()
+const defaultCaseMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
 const initialForm: FormState = {
   customer_id: '',
+  case_month: defaultCaseMonth,
   customer_name: '',
   phone_number: '',
   service_address: '',
@@ -88,6 +93,7 @@ export default function NewCustomerPage() {
   function validate() {
     const next: Record<string, string> = {}
     if (!form.customer_id.trim()) next.customer_id = tx('Customer ID is required.', 'Customer ID wajib diisi.')
+    if (!form.case_month) next.case_month = tx('Case month is required.', 'Bulan CRL wajib diisi.')
     if (!form.customer_name.trim()) next.customer_name = tx('Customer name is required.', 'Nama pelanggan wajib diisi.')
     if (form.phone_number.trim() && !/^(0|62)\d{8,13}$/.test(form.phone_number.replace(/\D/g, ''))) {
       next.phone_number = tx('Use 10–15 digits starting with 0 or 62.', 'Gunakan 10–15 digit yang diawali 0 atau 62.')
@@ -103,17 +109,23 @@ export default function NewCustomerPage() {
 
     setSaving(true)
     const customerId = form.customer_id.trim()
+    const caseMonth = `${form.case_month}-01`
 
     try {
       const { data: existing, error: lookupError } = await supabase
         .from('customers')
-        .select('customer_id')
+        .select('crl_id,customer_id,case_month')
         .eq('customer_id', customerId)
+        .eq('case_month', caseMonth)
         .maybeSingle()
 
       if (lookupError) throw lookupError
       if (existing) {
-        setFieldErrors((current) => ({ ...current, customer_id: tx('This Customer ID already exists.', 'Customer ID ini sudah terdaftar.') }))
+        setFieldErrors((current) => ({
+          ...current,
+          customer_id: tx('This Customer ID already exists for the selected CRL month.', 'Customer ID ini sudah terdaftar untuk bulan CRL yang dipilih.'),
+          case_month: tx('Choose another CRL month for a new case.', 'Pilih bulan CRL lain untuk membuat case baru.'),
+        }))
         return
       }
 
@@ -123,8 +135,9 @@ export default function NewCustomerPage() {
       const churnDays = form.days_left_to_churn.trim() ? Number(form.days_left_to_churn) : null
       const amount = form.outstanding_amount.trim() ? Number(form.outstanding_amount) : 0
 
-      const { error: insertError } = await supabase.from('customers').insert({
+      const { data: createdCustomer, error: insertError } = await supabase.from('customers').insert({
         customer_id: customerId,
+        case_month: caseMonth,
         customer_name: form.customer_name.trim(),
         phone_number: cleanPhone || null,
         service_address: nullable(form.service_address),
@@ -141,11 +154,12 @@ export default function NewCustomerPage() {
         customer_status: assigned ? '1. Assigned' : 'Unassigned',
         visit_status: 'Not Started',
         assignment_date: assigned ? new Date().toISOString().slice(0, 10) : null,
-      })
+      }).select('crl_id').single()
 
       if (insertError) throw insertError
+      if (!createdCustomer?.crl_id) throw new Error(tx('Customer was created without a CRL ID.', 'Pelanggan dibuat tanpa CRL ID.'))
 
-      router.push(`/superadmin/customers/${encodeURIComponent(customerId)}`)
+      router.push(`/superadmin/customers/${encodeURIComponent(createdCustomer.crl_id)}`)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : tx('Unable to create customer.', 'Pelanggan tidak dapat dibuat.'))
@@ -176,6 +190,7 @@ export default function NewCustomerPage() {
           <div className={styles.cardHead}><Building2 aria-hidden="true" /><div><h3>{tx('Customer identity', 'Identitas pelanggan')}</h3><p>{tx('Core account and contact information.', 'Informasi akun dan kontak utama.')}</p></div></div>
           <div className={styles.grid}>
             <Field label="Customer ID" error={fieldErrors.customer_id}><input value={form.customer_id} onChange={(e) => set('customer_id', e.target.value)} placeholder="CUST001" /></Field>
+            <Field label={tx('CRL month', 'Bulan CRL')} error={fieldErrors.case_month}><input type="month" value={form.case_month} onChange={(e) => set('case_month', e.target.value)} /></Field>
             <Field label={tx('Customer name', 'Nama pelanggan')} error={fieldErrors.customer_name}><input value={form.customer_name} onChange={(e) => set('customer_name', e.target.value)} /></Field>
             <Field label={tx('Phone number', 'Nomor telepon')} error={fieldErrors.phone_number}><input inputMode="tel" value={form.phone_number} onChange={(e) => set('phone_number', e.target.value)} placeholder="08... / 62..." /></Field>
             <Field label={tx('Product', 'Produk')}><input value={form.product} onChange={(e) => set('product', e.target.value)} /></Field>
