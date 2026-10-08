@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 
 type Props = {
   customerId: string
+  crlId: string
   routeId: string
   currentSpeed: number | null
   initialDownload: number | null
@@ -20,6 +21,7 @@ function formatMbps(value: number | null) {
 
 export default function CustomerSpeedPanel({
   customerId,
+  crlId,
   routeId,
   currentSpeed,
   initialDownload,
@@ -58,8 +60,8 @@ export default function CustomerSpeedPanel({
     }
 
     const supabase = createClient()
-    const { error: updateError } = await supabase.rpc('save_assigned_customer_speed_test', {
-      p_customer_id: customerId,
+    const { error: updateError } = await supabase.rpc('save_assigned_customer_speed_test_by_crl', {
+      p_crl_id: crlId,
       p_download_mbps: downloadValue,
       p_upload_mbps: uploadValue,
     })
