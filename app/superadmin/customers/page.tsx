@@ -19,6 +19,7 @@ type StatusFilter = (typeof STATUS_FILTERS)[number]
 type CustomerRow = {
   crl_id: string
   customer_id: string
+  case_month: string | null
   customer_name: string | null
   phone_number: string | null
   outstanding_amount: number | null
@@ -56,6 +57,8 @@ type CustomerCache = {
 }
 
 function cycleSort(a: CustomerRow, b: CustomerRow) {
+  const monthCompare = String(b.case_month || '').localeCompare(String(a.case_month || ''))
+  if (monthCompare !== 0) return monthCompare
   return (b.crl_id || '').localeCompare(a.crl_id || '', undefined, { numeric: true })
 }
 
@@ -110,7 +113,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     for (let from = 0; ; from += chunkSize) {
       const { data, error } = await supabase
         .from('customers')
-        .select('crl_id, customer_id, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date')
+        .select('crl_id, customer_id, case_month, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date')
         .order('customer_id')
         .range(from, from + chunkSize - 1)
 
@@ -296,7 +299,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
                 <div className={styles.cycleList}>
                   {group.cycles.map((cycle, cycleIndex) => <article key={cycle.crl_id} className={styles.cycleCard}>
                     <div className={styles.cycleTop}>
-                      <div><strong>{cycle.crl_id}</strong><span>{cycleIndex === 0 ? tx('Latest cycle', 'Cycle terbaru') : tx('Previous cycle', 'Cycle sebelumnya')}</span></div>
+                      <div><strong>{cycle.crl_id}</strong><span>{cycle.case_month ? new Date(cycle.case_month).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : (cycleIndex === 0 ? tx('Latest cycle', 'Cycle terbaru') : tx('Previous cycle', 'Cycle sebelumnya'))}</span></div>
                       <Link href={`/superadmin/customers/${encodeURIComponent(cycle.crl_id)}`} className={styles.viewButton}><Eye aria-hidden="true" className="size-4" />{tx('Open CRL', 'Buka CRL')}</Link>
                     </div>
                     <div className={styles.cycleGrid}>
