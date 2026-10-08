@@ -88,6 +88,7 @@ export default async function AdminVisitDetailPage({
   const { data: customer } = await supabase
     .from('customers')
     .select(`
+      crl_id,
       customer_id,
       customer_name,
       phone_number,
@@ -100,7 +101,7 @@ export default async function AdminVisitDetailPage({
       payment_status,
       visit_status
     `)
-    .eq('customer_id', visit.customer_id)
+    .eq('crl_id', visit.crl_id)
     .maybeSingle()
 
   const photoPaths = Array.isArray(visit.visit_photo_urls) && visit.visit_photo_urls.length > 0
