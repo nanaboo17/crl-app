@@ -8,6 +8,7 @@ import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 
 type Customer = {
+  crl_id: string
   customer_id: string
   customer_name: string
   priority_rank: string | null
@@ -101,7 +102,7 @@ export default function AgentRoutePage() {
 
         const { data, error: customerError } = await supabase
           .from('customers')
-          .select('customer_id, customer_name, priority_rank, service_address, city, district, sub_district, given_latitude, given_longitude, visit_status, payment_status, days_left_to_churn')
+          .select('crl_id, customer_id, customer_name, priority_rank, service_address, city, district, sub_district, given_latitude, given_longitude, visit_status, payment_status, days_left_to_churn')
           .ilike('agent_email', email)
           .eq('actionable', true)
           .order('priority_rank', { ascending: true })
@@ -308,7 +309,7 @@ export default function AgentRoutePage() {
             ) : null}
             <div className={styles.routeList}>
             {visibleCustomers.map((customer) => (
-              <article key={customer.customer_id} className={styles.stopCard}>
+              <article key={customer.crl_id || customer.customer_id} className={styles.stopCard}>
                 <div className={styles.sequence}>{customer.sequence}</div>
                 <div className={styles.stopContent}>
                   <div className={styles.stopHeader}>
@@ -328,7 +329,7 @@ export default function AgentRoutePage() {
                   </div>
                   <p className={styles.address}><MapPin size={14} /> {customer.service_address || customer.sub_district || customer.district || customer.city || '-'}</p>
                   <div className={styles.actions}>
-                    <Link href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link>
+                    <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link>
                     {hasValidCoordinates(customer) && (
                       <a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a>
                     )}
