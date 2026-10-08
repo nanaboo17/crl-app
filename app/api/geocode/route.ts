@@ -12,6 +12,7 @@ const BASE_URL = process.env.NOMINATIM_BASE_URL || 'https://nominatim.openstreet
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q')?.trim()
   const customerId = request.nextUrl.searchParams.get('customer_id')?.trim()
+  const crlId = request.nextUrl.searchParams.get('crl_id')?.trim()
 
   if (!query) {
     return NextResponse.json({ error: 'Address is required.' }, { status: 400 })
@@ -55,13 +56,19 @@ export async function GET(request: NextRequest) {
     }
 
     let persisted = false
-    if (customerId) {
+    if (crlId || customerId) {
       const supabase = await createClient()
-      const { error: persistError } = await supabase.rpc('update_customer_geocode', {
-        p_customer_id: customerId,
-        p_latitude: latitude,
-        p_longitude: longitude,
-      })
+      const { error: persistError } = crlId
+        ? await supabase.rpc('update_customer_geocode_by_crl', {
+            p_crl_id: crlId,
+            p_latitude: latitude,
+            p_longitude: longitude,
+          })
+        : await supabase.rpc('update_customer_geocode', {
+            p_customer_id: customerId!,
+            p_latitude: latitude,
+            p_longitude: longitude,
+          })
 
       if (persistError) {
         console.error('persist customer geocode:', persistError)
