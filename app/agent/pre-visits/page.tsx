@@ -55,7 +55,8 @@ export default function PreVisitsPage() {
   const rows = useMemo(() => {
     const latestByCustomer = new Map<string, PreVisit>()
     for (const record of records) {
-      if (!latestByCustomer.has(record.customer_id)) latestByCustomer.set(record.customer_id, record)
+      const caseId = record.crl_id || record.customer_id
+      if (!latestByCustomer.has(caseId)) latestByCustomer.set(caseId, record)
     }
     return Array.from(latestByCustomer.values())
   }, [records])
@@ -92,7 +93,7 @@ export default function PreVisitsPage() {
         <div className={styles.sectionHead}><div><span>{tx('LATEST PER CUSTOMER', 'TERBARU PER PELANGGAN')}</span><h2>{tx('Pre-Visit customers', 'Pelanggan Pra-Kunjungan')}</h2></div><p>{rows.length} {tx('customers', 'pelanggan')}</p></div>
         <div className={styles.listStack}>
           {pageRows.map((r) => (
-            <Link className={styles.card} href={`/agent/pre-visits/${encodeURIComponent(r.previsit_id)}`} key={r.customer_id}>
+            <Link className={styles.card} href={`/agent/pre-visits/${encodeURIComponent(r.previsit_id)}`} key={r.crl_id || r.previsit_id}>
               <div className={styles.cardRow}>
                 <div>
                   <span className={styles.previsitId}>{tx('Customer ID', 'ID Pelanggan')}</span>

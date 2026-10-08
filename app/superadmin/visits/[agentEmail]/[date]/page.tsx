@@ -40,7 +40,7 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
   const dayLabel = new Date(`${date}T00:00:00`).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
 
   const [visitResult, attendanceResult] = await Promise.all([
-    supabase.from('visits').select('visit_id,customer_id,visit_date,visit_status_kunjungan,conversation_result,distance_to_customer_meters,location_match').eq('agent_email', decodedEmail).gte('visit_date', startDate).lte('visit_date', endDate).order('visit_date', { ascending: true }),
+    supabase.from('visits').select('visit_id,crl_id,customer_id,visit_date,visit_status_kunjungan,conversation_result,distance_to_customer_meters,location_match').eq('agent_email', decodedEmail).gte('visit_date', startDate).lte('visit_date', endDate).order('visit_date', { ascending: true }),
     supabase.from('agent_attendance').select('check_in_at,check_out_at,check_in_status,worked_minutes,check_in_photo_path,check_out_photo_path').eq('agent_email', decodedEmail).eq('attendance_date', date).maybeSingle(),
   ])
 
@@ -48,13 +48,13 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
 
   const visits = visitResult.data ?? []
   const attendance = attendanceResult.data
-  const customerIds = [...new Set(visits.map(v => v.customer_id))]
+  const crlIds = [...new Set(visits.map(v => v.crl_id).filter(Boolean))]
   let customers: any[] = []
-  if (customerIds.length) {
-    const { data } = await supabase.from('customers').select('customer_id,customer_name,payment_status').in('customer_id', customerIds)
+  if (crlIds.length) {
+    const { data } = await supabase.from('customers').select('crl_id,customer_id,customer_name,payment_status').in('crl_id', crlIds)
     customers = data ?? []
   }
-  const customerMap = new Map(customers.map(c => [c.customer_id, c]))
+  const customerMap = new Map(customers.map(c => [c.crl_id, c]))
 
   let checkInPhoto = ''
   let checkOutPhoto = ''
@@ -128,8 +128,8 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
         <div className={styles.checkpointList}>
           <div className={styles.checkpointRow}><span className={styles.checkpointDot}>IN</span><div><strong>Check In</strong><small>{timeLabel(attendance?.check_in_at ?? null)}</small></div><span>-</span></div>
           {checkpoints.map(cp => {
-            const customer = customerMap.get(cp.customer_id)
-            return <div key={cp.visit_id} className={styles.checkpointRow}><span className={styles.checkpointDot}>{cp.sequence}</span><div><strong>{tx('Checkpoint', 'Checkpoint')} {cp.sequence} · {customer?.customer_name || cp.customer_id}</strong><small>{timeLabel(cp.visit_date)} · {cp.visit_id}</small></div><span>{cp.duration}</span></div>
+            const customer = customerMap.get(cp.crl_id)
+            return <div key={cp.visit_id} className={styles.checkpointRow}><span className={styles.checkpointDot}>{cp.sequence}</span><div><strong>{tx('Checkpoint', 'Checkpoint')} {cp.sequence} · {customer?.customer_name || cp.customer_id}</strong><small>{timeLabel(cp.visit_date)} · {cp.visit_id} · {cp.crl_id || '-'}</small></div><span>{cp.duration}</span></div>
           })}
           {attendance?.check_out_at && <div className={styles.checkpointRow}><span className={styles.checkpointDot}>OUT</span><div><strong>Check Out</strong><small>{timeLabel(attendance.check_out_at)}</small></div><span>{durationLabel(visits.at(-1)?.visit_date ?? attendance.check_in_at, attendance.check_out_at)}</span></div>}
         </div>
@@ -138,9 +138,9 @@ export default async function AgentDailyVisitsPage({ params }: { params: Promise
       <section className={styles.sectionHead}><div><span>{tx('SUBMITTED VISITS', 'KUNJUNGAN TERKIRIM')}</span><h2>{tx('Visit results', 'Hasil kunjungan')}</h2></div><p>{visits.length} {tx('records', 'data')}</p></section>
       <section className={styles.list}>
         {[...visits].reverse().map(visit => {
-          const customer = customerMap.get(visit.customer_id)
+          const customer = customerMap.get(visit.crl_id)
           return <Link key={visit.visit_id} href={`/superadmin/visits/${encodeURIComponent(decodedEmail)}/${date}/${encodeURIComponent(visit.visit_id)}`} className={styles.visitCard}>
-            <div className={styles.cardTop}><div><span className={styles.visitId}>{visit.visit_id}</span><h2>{customer?.customer_name || visit.customer_id}</h2><p>{visit.customer_id}</p></div><span className={styles.arrow}>›</span></div>
+            <div className={styles.cardTop}><div><span className={styles.visitId}>{visit.visit_id}</span><h2>{customer?.customer_name || visit.customer_id}</h2><p>{visit.customer_id} · {visit.crl_id || '-'}</p></div><span className={styles.arrow}>›</span></div>
             <div className={styles.infoGrid}><div><span>{tx('Visit status', 'Status kunjungan')}</span><strong>{visit.visit_status_kunjungan || '-'}</strong></div><div><span>{tx('Conversation result', 'Hasil percakapan')}</span><strong>{visit.conversation_result || '-'}</strong></div><div><span>{tx('Payment', 'Pembayaran')}</span><strong>{customer?.payment_status?.toUpperCase() || '-'}</strong></div><div><span>{tx('Distance', 'Jarak')}</span><strong>{visit.distance_to_customer_meters != null ? `${Number(visit.distance_to_customer_meters).toFixed(1)} m` : '-'}</strong></div></div>
             <div className={styles.footer}><span>{timeLabel(visit.visit_date)}</span><span className={visit.location_match === true ? styles.matchBadge : visit.location_match === false ? styles.mismatchBadge : styles.unknownBadge}>{visit.location_match === true ? 'GPS Match' : visit.location_match === false ? 'GPS Mismatch' : 'GPS Unknown'}</span></div>
           </Link>

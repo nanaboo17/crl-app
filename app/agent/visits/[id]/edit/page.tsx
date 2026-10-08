@@ -59,7 +59,7 @@ export default function EditVisitPage() {
       const { data: customerData } = await supabase
         .from('customers')
         .select('speed,customer_name')
-        .eq('customer_id', data.customer_id)
+        .eq('crl_id', data.crl_id)
         .ilike('agent_email', user.email.trim())
         .maybeSingle()
 
@@ -129,8 +129,8 @@ export default function EditVisitPage() {
       return
     }
 
-    const { error: speedError } = await supabase.rpc('save_assigned_customer_speed_test', {
-      p_customer_id: row.customer_id,
+    const { error: speedError } = await supabase.rpc('save_assigned_customer_speed_test_by_crl', {
+      p_crl_id: row.crl_id,
       p_download_mbps: downloadValue,
       p_upload_mbps: uploadValue,
     })
@@ -141,8 +141,8 @@ export default function EditVisitPage() {
       return
     }
 
-    const { error: customerError } = await supabase.rpc('sync_assigned_customer_after_visit_edit', {
-      p_customer_id: row.customer_id,
+    const { error: customerError } = await supabase.rpc('sync_assigned_customer_after_visit_edit_by_crl', {
+      p_crl_id: row.crl_id,
       p_payment_status: form.conversation_result === 'Sudah melakukan pembayaran' ? 'paid' : 'unpaid',
       p_phone_number: form.updated_phone.trim() || null,
     })
@@ -188,6 +188,7 @@ export default function EditVisitPage() {
               </h1>
               <p className="mt-1 text-sm text-base-content/60">
                 Customer ID: <span className="font-semibold text-base-content/75">{row?.customer_id}</span>
+                {row?.crl_id ? <> · CRL ID: <span className="font-semibold text-base-content/75">{row.crl_id}</span></> : null}
               </p>
             </div>
             <div className="rounded-xl border border-base-300 bg-base-100/80 px-4 py-3 text-sm backdrop-blur sm:text-right">

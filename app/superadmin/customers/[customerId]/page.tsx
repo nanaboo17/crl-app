@@ -27,6 +27,7 @@ export default function AssignCustomerPage() {
   const router = useRouter()
   const supabase = createClient()
   const customerId = decodeURIComponent(params.customerId as string)
+  const customerLookupColumn = /^CRL\d{8}$/.test(customerId) ? 'crl_id' : 'customer_id'
 
   const [customer, setCustomer] = useState<any>(null)
   const [agents, setAgents] = useState<any[]>([])
@@ -43,7 +44,7 @@ export default function AssignCustomerPage() {
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('*')
-        .eq('customer_id', customerId)
+        .eq(customerLookupColumn, customerId)
         .maybeSingle()
 
       if (customerError || !customerData) {
@@ -81,7 +82,7 @@ export default function AssignCustomerPage() {
     const { error: saveError } = await supabase
       .from('customers')
       .update({ agent_email: agentEmail || null, customer_status: agentEmail ? '1. Assigned' : 'Unassigned' })
-      .eq('customer_id', customerId)
+      .eq('crl_id', customer.crl_id)
 
     if (saveError) {
       setError(saveError.message)
@@ -128,7 +129,7 @@ export default function AssignCustomerPage() {
           { label: customer.customer_name || customerId },
         ]}
         title={customer.customer_name || customerId}
-        description={`${customer.customer_id} · ${customer.city || customer.district || '-'}`}
+        description={`${customer.customer_id} · ${customer.crl_id} · ${customer.city || customer.district || '-'}`}
       />
 
       <section className={styles.hero}>
