@@ -6,6 +6,7 @@ import { Eye, EyeOff, Loader2, LockKeyhole, MapPin, Phone, ClipboardList } from 
 
 type Props = {
   customerId: string
+  crlId: string
   agentEmail: string
   locale: string
   contactItems: [string, string | null | undefined][]
@@ -15,7 +16,7 @@ type Props = {
   initiallyUnlocked?: boolean
 }
 
-export default function SensitiveCustomerData({ customerId, agentEmail, locale, contactItems, locationItems, canStartPreVisit, preVisitHref, initiallyUnlocked = false }: Props) {
+export default function SensitiveCustomerData({ customerId, crlId, agentEmail, locale, contactItems, locationItems, canStartPreVisit, preVisitHref, initiallyUnlocked = false }: Props) {
   const [unlocked, setUnlocked] = useState(initiallyUnlocked)
   const [unlocking, setUnlocking] = useState(false)
   const [error, setError] = useState('')
@@ -29,7 +30,7 @@ export default function SensitiveCustomerData({ customerId, agentEmail, locale, 
       const response = await fetch('/api/customer-data-unlock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: customerId }),
+        body: JSON.stringify({ customer_id: customerId, crl_id: crlId }),
       })
 
       const result = await response.json().catch(() => null)
