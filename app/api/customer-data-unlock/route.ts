@@ -7,8 +7,8 @@ export async function POST(request: Request) {
     const customerId = typeof body?.customer_id === 'string' ? body.customer_id.trim() : ''
     const crlId = typeof body?.crl_id === 'string' ? body.crl_id.trim() : ''
 
-    if (!customerId && !crlId) {
-      return NextResponse.json({ error: 'Customer ID is required.' }, { status: 400 })
+    if (!crlId) {
+      return NextResponse.json({ error: 'CRL ID is required.' }, { status: 400 })
     }
 
     const supabase = await createClient()
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       supabase
         .from('customers')
         .select('customer_id, crl_id, agent_email')
-        .eq(crlId ? 'crl_id' : 'customer_id', crlId || customerId)
+        .eq('crl_id', crlId)
         .ilike('agent_email', email)
         .maybeSingle(),
     ])
