@@ -30,7 +30,7 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
   if (!user?.email) redirect('/login')
   const email = user.email.trim().toLowerCase()
 
-  const customerLookupColumn = /^CRL\\d{8}$/.test(decodedCustomerId) ? 'crl_id' : 'customer_id'
+  const customerLookupColumn = /^CRL\d{8}$/.test(decodedCustomerId) ? 'crl_id' : 'customer_id'
   const { data: customer } = await supabase
     .from('customers')
     .select('crl_id,customer_id,customer_name,phone_number,service_address,agent_email,payment_status,visit_status')
