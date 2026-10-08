@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 
 type Props = {
   customerId: string
+  routeId: string
   currentSpeed: number | null
   initialDownload: number | null
   initialUpload: number | null
@@ -19,12 +20,13 @@ function formatMbps(value: number | null) {
 
 export default function CustomerSpeedPanel({
   customerId,
+  routeId,
   currentSpeed,
   initialDownload,
   initialUpload,
 }: Props) {
   const pathname = usePathname()
-  const encodedId = encodeURIComponent(customerId)
+  const encodedId = encodeURIComponent(routeId)
   const detailPath = `/agent/customers/${encodedId}`
   const visitPath = `${detailPath}/visit`
   const isVisit = pathname === visitPath
