@@ -21,6 +21,7 @@ import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 
 type CustomerRow = {
+  crl_id: string
   customer_id: string
   customer_name: string
   priority_rank: number | null
@@ -122,7 +123,7 @@ export default function AgentCustomersPage() {
 
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
-        .select('customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
+        .select('crl_id, customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
         .eq('agent_email', email)
         .eq('actionable', true)
         .order('priority_rank', { ascending: true })
@@ -503,9 +504,9 @@ function CustomerSection({
       {count > 0 ? (
         <ul className="dui-list w-full rounded-box border border-base-300 bg-base-100 shadow-sm">
           {customers.map((customer) => (
-            <li key={customer.customer_id}>
+            <li key={customer.crl_id || customer.customer_id}>
               <Link
-                href={`/agent/customers/${encodeURIComponent(customer.customer_id)}`}
+                href={`/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`}
                 className="dui-list-row dui-list-col-grow hover:bg-base-200 transition-colors"
               >
                 <CustomerCardBody t={t} customer={customer} visited={visited} />
