@@ -159,16 +159,17 @@ export default function PreVisitForm() {
       }
 
       const s = createClient()
-      const [{ data: customerData, error: customerError }, { data: previousData, error: previousError }] = await Promise.all([
-        s.from('customers').select('*').eq('customer_id', customerId).single(),
-        s.from('pre_visits')
+      const customerLookupColumn = /^CRL\d{8}$/.test(customerId) ? 'crl_id' : 'customer_id'
+      const { data: customerData, error: customerError } = await s.from('customers').select('*').eq(customerLookupColumn, customerId).single()
+      const { data: previousData, error: previousError } = customerData
+        ? await s.from('pre_visits')
           .select('previsit_id,phone_contacted,customer_available,willing_to_reschedule,reschedule_date,direct_visit,address_confirmed,confirmed_address,landmark,wants_appointment,appointment_date,contact_result,unpaid_reason,previsit_notes')
-          .eq('customer_id', customerId)
+          .eq('crl_id', customerData.crl_id)
           .order('created_at', { ascending: false })
           .order('previsit_id', { ascending: false })
           .limit(1)
-          .maybeSingle(),
-      ])
+          .maybeSingle()
+        : { data: null, error: null }
 
       if (customerError) {
         setError(customerError.message)
@@ -287,7 +288,7 @@ export default function PreVisitForm() {
       const appointmentIso = jakartaLocalToIso(form.appointment_date)
 
       const payload = {
-        customer_id: customerId,
+        customer_id: customer?.customer_id,
         crl_id: customer?.crl_id,
         agent_email: p.email,
         previous_previsit_id: previousPreVisitId,
