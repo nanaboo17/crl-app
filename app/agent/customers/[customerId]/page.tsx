@@ -52,7 +52,7 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   const priority = customer.priority_rank
   const days = customer.days_left_to_churn
   const area = customer.sub_district || customer.district || customer.city || '-'
-  const customerRouteId = customer.crl_id || customer.customer_id
+  const customerRouteId = customer.crl_id
   const preVisitHref = `/agent/customers/${encodeURIComponent(customerRouteId)}/pre-visit`
   const prefixedComplaintName = complaintCustomerName(customer.customer_name)
 
