@@ -57,7 +57,7 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
 
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleString('id-ID') : '-'
   const formatPaymentDate = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('id-ID') : '-'
-  const backHref = `/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`
+  const backHref = `/agent/customers/${encodeURIComponent(customer.crl_id)}`
   const locationMatch = visit.location_match === true ? t('agent.visitResult.matchYes') : visit.location_match === false ? t('agent.visitResult.matchNo') : t('agent.visitResult.matchNa')
 
   return (
