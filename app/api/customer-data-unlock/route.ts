@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase-server'
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null)
-    const customerId = typeof body?.customer_id === 'string' ? body.customer_id.trim() : ''
     const crlId = typeof body?.crl_id === 'string' ? body.crl_id.trim() : ''
 
     if (!crlId) {
