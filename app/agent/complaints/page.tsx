@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-server'
 import { getComplaintTickets } from '@/lib/complaints'
 
 const COMPLAINT_WEB_URL =
-  'https://script.google.com/macros/s/AKfycbyCiplosm0JFAZpDeOEl5bBlY2pT3Vg77p9iTr2zc_GASU6eScltkcPSXGlvhmjqOgQ/exec'
+  'https://script.google.com/macros/s/AKfycbxttere4OHOIDIj9jE5TJ5Ay9Rljps51QqiIjFFD0Bq6B8NAHaN_F7tLXlGHMXfYjaS/exec'
 
 function statusTone(status: string) {
   const value = String(status || '').trim().toLowerCase()
