@@ -8,6 +8,7 @@ export type Agent = {
 }
 
 export type Customer = {
+  crl_id: string
   customer_id: string
   customer_name: string
   phone_number: string | null
@@ -27,6 +28,7 @@ export type Customer = {
 
 export type PreVisit = {
   previsit_id: string
+  crl_id?: string | null
   customer_id: string
   agent_email: string
   contact_attempt_date: string | null
@@ -45,6 +47,7 @@ export type PreVisit = {
 
 export type Visit = {
   visit_id: string
+  crl_id?: string | null
   customer_id: string
   agent_email: string
   visit_date: string
