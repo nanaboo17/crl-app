@@ -30,10 +30,11 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
   if (!user?.email) redirect('/login')
   const email = user.email.trim().toLowerCase()
 
+  const customerLookupColumn = /^CRL\\d{8}$/.test(decodedCustomerId) ? 'crl_id' : 'customer_id'
   const { data: customer } = await supabase
     .from('customers')
-    .select('customer_id,customer_name,phone_number,service_address,agent_email,payment_status,visit_status')
-    .eq('customer_id', decodedCustomerId)
+    .select('crl_id,customer_id,customer_name,phone_number,service_address,agent_email,payment_status,visit_status')
+    .eq(customerLookupColumn, decodedCustomerId)
     .eq('agent_email', email)
     .maybeSingle()
 
@@ -42,7 +43,7 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
   const { data: visit, error } = await supabase
     .from('visits')
     .select('*')
-    .eq('customer_id', decodedCustomerId)
+    .eq('crl_id', customer.crl_id)
     .eq('agent_email', email)
     .maybeSingle()
 
@@ -56,7 +57,7 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
 
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleString('id-ID') : '-'
   const formatPaymentDate = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('id-ID') : '-'
-  const backHref = `/agent/customers/${encodeURIComponent(decodedCustomerId)}`
+  const backHref = `/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`
   const locationMatch = visit.location_match === true ? t('agent.visitResult.matchYes') : visit.location_match === false ? t('agent.visitResult.matchNo') : t('agent.visitResult.matchNa')
 
   return (
