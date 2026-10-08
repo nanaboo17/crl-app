@@ -24,7 +24,7 @@ const LOCATION_LIMIT_METERS = 200
 const VISIT_DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000
 const MAX_PHOTO_DIMENSION = 1600
 const MAX_VISIT_PHOTOS = 5
-const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxMAlz_VZHT4Bn-ZmEaJKlSwY8YXQjibc2RdggPq6XOhlEisOcoD7f1p4VHuebX3vNS/exec'
+const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxttere4OHOIDIj9jE5TJ5Ay9Rljps51QqiIjFFD0Bq6B8NAHaN_F7tLXlGHMXfYjaS/exec'
 
 type OptionalVisitPhoto = {
   file: File
@@ -665,6 +665,7 @@ export default function VisitPage() {
     city: customer?.city || '',
     phone: effectivePhone,
     phoneNum: effectivePhone,
+    caseDetail: 'CRL - ',
     locale,
   })
   const complaintSubmitHref = `${COMPLAINT_WEB_URL}?${complaintParams.toString()}`
