@@ -127,6 +127,7 @@ export default async function AdminPreVisitDetailPage({
     await supabase
       .from('customers')
       .select(`
+        crl_id,
         customer_id,
         customer_name,
         phone_number,
@@ -142,8 +143,8 @@ export default async function AdminPreVisitDetailPage({
         visit_status
       `)
       .eq(
-        'customer_id',
-        preVisit.customer_id
+        'crl_id',
+        preVisit.crl_id
       )
       .maybeSingle()
 
