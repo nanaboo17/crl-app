@@ -504,9 +504,9 @@ function CustomerSection({
       {count > 0 ? (
         <ul className="dui-list w-full rounded-box border border-base-300 bg-base-100 shadow-sm">
           {customers.map((customer) => (
-            <li key={customer.crl_id || customer.customer_id}>
+            <li key={customer.crl_id}>
               <Link
-                href={`/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`}
+                href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`}
                 className="dui-list-row dui-list-col-grow hover:bg-base-200 transition-colors"
               >
                 <CustomerCardBody t={t} customer={customer} visited={visited} />

@@ -294,7 +294,7 @@ export default async function AgentPage() {
             {todayPlan.length === 0 ? <div className={styles.empty}>{tx('No customers need a visit today.', 'Tidak ada pelanggan yang perlu dikunjungi hari ini.')}</div> : todayPlan.map((customer: any, index: number) => {
               const area = customer.sub_district || customer.district || customer.city || '-'
               const churnUrgent = customer.days_left_to_churn !== null && customer.days_left_to_churn <= 7
-              return <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`} key={customer.crl_id || customer.customer_id} className={styles.planCard}>
+              return <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`} key={customer.crl_id} className={styles.planCard}>
                 <span className={styles.rank}>{index + 1}</span>
                 <div className={styles.planMain}><strong>{customer.customer_name}</strong><span>{customer.customer_id} · {area}</span></div>
                 <div className={styles.chips}><span className={styles.chip}>P{customer.priority_rank ?? '-'}</span>{churnUrgent && <span className={`${styles.chip} ${styles.urgent}`}>{customer.days_left_to_churn <= 0 ? tx('Churn overdue', 'Churn lewat') : `${customer.days_left_to_churn} ${tx('days', 'hari')}`}</span>}<span className={styles.chip}>Rp{Number(customer.invoice_amount ?? 0).toLocaleString('id-ID')}</span></div>
@@ -308,7 +308,7 @@ export default async function AgentPage() {
           <div className={styles.followupList}>
             {(followupsResult.data || []).length === 0 ? <div className={styles.empty}>{tx('No pending reminders.', 'Tidak ada pengingat tertunda.')}</div> : (followupsResult.data || []).map((row: any) => {
               const overdue = new Date(row.due_at).getTime() < now
-              return <Link href={`/agent/customers/${encodeURIComponent(row.crl_id || row.customer_id)}`} key={row.followup_id} className={`${styles.followupItem} ${overdue ? styles.overdue : ''}`}><strong>{row.note}</strong><span>{overdue ? tx('Overdue · ', 'Terlambat · ') : ''}{new Date(row.due_at).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB')}</span><span>{row.customer_id}</span></Link>
+              return <Link href={`/agent/customers/${encodeURIComponent(row.crl_id)}`} key={row.followup_id} className={`${styles.followupItem} ${overdue ? styles.overdue : ''}`}><strong>{row.note}</strong><span>{overdue ? tx('Overdue · ', 'Terlambat · ') : ''}{new Date(row.due_at).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB')}</span><span>{row.customer_id}</span></Link>
             })}
           </div>
         </section>
