@@ -15,6 +15,7 @@ export default async function CustomerLayout({
   const { data: { user } } = await supabase.auth.getUser()
 
   let resolvedCustomerId = decodedCustomerId
+  let resolvedCrlId = /^CRL\d{8}$/.test(decodedCustomerId) ? decodedCustomerId : ''
   let speed: number | null = null
   let download: number | null = null
   let upload: number | null = null
@@ -23,12 +24,13 @@ export default async function CustomerLayout({
     const customerLookupColumn = /^CRL\d{8}$/.test(decodedCustomerId) ? 'crl_id' : 'customer_id'
     const { data } = await supabase
       .from('customers')
-      .select('customer_id,speed,speed_test_download_mbps,speed_test_upload_mbps')
+      .select('crl_id,customer_id,speed,speed_test_download_mbps,speed_test_upload_mbps')
       .eq(customerLookupColumn, decodedCustomerId)
       .ilike('agent_email', user.email.trim())
       .maybeSingle()
 
     resolvedCustomerId = data?.customer_id || decodedCustomerId
+    resolvedCrlId = data?.crl_id || resolvedCrlId
     speed = data?.speed == null ? null : Number(data.speed)
     download = data?.speed_test_download_mbps == null ? null : Number(data.speed_test_download_mbps)
     upload = data?.speed_test_upload_mbps == null ? null : Number(data.speed_test_upload_mbps)
@@ -39,6 +41,7 @@ export default async function CustomerLayout({
       {children}
       <VisitSpeedPortal
         customerId={resolvedCustomerId}
+        crlId={resolvedCrlId}
         routeId={decodedCustomerId}
         currentSpeed={speed}
         initialDownload={download}
