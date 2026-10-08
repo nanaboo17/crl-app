@@ -12,7 +12,7 @@ import CustomerSpeedPanel from './CustomerSpeedPanel'
 import styles from './page.module.css'
 
 const TIMEZONE = 'Asia/Jakarta'
-const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxMAlz_VZHT4Bn-ZmEaJKlSwY8YXQjibc2RdggPq6XOhlEisOcoD7f1p4VHuebX3vNS/exec'
+const COMPLAINT_WEB_URL = 'https://script.google.com/macros/s/AKfycbxttere4OHOIDIj9jE5TJ5Ay9Rljps51QqiIjFFD0Bq6B8NAHaN_F7tLXlGHMXfYjaS/exec'
 
 function complaintCustomerName(value: unknown) {
   const clean = String(value || '').trim()
