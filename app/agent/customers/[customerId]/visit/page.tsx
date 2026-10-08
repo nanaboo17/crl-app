@@ -136,7 +136,7 @@ export default function VisitPage() {
         .maybeSingle()
       if (!agentData || !agentData.active || agentData.role !== 'agent') return router.replace('/auth/route')
 
-      const customerLookupColumn = /^CRL\\d{8}$/.test(customerId) ? 'crl_id' : 'customer_id'
+      const customerLookupColumn = /^CRL\d{8}$/.test(customerId) ? 'crl_id' : 'customer_id'
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('*')
