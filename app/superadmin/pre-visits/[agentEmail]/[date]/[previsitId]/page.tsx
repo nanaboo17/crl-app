@@ -54,7 +54,7 @@ export default async function AdminPreVisitDetailPage({ params }: { params: Prom
     )
   }
 
-  const { data: customer } = await supabase.from('customers').select('customer_id,customer_name,phone_number,alternative_phone_1,alternative_phone_2,alternative_phone_3,service_address,region,city,district,sub_district,customer_status,visit_status').eq('customer_id', preVisit.customer_id).maybeSingle()
+  const { data: customer } = await supabase.from('customers').select('crl_id,customer_id,customer_name,phone_number,alternative_phone_1,alternative_phone_2,alternative_phone_3,service_address,region,city,district,sub_district,customer_status,visit_status').eq('crl_id', preVisit.crl_id).maybeSingle()
 
   function formatDateTime(value: string | null) {
     if (!value) return '-'
