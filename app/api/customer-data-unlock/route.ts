@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         .maybeSingle(),
       supabase
         .from('customers')
-        .select('customer_id, agent_email')
+        .select('customer_id, crl_id, agent_email')
         .eq('customer_id', customerId)
         .ilike('agent_email', email)
         .maybeSingle(),
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       .from('customer_data_unlocks')
       .insert({
         customer_id: customerId,
+        crl_id: customer.crl_id,
         agent_email: email,
       })
 
