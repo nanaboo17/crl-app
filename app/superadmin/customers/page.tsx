@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertCircle, CircleDollarSign, Eye, Filter, Inbox, MapPinned, Search, UserCheck, UserPlus, UsersRound } from 'lucide-react'
+import { AlertCircle, CircleDollarSign, Eye, Filter, Inbox, MapPinned, Search, Upload, UserCheck, UserPlus, UsersRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import { cacheGetOrSet } from '@/lib/redis-cache'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
@@ -227,7 +227,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const hasExtraFilters = region !== 'all' || leadEmail !== 'all' || Boolean(search)
 
   return <div className={styles.page}>
-    <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('View the complete CRL customer base and filter by assignment, visit, payment status, and region.', 'Lihat seluruh basis pelanggan CRL dan filter berdasarkan status penugasan, kunjungan, pembayaran, dan region.')} actions={<Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link>} />
+    <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('View the complete CRL customer base and filter by assignment, visit, payment status, and region.', 'Lihat seluruh basis pelanggan CRL dan filter berdasarkan status penugasan, kunjungan, pembayaran, dan region.')} actions={<><Link href="/superadmin/customers/upload" className={styles.addButton}><Upload aria-hidden="true" className="size-4" />{tx('Upload Data', 'Upload Data')}</Link><Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link></>} />
     <section className={styles.hero}><div><span className={styles.heroEyebrow}>{tx('Customer journey', 'Perjalanan pelanggan')}</span><h2>{tx('See every customer stage in one place.', 'Lihat setiap tahap pelanggan dalam satu tempat.')}</h2><p>{tx('Use status, region, and search filters to quickly find the customers you need.', 'Gunakan filter status, region, dan pencarian untuk menemukan pelanggan dengan cepat.')}</p></div><div className={styles.heroScene} aria-hidden="true"><span className={styles.house}>🏡</span><span className={styles.pin}>📍</span><span className={styles.tree}>🌳</span></div></section>
     <section className={styles.summaryGrid}>{summaries.map(({ label, value, icon: Icon, tone }) => <article key={label} className={`${styles.summaryCard} ${styles[`tone_${tone}`]}`}><div className={styles.summaryIcon}><Icon aria-hidden="true" /></div><strong>{value.toLocaleString('id-ID')}</strong><span>{label}</span></article>)}</section>
     <section className={styles.rosterSection}>
