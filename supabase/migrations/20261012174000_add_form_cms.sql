@@ -79,3 +79,47 @@ values
 ('visit','unpaid_reason','Reason for unpaid bill','Alasan belum bayar','select',true,true,70,'[{"value":"Masalah keuangan","label_en":"Financial issue","label_id":"Masalah keuangan"},{"value":"Harga / tagihan","label_en":"Price / billing","label_id":"Harga / tagihan"},{"value":"Pindah ke provider lain","label_en":"Moved to another provider","label_id":"Pindah ke provider lain"},{"value":"Masalah jaringan / layanan","label_en":"Network / service issue","label_id":"Masalah jaringan / layanan"},{"value":"Jarang digunakan","label_en":"Rarely used","label_id":"Jarang digunakan"},{"value":"Pindah alamat","label_en":"Moved address","label_id":"Pindah alamat"},{"value":"Masalah sales","label_en":"Sales issue","label_id":"Masalah sales"},{"value":"Alasan pribadi","label_en":"Personal reason","label_id":"Alasan pribadi"},{"value":"Lainnya","label_en":"Other","label_id":"Lainnya"}]'::jsonb,true,false),
 ('visit','additional_notes','Additional notes','Catatan tambahan','textarea',false,true,80,'[]'::jsonb,true,false)
 on conflict (form_key, field_key) do nothing;
+
+
+-- Existing database note guards follow the CMS required/visible settings.
+create or replace function public.require_previsit_notes()
+returns trigger
+language plpgsql
+set search_path = public
+as $function$
+declare
+  v_required boolean := true;
+  v_visible boolean := true;
+begin
+  select required, visible into v_required, v_visible
+  from public.form_fields
+  where form_key = 'pre_visit' and field_key = 'previsit_notes';
+
+  if coalesce(v_visible,true) and coalesce(v_required,true)
+     and nullif(btrim(new.previsit_notes), '') is null then
+    raise exception 'Pre-Visit notes are required / Catatan Pra-Kunjungan wajib diisi.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$function$;
+
+create or replace function public.require_visit_notes()
+returns trigger
+language plpgsql
+set search_path = public
+as $function$
+declare
+  v_required boolean := true;
+  v_visible boolean := true;
+begin
+  select required, visible into v_required, v_visible
+  from public.form_fields
+  where form_key = 'visit' and field_key = 'additional_notes';
+
+  if coalesce(v_visible,true) and coalesce(v_required,true)
+     and nullif(btrim(new.additional_notes), '') is null then
+    raise exception 'Visit notes are required / Catatan Kunjungan wajib diisi.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$function$;
