@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, Upload, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, FileSpreadsheet, Loader2, PlusCircle, RefreshCw, Upload, XCircle } from 'lucide-react'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
@@ -305,16 +305,38 @@ export default function UploadCustomersPage() {
         breadcrumbs={[{ label: 'Superadmin', href: '/superadmin' }, { label: tx('Customers', 'Pelanggan'), href: '/superadmin/customers' }, { label: tx('Upload Data', 'Upload Data'), icon: Upload }]}
         title={tx('Upload Customer Data', 'Upload Data Pelanggan')}
         description={tx('Upload CSV or XLSX, map columns, validate the rows, then import clean customer records.', 'Upload CSV atau XLSX, petakan kolom, validasi data, lalu impor data pelanggan yang bersih.')}
-        actions={<Link href="/superadmin/customers" className={styles.back}><ArrowLeft className="size-4" />{tx('Back to Customers', 'Kembali ke Pelanggan')}</Link>}
+        actions={<Link href="/superadmin/customers" className={styles.back}><ChevronLeft aria-hidden="true" />{tx('Back to Customers', 'Kembali ke Pelanggan')}</Link>}
       />
 
       <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe customer upload', 'Upload pelanggan aman')}</strong><span>{mode === 'insert' ? tx('Insert mode creates new CRL cases and never overwrites an existing Customer ID + CRL Month.', 'Mode insert membuat case CRL baru dan tidak menimpa Customer ID + Bulan CRL yang sudah ada.') : tx('Update mode only changes mapped enrichment fields on an existing Customer ID + CRL Month: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, invoice_amount, invoice_date, billing_cycle, payment_due_date, and suspension_date. Unpaid Since follows Payment Due Date automatically.', 'Mode update hanya mengubah field enrichment yang dipetakan pada Customer ID + Bulan CRL yang sudah ada: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, invoice_amount, invoice_date, billing_cycle, payment_due_date, dan suspension_date. Unpaid Since otomatis mengikuti Payment Due Date.')}</span></div></div>
 
       <section className={styles.card}>
         <div className={styles.stepHead}><span>0</span><div><h2>{tx('Choose upload mode', 'Pilih mode upload')}</h2><p>{tx('Use Update Existing for your 9 October enrichment file.', 'Gunakan Update Existing untuk file enrichment tanggal 9 Oktober.')}</p></div></div>
-        <div className={styles.actionRow}>
-          <button type="button" onClick={() => { setMode('insert'); setValidation(null); setResult(null) }} className={styles.primary} disabled={mode === 'insert'}>{tx('Insert New Cases', 'Insert Case Baru')}</button>
-          <button type="button" onClick={() => { setMode('update'); setValidation(null); setResult(null) }} className={styles.primary} disabled={mode === 'update'}>{tx('Update Existing', 'Update Data Existing')}</button>
+        <div className={styles.modeSelector} role="group" aria-label={tx('Upload mode', 'Mode upload')}>
+          <button
+            type="button"
+            aria-pressed={mode === 'insert'}
+            onClick={() => { setMode('insert'); setValidation(null); setResult(null) }}
+            className={`${styles.modeButton} ${mode === 'insert' ? styles.modeButtonActive : ''}`}
+          >
+            <span className={styles.modeIcon}><PlusCircle aria-hidden="true" /></span>
+            <span className={styles.modeCopy}>
+              <strong>{tx('Insert New Cases', 'Insert Case Baru')}</strong>
+              <small>{tx('Create a new CRL cycle without overwriting existing data.', 'Buat cycle CRL baru tanpa menimpa data yang sudah ada.')}</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'update'}
+            onClick={() => { setMode('update'); setValidation(null); setResult(null) }}
+            className={`${styles.modeButton} ${mode === 'update' ? styles.modeButtonActive : ''}`}
+          >
+            <span className={styles.modeIcon}><RefreshCw aria-hidden="true" /></span>
+            <span className={styles.modeCopy}>
+              <strong>{tx('Update Existing', 'Update Data Existing')}</strong>
+              <small>{tx('Enrich matching Customer ID + CRL Month records.', 'Perbarui field enrichment untuk Customer ID + Bulan CRL yang cocok.')}</small>
+            </span>
+          </button>
         </div>
       </section>
 
