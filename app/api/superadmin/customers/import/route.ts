@@ -352,6 +352,13 @@ export async function POST(request: Request) {
 
     let inserted = 0
     let updated = 0
+    let assignmentRefresh: {
+      date?: string
+      auto_assigned?: number
+      rolled_forward?: number
+      completed?: number
+      duplicates_cleared?: number
+    } | null = null
 
     if (mode === 'insert') {
       for (let i = 0; i < valid.length; i += 250) {
@@ -374,10 +381,20 @@ export async function POST(request: Request) {
       }
     }
 
+    if (inserted > 0 || updated > 0) {
+      const { data: refreshData, error: refreshError } = await auth.supabase.rpc('refresh_customer_assignments')
+      if (refreshError) {
+        console.error('customer import assignment refresh failed', refreshError)
+        throw new Error(`Customer data was saved, but assignment refresh failed: ${refreshError.message}`)
+      }
+      assignmentRefresh = refreshData ?? null
+    }
+
     return NextResponse.json({
       inserted,
       updated,
       skipped: validation.summary.total - (mode === 'insert' ? inserted : updated),
+      assignmentRefresh,
       validation: {
         summary: validation.summary,
         rows: validation.rows.map(({ payload, ...row }) => row),

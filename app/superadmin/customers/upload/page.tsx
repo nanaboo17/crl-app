@@ -224,7 +224,7 @@ export default function UploadCustomersPage() {
   const [validation, setValidation] = useState<ValidationResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<'insert' | 'update'>('insert')
-  const [result, setResult] = useState<{ inserted: number; updated: number; skipped: number } | null>(null)
+  const [result, setResult] = useState<{ inserted: number; updated: number; skipped: number; autoAssigned: number; rolledForward: number } | null>(null)
   const [error, setError] = useState('')
 
   const normalizedRows = useMemo(() => rawRows.map((row) => {
@@ -281,6 +281,8 @@ export default function UploadCustomersPage() {
           inserted: data.inserted || 0,
           updated: data.updated || 0,
           skipped: data.skipped || 0,
+          autoAssigned: data.assignmentRefresh?.auto_assigned || 0,
+          rolledForward: data.assignmentRefresh?.rolled_forward || 0,
         })
         setValidation(data.validation)
       }
@@ -354,7 +356,7 @@ export default function UploadCustomersPage() {
         </section>
       )}
 
-      {result && <div className={styles.success}><CheckCircle2 /><div><strong>{tx(mode === 'update' ? 'Update complete' : 'Import complete', mode === 'update' ? 'Update selesai' : 'Impor selesai')}</strong><span>{mode === 'update' ? `${result.updated} ${tx('rows updated', 'baris berhasil di-update')}` : `${result.inserted} ${tx('rows inserted', 'baris berhasil diimpor')}`} · {result.skipped} {tx('rows skipped', 'baris dilewati')}</span></div></div>}
+      {result && <div className={styles.success}><CheckCircle2 /><div><strong>{tx(mode === 'update' ? 'Update complete' : 'Import complete', mode === 'update' ? 'Update selesai' : 'Impor selesai')}</strong><span>{mode === 'update' ? `${result.updated} ${tx('rows updated', 'baris berhasil di-update')}` : `${result.inserted} ${tx('rows inserted', 'baris berhasil diimpor')}`} · {result.skipped} {tx('rows skipped', 'baris dilewati')} · {result.autoAssigned} {tx('newly auto-assigned', 'baru ter-assign otomatis')} · {result.rolledForward} {tx('existing assignments refreshed', 'assignment existing diperbarui')}</span></div></div>}
       {error && <div className={styles.error}><XCircle /><span>{error}</span></div>}
     </div>
   )
