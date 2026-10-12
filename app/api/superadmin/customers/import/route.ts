@@ -135,7 +135,7 @@ async function authorize() {
   return { supabase }
 }
 
-async function validateRows(supabase: any, rows: InputRow[]) {
+async function validateRows(supabase: any, rows: InputRow[], mode: 'insert' | 'update', mappedFields: string[]) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return {
       rows: [] as CheckedRow[],
@@ -210,49 +210,78 @@ async function validateRows(supabase: any, rows: InputRow[]) {
 
     if (!customerId) messages.push('Customer ID is required.')
     if (!caseMonth) messages.push('CRL Month is required and must be a valid month/date.')
-    if (!customerName) messages.push('Customer name is required.')
     if (key && duplicateKeys.has(key)) messages.push('Duplicate Customer ID + CRL Month inside this file.')
-    if (existing) messages.push('This Customer ID + CRL Month already exists and will not be overwritten.')
-    if (lat === null || lng === null) messages.push('Latitude and longitude are required.')
-    if (lat !== null && (lat < -90 || lat > 90)) messages.push('Latitude must be between -90 and 90.')
-    if (lng !== null && (lng < -180 || lng > 180)) messages.push('Longitude must be between -180 and 180.')
-    if (agentEmail && !validAgents.has(agentEmail)) messages.push('Assigned agent is not an active agent.')
-    if (rawEstimatedChurnDate && !estimatedChurnDate) messages.push('Estimated Churn Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
+
+    if (mode === 'insert') {
+      if (!customerName) messages.push('Customer name is required.')
+      if (existing) messages.push('This Customer ID + CRL Month already exists and will not be overwritten.')
+      if (lat === null || lng === null) messages.push('Latitude and longitude are required.')
+      if (lat !== null && (lat < -90 || lat > 90)) messages.push('Latitude must be between -90 and 90.')
+      if (lng !== null && (lng < -180 || lng > 180)) messages.push('Longitude must be between -180 and 180.')
+      if (agentEmail && !validAgents.has(agentEmail)) messages.push('Assigned agent is not an active agent.')
+      if (rawEstimatedChurnDate && !estimatedChurnDate) messages.push('Estimated Churn Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
+    } else {
+      if (!existing) messages.push('Customer ID + CRL Month does not exist, so it cannot be updated.')
+      const allowed = new Set(['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount'])
+      if (!mappedFields.some((field) => allowed.has(field))) {
+        messages.push('Map at least one enrichment field to update.')
+      }
+    }
+
     if (rawUnpaidSince && !unpaidSince) messages.push('Unpaid Since must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
 
     const hasError = messages.length > 0
     const assigned = agentEmail && validAgents.has(agentEmail) ? agentEmail : null
 
-    const payload = hasError ? undefined : {
-      customer_id: customerId,
-      case_month: caseMonth,
-      customer_name: customerName,
-      phone_number: nullable(row.phone_number)?.replace(/\D/g, '') || null,
-      service_address: nullable(row.service_address),
-      product: nullable(row.product),
-      site_id: nullable(row.site_id),
-      territory: nullable(row.territory),
-      outstanding_amount: numberOrNull(row.outstanding_amount) ?? 0,
-      invoice_num: nullable(row.invoice_num),
-      invoice_amount: numberOrNull(row.invoice_amount),
-      unpaid_since: unpaidSince,
-      customer_tenure: nullable(row.customer_tenure),
-      payment_status: payment(row.payment_status),
-      priority_rank: priority(row.priority_rank),
-      days_left_to_churn: numberOrNull(row.days_left_to_churn),
-      estimated_churn_date: estimatedChurnDate,
-      region: nullable(row.region),
-      city: nullable(row.city),
-      district: nullable(row.district),
-      sub_district: nullable(row.sub_district),
-      given_latitude: lat,
-      given_longitude: lng,
-      speed: numberOrNull(row.speed),
-      agent_email: assigned,
-      customer_status: assigned ? '1. Assigned' : 'Unassigned',
-      assign_status: assigned ? 'assigned' : 'unassigned',
-      assignment_date: assigned ? new Date().toISOString().slice(0, 10) : null,
-      speed_test: false,
+    let payload: Record<string, unknown> | undefined
+
+    if (!hasError && mode === 'insert') {
+      payload = {
+        customer_id: customerId,
+        case_month: caseMonth,
+        customer_name: customerName,
+        phone_number: nullable(row.phone_number)?.replace(/\D/g, '') || null,
+        service_address: nullable(row.service_address),
+        product: nullable(row.product),
+        site_id: nullable(row.site_id),
+        territory: nullable(row.territory),
+        outstanding_amount: numberOrNull(row.outstanding_amount) ?? 0,
+        invoice_num: nullable(row.invoice_num),
+        invoice_amount: numberOrNull(row.invoice_amount),
+        unpaid_since: unpaidSince,
+        customer_tenure: nullable(row.customer_tenure),
+        payment_status: payment(row.payment_status),
+        priority_rank: priority(row.priority_rank),
+        days_left_to_churn: numberOrNull(row.days_left_to_churn),
+        estimated_churn_date: estimatedChurnDate,
+        region: nullable(row.region),
+        city: nullable(row.city),
+        district: nullable(row.district),
+        sub_district: nullable(row.sub_district),
+        given_latitude: lat,
+        given_longitude: lng,
+        speed: numberOrNull(row.speed),
+        agent_email: assigned,
+        customer_status: assigned ? '1. Assigned' : 'Unassigned',
+        assign_status: assigned ? 'assigned' : 'unassigned',
+        assignment_date: assigned ? new Date().toISOString().slice(0, 10) : null,
+        speed_test: false,
+      }
+    }
+
+    if (!hasError && mode === 'update') {
+      payload = {
+        customer_id: customerId,
+        case_month: caseMonth,
+      }
+
+      if (mappedFields.includes('territory')) payload.territory = nullable(row.territory)
+      if (mappedFields.includes('speed')) payload.speed = numberOrNull(row.speed)
+      if (mappedFields.includes('unpaid_since')) payload.unpaid_since = unpaidSince
+      if (mappedFields.includes('customer_tenure')) payload.customer_tenure = nullable(row.customer_tenure)
+      if (mappedFields.includes('site_id')) payload.site_id = nullable(row.site_id)
+      if (mappedFields.includes('invoice_num')) payload.invoice_num = nullable(row.invoice_num)
+      if (mappedFields.includes('invoice_amount')) payload.invoice_amount = numberOrNull(row.invoice_amount)
     }
 
     return {
@@ -283,9 +312,11 @@ export async function POST(request: Request) {
     if ('error' in auth) return auth.error
 
     const body = await request.json().catch(() => null)
-    const action = body?.action === 'import' ? 'import' : 'validate'
+    const action = body?.action === 'apply' ? 'apply' : 'validate'
+    const mode: 'insert' | 'update' = body?.mode === 'update' ? 'update' : 'insert'
     const rows = Array.isArray(body?.rows) ? body.rows : []
-    const validation = await validateRows(auth.supabase, rows)
+    const mappedFields = Array.isArray(body?.mappedFields) ? body.mappedFields.map((value: unknown) => text(value)) : []
+    const validation = await validateRows(auth.supabase, rows, mode, mappedFields)
 
     if (action === 'validate') {
       return NextResponse.json({
@@ -299,16 +330,33 @@ export async function POST(request: Request) {
       .map((row) => row.payload!)
 
     let inserted = 0
-    for (let i = 0; i < valid.length; i += 250) {
-      const chunk = valid.slice(i, i + 250)
-      const { error } = await auth.supabase.from('customers').insert(chunk)
-      if (error) throw error
-      inserted += chunk.length
+    let updated = 0
+
+    if (mode === 'insert') {
+      for (let i = 0; i < valid.length; i += 250) {
+        const chunk = valid.slice(i, i + 250)
+        const { error } = await auth.supabase.from('customers').insert(chunk)
+        if (error) throw error
+        inserted += chunk.length
+      }
+    } else {
+      for (const row of valid) {
+        const { customer_id, case_month, ...changes } = row
+        const { error } = await auth.supabase
+          .from('customers')
+          .update(changes)
+          .eq('customer_id', customer_id)
+          .eq('case_month', case_month)
+
+        if (error) throw error
+        updated += 1
+      }
     }
 
     return NextResponse.json({
       inserted,
-      skipped: validation.summary.total - inserted,
+      updated,
+      skipped: validation.summary.total - (mode === 'insert' ? inserted : updated),
       validation: {
         summary: validation.summary,
         rows: validation.rows.map(({ payload, ...row }) => row),
