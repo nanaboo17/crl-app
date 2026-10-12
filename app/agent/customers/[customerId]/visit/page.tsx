@@ -753,13 +753,13 @@ export default function VisitPage() {
         <div className="flex items-center gap-2 text-sm font-bold"><Phone className="h-4 w-4" /> {locale === 'id' ? 'Nomor telepon terdaftar' : 'Registered phone'}</div>
         <ReadOnly label={t('agent.visit.fieldCurrentPhone')} value={customer?.phone_number || '-'} />
         {alternativePhones.length > 0 && <div className="grid gap-2 sm:grid-cols-3">{alternativePhones.map((phone: string, index: number) => <ReadOnly key={`${phone}-${index}`} label={locale === 'id' ? `Alternatif ${index + 1}` : `Alternative ${index + 1}`} value={phone} />)}</div>}
-        <Field label={locale === 'id' ? 'Apakah nomor telepon terdaftar sudah benar?' : 'Is the registered phone number correct?'}>
+        <Field label={cmsLabel(visitField('phone_correct'), locale, 'Is the registered phone number correct?', 'Apakah nomor telepon terdaftar sudah benar?')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button type="button" className={`dui-btn ${phoneCorrect === true ? 'dui-btn-success' : 'dui-btn-outline'}`} onClick={() => { setPhoneCorrect(true); setUpdatedPhone('') }}><CheckCircle2 className="h-4 w-4" /> {locale === 'id' ? 'Ya, benar' : 'Yes, correct'}</button>
             <button type="button" className={`dui-btn ${phoneCorrect === false ? 'dui-btn-warning' : 'dui-btn-outline'}`} onClick={() => setPhoneCorrect(false)}><AlertTriangle className="h-4 w-4" /> {locale === 'id' ? 'Tidak, perbarui' : 'No, update'}</button>
           </div>
         </Field>
-        {phoneCorrect === false && <Field label={t('agent.visit.fieldUpdatedPhone')}><input type="tel" inputMode="tel" value={updatedPhone} onChange={(e) => setUpdatedPhone(e.target.value)} className={`dui-input w-full ${updatedPhone && !isValidPhone(updatedPhone) ? 'dui-input-error' : ''}`} placeholder="08xxxxxxxxxx atau 62xxxxxxxxxxx" />{updatedPhone && <div className={`mt-1 text-xs ${isValidPhone(updatedPhone) ? 'text-success' : 'text-error'}`}>{isValidPhone(updatedPhone) ? (locale === 'id' ? 'Nomor telepon valid' : 'Valid phone number') : (locale === 'id' ? 'Gunakan 10–15 digit diawali 0 atau 62' : 'Use 10–15 digits starting with 0 or 62')}</div>}</Field>}
+        {phoneCorrect === false && <Field label={cmsLabel(visitField('updated_phone'), locale, t('agent.visit.fieldUpdatedPhone'), t('agent.visit.fieldUpdatedPhone'))}><input type="tel" inputMode="tel" value={updatedPhone} onChange={(e) => setUpdatedPhone(e.target.value)} className={`dui-input w-full ${updatedPhone && !isValidPhone(updatedPhone) ? 'dui-input-error' : ''}`} placeholder="08xxxxxxxxxx atau 62xxxxxxxxxxx" />{updatedPhone && <div className={`mt-1 text-xs ${isValidPhone(updatedPhone) ? 'text-success' : 'text-error'}`}>{isValidPhone(updatedPhone) ? (locale === 'id' ? 'Nomor telepon valid' : 'Valid phone number') : (locale === 'id' ? 'Gunakan 10–15 digit diawali 0 atau 62' : 'Use 10–15 digits starting with 0 or 62')}</div>}</Field>}
       </StepCard>
 
       <StepCard t={t} step="3" title={t('agent.visit.step3')}>
