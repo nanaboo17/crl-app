@@ -21,7 +21,13 @@ const fields = [
   ['phone_number', 'Phone Number', false],
   ['service_address', 'Service Address', false],
   ['product', 'Product', false],
+  ['site_id', 'Site ID', false],
+  ['territory', 'Territory', false],
   ['outstanding_amount', 'Outstanding Amount', false],
+  ['invoice_num', 'Invoice Number', false],
+  ['invoice_amount', 'Invoice Amount', false],
+  ['unpaid_since', 'Unpaid Since', false],
+  ['customer_tenure', 'Customer Tenure', false],
   ['payment_status', 'Payment Status', false],
   ['priority_rank', 'Priority', false],
   ['days_left_to_churn', 'Days Left to Churn', false],
@@ -45,7 +51,13 @@ const aliases: Record<FieldKey, string[]> = {
   phone_number: ['phone_number', 'phone number', 'phone', 'msisdn', 'nomor telepon'],
   service_address: ['service_address', 'service address', 'address', 'alamat'],
   product: ['product', 'package', 'package_name', 'nama paket'],
-  outstanding_amount: ['outstanding_amount', 'outstanding amount', 'outstanding', 'invoice_amount', 'invoice amount'],
+  site_id: ['site_id', 'site id', 'site'],
+  territory: ['territory', 'territory_code', 'territory code', 'teritory', 'teritori'],
+  outstanding_amount: ['outstanding_amount', 'outstanding amount', 'outstanding', 'balance_out_mny', 'balance out mny'],
+  invoice_num: ['invoice_num', 'invoice number', 'invoice no', 'invoice_no', 'invoice'],
+  invoice_amount: ['invoice_amount', 'invoice amount', 'bill_amount', 'bill amount'],
+  unpaid_since: ['unpaid_since', 'unpaid since'],
+  customer_tenure: ['customer_tenure', 'customer tenure', 'tenure', 'tenure_day', 'tenure day'],
   payment_status: ['payment_status', 'payment status'],
   priority_rank: ['priority_rank', 'priority rank', 'priority'],
   days_left_to_churn: ['days_left_to_churn', 'days left to churn', 'days_to_churn'],
@@ -293,7 +305,7 @@ export default function UploadCustomersPage() {
       {preview.length > 0 && (
         <section className={styles.card}>
           <div className={styles.stepHead}><span>3</span><div><h2>{tx('Preview & validate', 'Preview & validasi')}</h2><p>{tx('Previewing the first 8 rows. Validation checks required fields, coordinates, duplicate Customer ID + CRL Month cases, and assigned agents.', 'Menampilkan 8 baris pertama. Validasi memeriksa field wajib, koordinat, duplikasi Customer ID + Bulan CRL, dan agen yang ditugaskan.')}</p></div></div>
-          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
+          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Site ID</th><th>Territory</th><th>Invoice #</th><th>Invoice Amount</th><th>Unpaid Since</th><th>Tenure</th><th>Speed</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.site_id || '—'}</td><td>{row.territory || '—'}</td><td>{row.invoice_num || '—'}</td><td>{row.invoice_amount || '—'}</td><td>{row.unpaid_since || '—'}</td><td>{row.customer_tenure || '—'}</td><td>{row.speed || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
           <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx('Validate Data', 'Validasi Data')}</button></div>
         </section>
       )}
