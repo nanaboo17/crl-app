@@ -7,6 +7,7 @@ import {
   MapPin,
   MapPinned,
   Route,
+  Settings2,
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -58,6 +59,7 @@ export const superadminConfig: ShellConfig = {
       { href: '/superadmin/visits', labelKey: 'nav.visits', icon: MapPin },
       { href: '/superadmin/attendance', labelKey: 'nav.attendance', icon: CalendarCheck2 },
       { href: '/superadmin/reports', labelKey: 'nav.reports', icon: FileBarChart2 },
+      { href: '/superadmin/cms', labelKey: 'nav.cms', icon: Settings2 },
     ]),
   ],
 }
