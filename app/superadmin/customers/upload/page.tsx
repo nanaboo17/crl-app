@@ -215,7 +215,8 @@ export default function UploadCustomersPage() {
   const [mapping, setMapping] = useState<Partial<Record<FieldKey, string>>>({})
   const [validation, setValidation] = useState<ValidationResponse | null>(null)
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null)
+  const [mode, setMode] = useState<'insert' | 'update'>('insert')
+  const [result, setResult] = useState<{ inserted: number; updated: number; skipped: number } | null>(null)
   const [error, setError] = useState('')
 
   const normalizedRows = useMemo(() => rawRows.map((row) => {
@@ -250,24 +251,41 @@ export default function UploadCustomersPage() {
     } finally { setBusy(false) }
   }
 
-  async function callApi(action: 'validate' | 'import') {
+  async function callApi(action: 'validate' | 'apply') {
     setBusy(true); setError('')
     try {
       const response = await fetch('/api/superadmin/customers/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, rows: normalizedRows }),
+        body: JSON.stringify({
+          action,
+          mode,
+          rows: normalizedRows,
+          mappedFields: Object.keys(mapping).filter((key) => Boolean(mapping[key as FieldKey])),
+        }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data?.error || 'Request failed.')
       if (action === 'validate') setValidation(data)
-      else { setResult({ inserted: data.inserted, skipped: data.skipped }); setValidation(data.validation) }
+      else {
+        setResult({
+          inserted: data.inserted || 0,
+          updated: data.updated || 0,
+          skipped: data.skipped || 0,
+        })
+        setValidation(data.validation)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed.')
     } finally { setBusy(false) }
   }
 
-  const canValidate = rawRows.length > 0 && Boolean(mapping.customer_id && mapping.case_month && mapping.customer_name && mapping.given_latitude && mapping.given_longitude)
+  const updateFields: FieldKey[] = ['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount']
+  const canValidate = rawRows.length > 0 && (
+    mode === 'insert'
+      ? Boolean(mapping.customer_id && mapping.case_month && mapping.customer_name && mapping.given_latitude && mapping.given_longitude)
+      : Boolean(mapping.customer_id && mapping.case_month && updateFields.some((key) => mapping[key]))
+  )
   const preview = normalizedRows.slice(0, 8)
 
   return (
@@ -279,7 +297,15 @@ export default function UploadCustomersPage() {
         actions={<Link href="/superadmin/customers" className={styles.back}><ArrowLeft className="size-4" />{tx('Back to Customers', 'Kembali ke Pelanggan')}</Link>}
       />
 
-      <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe import mode', 'Mode impor aman')}</strong><span>{tx('Each uploaded row creates a CRL case. The same Customer ID can appear in another month, but the same Customer ID + CRL Month combination cannot be imported twice.', 'Setiap baris upload membuat satu case CRL. Customer ID yang sama boleh muncul di bulan berbeda, tetapi kombinasi Customer ID + Bulan CRL yang sama tidak dapat diimpor dua kali.')}</span></div></div>
+      <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe customer upload', 'Upload pelanggan aman')}</strong><span>{mode === 'insert' ? tx('Insert mode creates new CRL cases and never overwrites an existing Customer ID + CRL Month.', 'Mode insert membuat case CRL baru dan tidak menimpa Customer ID + Bulan CRL yang sudah ada.') : tx('Update mode only changes mapped enrichment fields on an existing Customer ID + CRL Month: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, and invoice_amount.', 'Mode update hanya mengubah field enrichment yang dipetakan pada Customer ID + Bulan CRL yang sudah ada: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, dan invoice_amount.')}</span></div></div>
+
+      <section className={styles.card}>
+        <div className={styles.stepHead}><span>0</span><div><h2>{tx('Choose upload mode', 'Pilih mode upload')}</h2><p>{tx('Use Update Existing for your 9 October enrichment file.', 'Gunakan Update Existing untuk file enrichment tanggal 9 Oktober.')}</p></div></div>
+        <div className={styles.actionRow}>
+          <button type="button" onClick={() => { setMode('insert'); setValidation(null); setResult(null) }} className={styles.primary} disabled={mode === 'insert'}>{tx('Insert New Cases', 'Insert Case Baru')}</button>
+          <button type="button" onClick={() => { setMode('update'); setValidation(null); setResult(null) }} className={styles.primary} disabled={mode === 'update'}>{tx('Update Existing', 'Update Data Existing')}</button>
+        </div>
+      </section>
 
       <section className={styles.card}>
         <div className={styles.stepHead}><span>1</span><div><h2>{tx('Upload file', 'Upload file')}</h2><p>{tx('CSV and XLSX are supported. XLSX reads the first worksheet.', 'CSV dan XLSX didukung. XLSX membaca worksheet pertama.')}</p></div></div>
@@ -306,20 +332,20 @@ export default function UploadCustomersPage() {
         <section className={styles.card}>
           <div className={styles.stepHead}><span>3</span><div><h2>{tx('Preview & validate', 'Preview & validasi')}</h2><p>{tx('Previewing the first 8 rows. Validation checks required fields, coordinates, duplicate Customer ID + CRL Month cases, and assigned agents.', 'Menampilkan 8 baris pertama. Validasi memeriksa field wajib, koordinat, duplikasi Customer ID + Bulan CRL, dan agen yang ditugaskan.')}</p></div></div>
           <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Site ID</th><th>Territory</th><th>Invoice #</th><th>Invoice Amount</th><th>Unpaid Since</th><th>Tenure</th><th>Speed</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.site_id || '—'}</td><td>{row.territory || '—'}</td><td>{row.invoice_num || '—'}</td><td>{row.invoice_amount || '—'}</td><td>{row.unpaid_since || '—'}</td><td>{row.customer_tenure || '—'}</td><td>{row.speed || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
-          <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx('Validate Data', 'Validasi Data')}</button></div>
+          <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx(mode === 'update' ? 'Validate Updates' : 'Validate Data', mode === 'update' ? 'Validasi Update' : 'Validasi Data')}</button></div>
         </section>
       )}
 
       {validation && (
         <section className={styles.card}>
-          <div className={styles.stepHead}><span>4</span><div><h2>{tx('Validation result', 'Hasil validasi')}</h2><p>{tx('Only valid CRL cases will be imported. Existing Customer ID + CRL Month cases remain untouched.', 'Hanya case CRL valid yang akan diimpor. Kombinasi Customer ID + Bulan CRL yang sudah ada tidak akan diubah.')}</p></div></div>
+          <div className={styles.stepHead}><span>4</span><div><h2>{tx('Validation result', 'Hasil validasi')}</h2><p>{mode === 'update' ? tx('Only existing Customer ID + CRL Month rows will be updated, and only mapped enrichment fields will change.', 'Hanya Customer ID + Bulan CRL yang sudah ada yang akan di-update, dan hanya field enrichment yang dipetakan yang akan berubah.') : tx('Only valid CRL cases will be imported. Existing Customer ID + CRL Month cases remain untouched.', 'Hanya case CRL valid yang akan diimpor. Kombinasi Customer ID + Bulan CRL yang sudah ada tidak akan diubah.')}</p></div></div>
           <div className={styles.stats}><Stat label={tx('Total', 'Total')} value={validation.summary.total} /><Stat label={tx('Valid', 'Valid')} value={validation.summary.valid} good /><Stat label={tx('Warnings', 'Peringatan')} value={validation.summary.warnings} /><Stat label={tx('Errors', 'Error')} value={validation.summary.errors} bad /><Stat label={tx('Existing', 'Sudah ada')} value={validation.summary.existing} /></div>
           {validation.rows.some((row) => row.status !== 'valid') && <div className={styles.issueList}>{validation.rows.filter((row) => row.status !== 'valid').slice(0, 50).map((row) => <div key={row.row} className={row.status === 'error' ? styles.issueError : styles.issueWarning}>{row.status === 'error' ? <XCircle /> : <AlertTriangle />}<div><strong>{tx('Row', 'Baris')} {row.row} · {row.customer_id || '—'}</strong><span>{row.messages.join(' · ')}</span></div></div>)}</div>}
-          <div className={styles.actionRow}><button disabled={busy || validation.summary.valid === 0} onClick={() => callApi('import')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <Upload />}{tx(`Import ${validation.summary.valid} Valid Rows`, `Impor ${validation.summary.valid} Baris Valid`)}</button></div>
+          <div className={styles.actionRow}><button disabled={busy || validation.summary.valid === 0} onClick={() => callApi('apply')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <Upload />}{mode === 'update' ? tx(`Update ${validation.summary.valid} Existing Rows`, `Update ${validation.summary.valid} Baris Existing`) : tx(`Import ${validation.summary.valid} Valid Rows`, `Impor ${validation.summary.valid} Baris Valid`)}</button></div>
         </section>
       )}
 
-      {result && <div className={styles.success}><CheckCircle2 /><div><strong>{tx('Import complete', 'Impor selesai')}</strong><span>{result.inserted} {tx('rows inserted', 'baris berhasil diimpor')} · {result.skipped} {tx('rows skipped', 'baris dilewati')}</span></div></div>}
+      {result && <div className={styles.success}><CheckCircle2 /><div><strong>{tx(mode === 'update' ? 'Update complete' : 'Import complete', mode === 'update' ? 'Update selesai' : 'Impor selesai')}</strong><span>{mode === 'update' ? `${result.updated} ${tx('rows updated', 'baris berhasil di-update')}` : `${result.inserted} ${tx('rows inserted', 'baris berhasil diimpor')}`} · {result.skipped} {tx('rows skipped', 'baris dilewati')}</span></div></div>}
       {error && <div className={styles.error}><XCircle /><span>{error}</span></div>}
     </div>
   )
