@@ -9,6 +9,8 @@ import type { Customer } from '@/lib/types'
 import PageTop from '@/components/PageTop'
 import Loading from '@/components/Loading'
 import { useI18n } from '@/components/providers/i18n-provider'
+import CmsCustomFields, { validateCmsCustomFields } from '@/components/forms/CmsCustomFields'
+import { cmsField, cmsLabel, cmsOptions, loadCmsFormFields, type CmsFormField } from '@/lib/form-cms'
 import styles from './page.module.css'
 
 type FormState = {
@@ -146,6 +148,8 @@ export default function PreVisitForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState<FormState>(initialForm)
+  const [cmsFields, setCmsFields] = useState<CmsFormField[]>([])
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>({})
   const [minDateTime, setMinDateTime] = useState('')
 
   useEffect(() => setMinDateTime(jakartaInputNow()), [])
@@ -159,6 +163,7 @@ export default function PreVisitForm() {
       }
 
       const s = createClient()
+      try { setCmsFields(await loadCmsFormFields('pre_visit')) } catch {}
       const customerLookupColumn = /^CRL\d{8}$/.test(customerId) ? 'crl_id' : 'customer_id'
       const { data: customerData, error: customerError } = await s.from('customers').select('*').eq(customerLookupColumn, customerId).single()
       const { data: previousData, error: previousError } = customerData
@@ -219,6 +224,10 @@ export default function PreVisitForm() {
     return []
   }, [form.phone_contacted, locale])
 
+  const preField = (key: string) => cmsField(cmsFields, key)
+  const unpaidReasonOptions = cmsOptions(preField('unpaid_reason'), locale)
+  const previsitNotesField = preField('previsit_notes')
+
   const customerLat = Number(customer?.given_latitude)
   const customerLng = Number(customer?.given_longitude)
   const hasCustomerCoordinates = Number.isFinite(customerLat) && Number.isFinite(customerLng) && customer?.given_latitude != null && customer?.given_longitude != null
@@ -278,7 +287,9 @@ export default function PreVisitForm() {
         throw new Error(tx('Please confirm whether to visit directly.', 'Konfirmasi apakah akan langsung melakukan kunjungan.'))
       }
 
-      if (!form.previsit_notes.trim()) throw new Error(tx('Pre-Visit notes are required.', 'Catatan Pra-Kunjungan wajib diisi.'))
+      if (previsitNotesField?.visible !== false && previsitNotesField?.required !== false && !form.previsit_notes.trim()) throw new Error(tx('Pre-Visit notes are required.', 'Catatan Pra-Kunjungan wajib diisi.'))
+      const customValidation = validateCmsCustomFields(cmsFields, customValues, locale)
+      if (customValidation) throw new Error(customValidation)
 
       const p = await getCurrentProfile()
       const s = createClient()
@@ -310,7 +321,8 @@ export default function PreVisitForm() {
         supervisor_approval: false,
         direct_visit: outcome.direct,
         stop_reason: outcome.reason,
-        previsit_notes: form.previsit_notes.trim(),
+        previsit_notes: form.previsit_notes.trim() || null,
+        extra_data: customValues,
         previsit_status: outcome.status,
       }
 
@@ -377,7 +389,7 @@ export default function PreVisitForm() {
             <div className={styles.field}><label>{tx('Landmark / access note', 'Patokan / catatan akses')}</label><textarea value={form.landmark} onChange={(e) => setForm((current) => ({ ...current, landmark: e.target.value }))} placeholder={tx('Nearest landmark or access note', 'Patokan terdekat atau catatan akses')} /></div>
           </section>
 
-          <section className={styles.stepCard}><div className={styles.stepTitle}><span>4</span><div><h2>{tx('Unpaid Reason', 'Alasan Belum Bayar')}</h2><p>{tx('Record why the customer has not paid yet.', 'Catat alasan pelanggan belum melakukan pembayaran.')}</p></div></div><div className={styles.field}><label>{tx('Unpaid reason', 'Alasan belum bayar')}</label><select value={form.unpaid_reason} onChange={(e) => setForm((current) => ({ ...current, unpaid_reason: e.target.value }))}><option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>{UNPAID_REASONS.map(([value, en]) => <option key={value} value={value}>{locale === 'id' ? value : en}</option>)}</select></div></section>
+          {preField('unpaid_reason')?.visible !== false && <section className={styles.stepCard}><div className={styles.stepTitle}><span>4</span><div><h2>{tx('Unpaid Reason', 'Alasan Belum Bayar')}</h2><p>{tx('Record why the customer has not paid yet.', 'Catat alasan pelanggan belum melakukan pembayaran.')}</p></div></div><div className={styles.field}><label>{cmsLabel(preField('unpaid_reason'), locale, 'Unpaid reason', 'Alasan belum bayar')}{preField('unpaid_reason')?.required ? ' *' : ''}</label><select value={form.unpaid_reason} onChange={(e) => setForm((current) => ({ ...current, unpaid_reason: e.target.value }))}><option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>{(unpaidReasonOptions.length ? unpaidReasonOptions : UNPAID_REASONS.map(([value, en]) => ({ value, label: locale === 'id' ? value : en }))).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div></section>}
 
           <section className={styles.stepCard}><div className={styles.stepTitle}><span>5</span><div><h2>{tx('Appointment', 'Janji Kunjungan')}</h2><p>{tx('Confirm the agreed visit date and time.', 'Konfirmasi tanggal dan waktu kunjungan yang telah disepakati.')}</p></div></div><div className={styles.question}><label>{tx('Does the customer want to make an appointment?', 'Apakah pelanggan ingin membuat janji kunjungan?')}</label><div className={styles.choiceGrid}><button type="button" className={form.wants_appointment === true ? styles.selected : ''} onClick={() => setBoolean('wants_appointment', true)}>{tx('Yes', 'Ya')}</button><button type="button" className={form.wants_appointment === false ? styles.selected : ''} onClick={() => setBoolean('wants_appointment', false)}>{tx('No', 'Tidak')}</button></div></div>{form.wants_appointment === true && <div className={styles.field}><label>{tx('Visit date & time (WIB)', 'Tanggal & waktu kunjungan (WIB)')}</label><input type="datetime-local" value={form.appointment_date} min={minDateTime || undefined} step={60} onChange={(e) => setForm((current) => ({ ...current, appointment_date: e.target.value }))} /></div>}</section>
         </>}
@@ -390,7 +402,9 @@ export default function PreVisitForm() {
           </section>
         )}
 
-        <section className={styles.stepCard}><div className={styles.stepTitle}><span>✓</span><div><h2>{tx('Closure', 'Penutupan')}</h2><p>{tx('The status is calculated automatically from the answers above.', 'Status dihitung otomatis berdasarkan jawaban di atas.')}</p></div></div><div className={styles.statusBox}><span>{tx('Pre-Visit status', 'Status Pra-Kunjungan')}</span><strong>{outcome.status}</strong>{outcome.reason && <small>{outcome.reason}</small>}</div><div className={styles.field}><label>{tx('Notes', 'Catatan')} *</label><textarea value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={tx('Required notes', 'Catatan wajib diisi')} /></div></section>
+        <section className={styles.stepCard}><div className={styles.stepTitle}><span>✓</span><div><h2>{tx('Closure', 'Penutupan')}</h2><p>{tx('The status is calculated automatically from the answers above.', 'Status dihitung otomatis berdasarkan jawaban di atas.')}</p></div></div><div className={styles.statusBox}><span>{tx('Pre-Visit status', 'Status Pra-Kunjungan')}</span><strong>{outcome.status}</strong>{outcome.reason && <small>{outcome.reason}</small>}</div>{previsitNotesField?.visible !== false && <div className={styles.field}><label>{cmsLabel(previsitNotesField, locale, 'Notes', 'Catatan')}{previsitNotesField?.required !== false ? ' *' : ''}</label><textarea value={form.previsit_notes} onChange={(e) => setForm((current) => ({ ...current, previsit_notes: e.target.value }))} placeholder={locale === 'id' ? (previsitNotesField?.placeholder_id || 'Catatan wajib diisi') : (previsitNotesField?.placeholder_en || 'Required notes')} /></div>}</section>
+
+        <CmsCustomFields fields={cmsFields} values={customValues} onChange={(key, value) => setCustomValues((current) => ({ ...current, [key]: value }))} locale={locale} />
 
         <button className={styles.submitButton} disabled={saving}>{saving ? tx('Saving…', 'Menyimpan…') : previousPreVisitId ? tx('Save New Pre-Visit', 'Simpan Pra-Kunjungan Baru') : tx('Save Pre-Visit', 'Simpan Pra-Kunjungan')}</button>
       </form>
