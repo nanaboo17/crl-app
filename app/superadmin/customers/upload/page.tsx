@@ -26,6 +26,9 @@ const fields = [
   ['outstanding_amount', 'Outstanding Amount', false],
   ['invoice_num', 'Invoice Number', false],
   ['invoice_amount', 'Invoice Amount', false],
+  ['billing_cycle', 'Billing Cycle', false],
+  ['payment_due_date', 'Payment Due Date', false],
+  ['suspension_date', 'Suspension Date', false],
   ['unpaid_since', 'Unpaid Since', false],
   ['customer_tenure', 'Customer Tenure', false],
   ['payment_status', 'Payment Status', false],
@@ -56,6 +59,9 @@ const aliases: Record<FieldKey, string[]> = {
   outstanding_amount: ['outstanding_amount', 'outstanding amount', 'outstanding', 'balance_out_mny', 'balance out mny'],
   invoice_num: ['invoice_num', 'invoice number', 'invoice no', 'invoice_no', 'invoice'],
   invoice_amount: ['invoice_amount', 'invoice amount', 'bill_amount', 'bill amount'],
+  billing_cycle: ['billing_cycle', 'billing cycle', 'bill_cycle', 'bill cycle'],
+  payment_due_date: ['payment_due_date', 'payment due date', 'payment_due_dat', 'payment due dat', 'due_date', 'due date'],
+  suspension_date: ['suspension_date', 'suspension date', 'ac_st_dt', 'ac st dt'],
   unpaid_since: ['unpaid_since', 'unpaid since'],
   customer_tenure: ['customer_tenure', 'customer tenure', 'tenure', 'tenure_day', 'tenure day'],
   payment_status: ['payment_status', 'payment status'],
@@ -280,7 +286,7 @@ export default function UploadCustomersPage() {
     } finally { setBusy(false) }
   }
 
-  const updateFields: FieldKey[] = ['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount']
+  const updateFields: FieldKey[] = ['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount', 'billing_cycle', 'payment_due_date', 'suspension_date']
   const canValidate = rawRows.length > 0 && (
     mode === 'insert'
       ? Boolean(mapping.customer_id && mapping.case_month && mapping.customer_name && mapping.given_latitude && mapping.given_longitude)
@@ -297,7 +303,7 @@ export default function UploadCustomersPage() {
         actions={<Link href="/superadmin/customers" className={styles.back}><ArrowLeft className="size-4" />{tx('Back to Customers', 'Kembali ke Pelanggan')}</Link>}
       />
 
-      <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe customer upload', 'Upload pelanggan aman')}</strong><span>{mode === 'insert' ? tx('Insert mode creates new CRL cases and never overwrites an existing Customer ID + CRL Month.', 'Mode insert membuat case CRL baru dan tidak menimpa Customer ID + Bulan CRL yang sudah ada.') : tx('Update mode only changes mapped enrichment fields on an existing Customer ID + CRL Month: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, and invoice_amount.', 'Mode update hanya mengubah field enrichment yang dipetakan pada Customer ID + Bulan CRL yang sudah ada: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, dan invoice_amount.')}</span></div></div>
+      <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe customer upload', 'Upload pelanggan aman')}</strong><span>{mode === 'insert' ? tx('Insert mode creates new CRL cases and never overwrites an existing Customer ID + CRL Month.', 'Mode insert membuat case CRL baru dan tidak menimpa Customer ID + Bulan CRL yang sudah ada.') : tx('Update mode only changes mapped enrichment fields on an existing Customer ID + CRL Month: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, invoice_amount, billing_cycle, payment_due_date, and suspension_date.', 'Mode update hanya mengubah field enrichment yang dipetakan pada Customer ID + Bulan CRL yang sudah ada: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, invoice_amount, billing_cycle, payment_due_date, dan suspension_date.')}</span></div></div>
 
       <section className={styles.card}>
         <div className={styles.stepHead}><span>0</span><div><h2>{tx('Choose upload mode', 'Pilih mode upload')}</h2><p>{tx('Use Update Existing for your 9 October enrichment file.', 'Gunakan Update Existing untuk file enrichment tanggal 9 Oktober.')}</p></div></div>
@@ -331,7 +337,7 @@ export default function UploadCustomersPage() {
       {preview.length > 0 && (
         <section className={styles.card}>
           <div className={styles.stepHead}><span>3</span><div><h2>{tx('Preview & validate', 'Preview & validasi')}</h2><p>{tx('Previewing the first 8 rows. Validation checks required fields, coordinates, duplicate Customer ID + CRL Month cases, and assigned agents.', 'Menampilkan 8 baris pertama. Validasi memeriksa field wajib, koordinat, duplikasi Customer ID + Bulan CRL, dan agen yang ditugaskan.')}</p></div></div>
-          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Site ID</th><th>Territory</th><th>Invoice #</th><th>Invoice Amount</th><th>Unpaid Since</th><th>Tenure</th><th>Speed</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.site_id || '—'}</td><td>{row.territory || '—'}</td><td>{row.invoice_num || '—'}</td><td>{row.invoice_amount || '—'}</td><td>{row.unpaid_since || '—'}</td><td>{row.customer_tenure || '—'}</td><td>{row.speed || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
+          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Site ID</th><th>Territory</th><th>Invoice #</th><th>Invoice Amount</th><th>Billing Cycle</th><th>Payment Due</th><th>Suspension Date</th><th>Unpaid Since</th><th>Tenure</th><th>Speed</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.site_id || '—'}</td><td>{row.territory || '—'}</td><td>{row.invoice_num || '—'}</td><td>{row.invoice_amount || '—'}</td><td>{row.billing_cycle || '—'}</td><td>{row.payment_due_date || '—'}</td><td>{row.suspension_date || '—'}</td><td>{row.unpaid_since || '—'}</td><td>{row.customer_tenure || '—'}</td><td>{row.speed || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
           <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx(mode === 'update' ? 'Validate Updates' : 'Validate Data', mode === 'update' ? 'Validasi Update' : 'Validasi Data')}</button></div>
         </section>
       )}
