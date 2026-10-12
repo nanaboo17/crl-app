@@ -205,6 +205,10 @@ async function validateRows(supabase: any, rows: InputRow[], mode: 'insert' | 'u
     const estimatedChurnDate = normalizeDate(row.estimated_churn_date)
     const rawUnpaidSince = text(row.unpaid_since)
     const unpaidSince = normalizeDate(row.unpaid_since)
+    const rawPaymentDueDate = text(row.payment_due_date)
+    const paymentDueDate = normalizeDate(row.payment_due_date)
+    const rawSuspensionDate = text(row.suspension_date)
+    const suspensionDate = normalizeDate(row.suspension_date)
     const key = customerId && caseMonth ? caseKey(customerId, caseMonth) : ''
     const existing = Boolean(key && existingKeys.has(key))
 
@@ -222,13 +226,15 @@ async function validateRows(supabase: any, rows: InputRow[], mode: 'insert' | 'u
       if (rawEstimatedChurnDate && !estimatedChurnDate) messages.push('Estimated Churn Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
     } else {
       if (!existing) messages.push('Customer ID + CRL Month does not exist, so it cannot be updated.')
-      const allowed = new Set(['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount'])
+      const allowed = new Set(['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount', 'billing_cycle', 'payment_due_date', 'suspension_date'])
       if (!mappedFields.some((field) => allowed.has(field))) {
         messages.push('Map at least one enrichment field to update.')
       }
     }
 
     if (rawUnpaidSince && !unpaidSince) messages.push('Unpaid Since must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
+    if (rawPaymentDueDate && !paymentDueDate) messages.push('Payment Due Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
+    if (rawSuspensionDate && !suspensionDate) messages.push('Suspension Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
 
     const hasError = messages.length > 0
     const assigned = agentEmail && validAgents.has(agentEmail) ? agentEmail : null
@@ -248,6 +254,9 @@ async function validateRows(supabase: any, rows: InputRow[], mode: 'insert' | 'u
         outstanding_amount: numberOrNull(row.outstanding_amount) ?? 0,
         invoice_num: nullable(row.invoice_num),
         invoice_amount: numberOrNull(row.invoice_amount),
+        billing_cycle: nullable(row.billing_cycle),
+        payment_due_date: paymentDueDate,
+        suspension_date: suspensionDate,
         unpaid_since: unpaidSince,
         customer_tenure: nullable(row.customer_tenure),
         payment_status: payment(row.payment_status),
@@ -282,6 +291,9 @@ async function validateRows(supabase: any, rows: InputRow[], mode: 'insert' | 'u
       if (mappedFields.includes('site_id')) payload.site_id = nullable(row.site_id)
       if (mappedFields.includes('invoice_num')) payload.invoice_num = nullable(row.invoice_num)
       if (mappedFields.includes('invoice_amount')) payload.invoice_amount = numberOrNull(row.invoice_amount)
+      if (mappedFields.includes('billing_cycle')) payload.billing_cycle = nullable(row.billing_cycle)
+      if (mappedFields.includes('payment_due_date')) payload.payment_due_date = paymentDueDate
+      if (mappedFields.includes('suspension_date')) payload.suspension_date = suspensionDate
     }
 
     return {
