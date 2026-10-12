@@ -203,6 +203,8 @@ async function validateRows(supabase: any, rows: InputRow[]) {
     const agentEmail = text(row.agent_email).toLowerCase()
     const rawEstimatedChurnDate = text(row.estimated_churn_date)
     const estimatedChurnDate = normalizeDate(row.estimated_churn_date)
+    const rawUnpaidSince = text(row.unpaid_since)
+    const unpaidSince = normalizeDate(row.unpaid_since)
     const key = customerId && caseMonth ? caseKey(customerId, caseMonth) : ''
     const existing = Boolean(key && existingKeys.has(key))
 
@@ -216,6 +218,7 @@ async function validateRows(supabase: any, rows: InputRow[]) {
     if (lng !== null && (lng < -180 || lng > 180)) messages.push('Longitude must be between -180 and 180.')
     if (agentEmail && !validAgents.has(agentEmail)) messages.push('Assigned agent is not an active agent.')
     if (rawEstimatedChurnDate && !estimatedChurnDate) messages.push('Estimated Churn Date must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
+    if (rawUnpaidSince && !unpaidSince) messages.push('Unpaid Since must be YYYY-MM-DD, DD/MM/YYYY, or a valid Excel date.')
 
     const hasError = messages.length > 0
     const assigned = agentEmail && validAgents.has(agentEmail) ? agentEmail : null
@@ -227,7 +230,13 @@ async function validateRows(supabase: any, rows: InputRow[]) {
       phone_number: nullable(row.phone_number)?.replace(/\D/g, '') || null,
       service_address: nullable(row.service_address),
       product: nullable(row.product),
+      site_id: nullable(row.site_id),
+      territory: nullable(row.territory),
       outstanding_amount: numberOrNull(row.outstanding_amount) ?? 0,
+      invoice_num: nullable(row.invoice_num),
+      invoice_amount: numberOrNull(row.invoice_amount),
+      unpaid_since: unpaidSince,
+      customer_tenure: nullable(row.customer_tenure),
       payment_status: payment(row.payment_status),
       priority_rank: priority(row.priority_rank),
       days_left_to_churn: numberOrNull(row.days_left_to_churn),
