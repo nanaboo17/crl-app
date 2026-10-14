@@ -75,6 +75,8 @@ export default function SuperadminReportsPage() {
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [rows, setRows] = useState<ReportRow[]>([])
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
+  const [weeklyWeek, setWeeklyWeek] = useState('')
+  const [weeklyPage, setWeeklyPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -155,6 +157,39 @@ export default function SuperadminReportsPage() {
     return weeklyRows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
   }, [agents, organization, weeklyRows])
 
+
+  const weeklyWeekOptions = useMemo(() => Array.from(
+    new Map(
+      visibleWeeklyRows.map((row) => [
+        row.week_start,
+        { week_start: row.week_start, week_end: row.week_end },
+      ])
+    ).values()
+  ).sort((a, b) => b.week_start.localeCompare(a.week_start)), [visibleWeeklyRows])
+
+  const filteredWeeklyRows = useMemo(
+    () => weeklyWeek
+      ? visibleWeeklyRows.filter((row) => row.week_start === weeklyWeek)
+      : visibleWeeklyRows,
+    [visibleWeeklyRows, weeklyWeek]
+  )
+
+  const WEEKLY_PAGE_SIZE = 10
+  const weeklyTotalPages = Math.max(1, Math.ceil(filteredWeeklyRows.length / WEEKLY_PAGE_SIZE))
+  const safeWeeklyPage = Math.min(weeklyPage, weeklyTotalPages)
+  const paginatedWeeklyRows = filteredWeeklyRows.slice(
+    (safeWeeklyPage - 1) * WEEKLY_PAGE_SIZE,
+    safeWeeklyPage * WEEKLY_PAGE_SIZE
+  )
+
+  useEffect(() => {
+    setWeeklyPage(1)
+  }, [weeklyWeek, organization, agentEmail, startDate, endDate])
+
+  useEffect(() => {
+    if (weeklyPage > weeklyTotalPages) setWeeklyPage(weeklyTotalPages)
+  }, [weeklyPage, weeklyTotalPages])
+
   const weeklyTotals = useMemo(() => {
     const byWeek = new Map<string, { week_start: string; week_end: string; pre_visits: number; visits: number }>()
     for (const row of visibleWeeklyRows) {
@@ -170,6 +205,16 @@ export default function SuperadminReportsPage() {
     }
     return Array.from(byWeek.values()).sort((a, b) => a.week_start.localeCompare(b.week_start))
   }, [visibleWeeklyRows])
+
+
+  const chartWeekStart = weeklyWeek || weeklyWeekOptions[0]?.week_start || ''
+  const chartAgentRows = useMemo(
+    () => visibleWeeklyRows
+      .filter((row) => row.week_start === chartWeekStart)
+      .sort((a, b) => (Number(b.visits || 0) + Number(b.pre_visits || 0)) - (Number(a.visits || 0) + Number(a.pre_visits || 0)))
+      .slice(0, 10),
+    [chartWeekStart, visibleWeeklyRows]
+  )
 
   const totals = useMemo(() => visibleRows.reduce(
     (acc, row) => ({
@@ -388,9 +433,26 @@ export default function SuperadminReportsPage() {
       </section>
 
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
-        <div className="dui-card-body gap-3 p-0 sm:p-0">
-          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
-            <Users className="h-5 w-5" /> {tx('Weekly Activity by Agent', 'Aktivitas Mingguan per Agen')}
+        <div className="dui-card-body gap-4 p-0 sm:p-0">
+          <div className="flex flex-col gap-3 px-4 pt-4 sm:flex-row sm:items-end sm:justify-between sm:px-5 sm:pt-5">
+            <div className="flex items-center gap-2 font-bold">
+              <Users className="h-5 w-5" /> {tx('Weekly Activity by Agent', 'Aktivitas Mingguan per Agen')}
+            </div>
+            <label className="dui-fieldset w-full sm:w-72">
+              <span className="dui-fieldset-legend">{tx('Filter week', 'Filter minggu')}</span>
+              <select
+                className="dui-select w-full"
+                value={weeklyWeek}
+                onChange={(e) => setWeeklyWeek(e.target.value)}
+              >
+                <option value="">{tx('All weeks', 'Semua minggu')}</option>
+                {weeklyWeekOptions.map((week) => (
+                  <option key={week.week_start} value={week.week_start}>
+                    {week.week_start} — {week.week_end}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           {loading ? (
             <div className="flex justify-center py-12"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></div>
@@ -407,7 +469,7 @@ export default function SuperadminReportsPage() {
                   <th>{tx('Visit Conversion', 'Konversi Kunjungan')}</th>
                 </tr></thead>
                 <tbody>
-                  {visibleWeeklyRows.map((row) => <tr key={`${row.agent_email}-${row.week_start}`}>
+                  {paginatedWeeklyRows.map((row) => <tr key={`${row.agent_email}-${row.week_start}`}>
                     <td><div className="font-bold">{row.agent_name || '—'}</div><div className="text-[11px] text-base-content/50">{row.agent_email}</div></td>
                     <td>{row.week_start} — {row.week_end}</td>
                     <td>{row.pre_visits}</td>
@@ -418,6 +480,100 @@ export default function SuperadminReportsPage() {
               </table>
             </div>
           )}
+          {!loading && filteredWeeklyRows.length > 0 && (
+            <div className="flex flex-col gap-3 border-t border-base-300 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="text-xs font-semibold text-base-content/60">
+                {tx('Showing', 'Menampilkan')} {(safeWeeklyPage - 1) * WEEKLY_PAGE_SIZE + 1}–{Math.min(safeWeeklyPage * WEEKLY_PAGE_SIZE, filteredWeeklyRows.length)}
+                {' '}{tx('of', 'dari')} {filteredWeeklyRows.length}
+              </div>
+              <div className="dui-join">
+                <button
+                  type="button"
+                  className="dui-btn dui-btn-sm dui-join-item"
+                  disabled={safeWeeklyPage <= 1}
+                  onClick={() => setWeeklyPage((page) => Math.max(1, page - 1))}
+                >
+                  {tx('Previous', 'Sebelumnya')}
+                </button>
+                <button type="button" className="dui-btn dui-btn-sm dui-join-item pointer-events-none">
+                  {safeWeeklyPage} / {weeklyTotalPages}
+                </button>
+                <button
+                  type="button"
+                  className="dui-btn dui-btn-sm dui-join-item"
+                  disabled={safeWeeklyPage >= weeklyTotalPages}
+                  onClick={() => setWeeklyPage((page) => Math.min(weeklyTotalPages, page + 1))}
+                >
+                  {tx('Next', 'Berikutnya')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="dui-card border border-base-300 bg-base-100 shadow-sm">
+          <div className="dui-card-body gap-4">
+            <div>
+              <div className="font-bold">{tx('Weekly Activity Trend', 'Tren Aktivitas Mingguan')}</div>
+              <div className="text-xs text-base-content/50">{tx('Pre-Visits and Visits by week for the current filters.', 'Pra-Kunjungan dan Kunjungan per minggu sesuai filter saat ini.')}</div>
+            </div>
+            <div className="space-y-4">
+              {weeklyTotals.map((row) => {
+                const maxValue = Math.max(1, ...weeklyTotals.flatMap((item) => [Number(item.pre_visits || 0), Number(item.visits || 0)]))
+                return <div key={row.week_start} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="font-semibold">{row.week_start} — {row.week_end}</span>
+                    <span className="text-base-content/50">{row.pre_visits} / {row.visits}</span>
+                  </div>
+                  <div className="grid grid-cols-[76px_1fr] items-center gap-2 text-[11px]">
+                    <span>{tx('Pre-Visits', 'Pra-Kunjungan')}</span>
+                    <div className="h-3 rounded-full bg-base-200">
+                      <div className="h-3 rounded-full bg-primary" style={{ width: `${(Number(row.pre_visits || 0) / maxValue) * 100}%` }} />
+                    </div>
+                    <span>{tx('Visits', 'Kunjungan')}</span>
+                    <div className="h-3 rounded-full bg-secondary" style={{ width: `${(Number(row.visits || 0) / maxValue) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="dui-card border border-base-300 bg-base-100 shadow-sm">
+          <div className="dui-card-body gap-4">
+            <div>
+              <div className="font-bold">{tx('Top Agent Activity', 'Aktivitas Agen Teratas')}</div>
+              <div className="text-xs text-base-content/50">
+                {chartWeekStart ? `${chartWeekStart} — ${weeklyWeekOptions.find((week) => week.week_start === chartWeekStart)?.week_end || chartWeekStart}` : tx('No week available', 'Tidak ada minggu tersedia')}
+              </div>
+            </div>
+            <div className="space-y-3">
+              {chartAgentRows.map((row) => {
+                const maxValue = Math.max(1, ...chartAgentRows.flatMap((item) => [Number(item.pre_visits || 0), Number(item.visits || 0)]))
+                return <div key={row.agent_email} className="space-y-1">
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="truncate font-semibold">{row.agent_name || row.agent_email}</span>
+                    <span className="shrink-0 text-base-content/50">{row.pre_visits} PV · {row.visits} V</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="h-2.5 rounded-full bg-base-200">
+                      <div className="h-2.5 rounded-full bg-primary" style={{ width: `${(Number(row.pre_visits || 0) / maxValue) * 100}%` }} />
+                    </div>
+                    <div className="h-2.5 rounded-full bg-base-200">
+                      <div className="h-2.5 rounded-full bg-secondary" style={{ width: `${(Number(row.visits || 0) / maxValue) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              })}
+            </div>
+            <div className="flex gap-4 text-[11px] text-base-content/60">
+              <span><span className="mr-1 inline-block size-2 rounded-sm bg-primary" />{tx('Pre-Visits', 'Pra-Kunjungan')}</span>
+              <span><span className="mr-1 inline-block size-2 rounded-sm bg-secondary" />{tx('Visits', 'Kunjungan')}</span>
+            </div>
+          </div>
         </div>
       </section>
 
