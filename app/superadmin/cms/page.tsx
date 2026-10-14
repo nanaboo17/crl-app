@@ -63,6 +63,14 @@ export default function CmsPage() {
     setSavingId(field.id)
     setMessage('')
     setError('')
+    if (field.field_type === 'select' || field.field_type === 'radio') {
+      const values = (field.options || []).map((option) => String(option.value || '').trim())
+      if (values.some((value) => !value) || new Set(values).size !== values.length) {
+        setError(tx('Option values must be non-empty and unique.', 'Nilai setiap pilihan harus terisi dan tidak boleh duplikat.'))
+        setSavingId(null)
+        return
+      }
+    }
     const s = createClient()
     const { error } = await s.from('form_fields').update({
       label_en: field.label_en.trim(),
@@ -140,8 +148,11 @@ export default function CmsPage() {
   }
 
   function addOption(field: CmsFormField) {
-    const nextNumber = (field.options?.length ?? 0) + 1
-    const value = field.system_field ? `option_${nextNumber}` : `option_${Date.now()}`
+    if (field.field_type !== 'select' && field.field_type !== 'radio') return
+    const existingValues = new Set((field.options || []).map((option) => option.value))
+    let nextNumber = (field.options?.length ?? 0) + 1
+    while (existingValues.has(`option_${nextNumber}`)) nextNumber += 1
+    const value = field.system_field ? `option_${nextNumber}` : `option_${Date.now()}_${nextNumber}`
     patch(field.id, {
       options: [...(field.options || []), {
         value,
@@ -231,11 +242,11 @@ export default function CmsPage() {
                       <div className="text-sm font-black">{tx('Answer options', 'Pilihan jawaban')}</div>
                       <p className="mt-1 text-xs text-base-content/55">
                         {field.system_field
-                          ? tx('Edit what agents see. Internal values stay locked to keep workflow logic safe.', 'Ubah teks yang dilihat agent. Nilai internal dikunci agar logika workflow tetap aman.')
+                          ? tx('You can add options. Existing internal values remain locked; new values may require workflow support.', 'Anda dapat menambah pilihan. Nilai internal lama tetap dikunci; nilai baru mungkin perlu didukung dalam workflow.')
                           : tx('Add, remove, rename, or reorder the choices shown in the form.', 'Tambah, hapus, ubah nama, atau atur urutan pilihan yang tampil di form.')}
                       </p>
                     </div>
-                    {!field.system_field && (
+                    {(field.field_type === 'select' || !field.system_field) && (
                       <button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={() => addOption(field)}>
                         <Plus className="size-4" />
                         {tx('Add option', 'Tambah pilihan')}
@@ -303,7 +314,7 @@ export default function CmsPage() {
                       <div className="rounded-xl border border-dashed border-base-300 bg-base-100 px-4 py-6 text-center">
                         <p className="text-sm font-bold">{tx('No options yet', 'Belum ada pilihan')}</p>
                         <p className="mt-1 text-xs text-base-content/55">{tx('Add the first option for this field.', 'Tambahkan pilihan pertama untuk field ini.')}</p>
-                        {!field.system_field && (
+                        {(field.field_type === 'select' || !field.system_field) && (
                           <button type="button" className="dui-btn dui-btn-primary dui-btn-sm mt-3" onClick={() => addOption(field)}>
                             <Plus className="size-4" />{tx('Add option', 'Tambah pilihan')}
                           </button>
