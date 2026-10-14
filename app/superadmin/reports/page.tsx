@@ -18,6 +18,16 @@ type AgentOption = {
   organization: string | null
 }
 
+type WeeklyRow = {
+  agent_email: string
+  agent_name: string | null
+  week_start: string
+  week_end: string
+  pre_visits: number
+  visits: number
+  visit_conversion: number
+}
+
 type ReportRow = {
   agent_email: string
   agent_name: string | null
@@ -64,6 +74,7 @@ export default function SuperadminReportsPage() {
   const [agentEmail, setAgentEmail] = useState('')
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [rows, setRows] = useState<ReportRow[]>([])
+  const [weeklyRows, setWeeklyRows] = useState<WeeklyRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -71,14 +82,19 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
-        .eq('role', 'agent')
+        .eq('organization', 'Agent')
         .eq('active', true)
         .order('agent_name'),
       supabase.rpc('get_superadmin_report', {
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('get_superadmin_weekly_agent_report', {
         p_start_date: startDate,
         p_end_date: endDate,
         p_agent_email: agentEmail || null,
@@ -95,9 +111,15 @@ export default function SuperadminReportsPage() {
       setLoading(false)
       return
     }
+    if (weeklyResult.error) {
+      setError(weeklyResult.error.message)
+      setLoading(false)
+      return
+    }
 
     setAgents((agentResult.data ?? []) as AgentOption[])
     setRows((reportResult.data ?? []) as ReportRow[])
+    setWeeklyRows((weeklyResult.data ?? []) as WeeklyRow[])
     setLoading(false)
   }, [agentEmail, endDate, startDate, supabase])
 
@@ -113,15 +135,37 @@ export default function SuperadminReportsPage() {
     ? agents.filter((agent) => (agent.organization || '').trim() === organization)
     : agents, [agents, organization])
 
-  const visibleRows = useMemo(() => {
-    if (!organization) return rows
-    const allowed = new Set(
-      agents
-        .filter((agent) => (agent.organization || '').trim() === organization)
-        .map((agent) => agent.email.toLowerCase())
-    )
-    return rows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
-  }, [agents, organization, rows])
+  const allowedAgentEmails = useMemo(() => new Set(
+    agents
+      .filter((agent) => !organization || (agent.organization || '').trim() === organization)
+      .map((agent) => agent.email.toLowerCase())
+  ), [agents, organization])
+
+  const visibleRows = useMemo(
+    () => rows.filter((row) => allowedAgentEmails.has(row.agent_email.toLowerCase())),
+    [allowedAgentEmails, rows]
+  )
+
+  const visibleWeeklyRows = useMemo(
+    () => weeklyRows.filter((row) => allowedAgentEmails.has(row.agent_email.toLowerCase())),
+    [allowedAgentEmails, weeklyRows]
+  )
+
+  const weeklyTotals = useMemo(() => {
+    const byWeek = new Map<string, { week_start: string; week_end: string; pre_visits: number; visits: number }>()
+    for (const row of visibleWeeklyRows) {
+      const current = byWeek.get(row.week_start) ?? {
+        week_start: row.week_start,
+        week_end: row.week_end,
+        pre_visits: 0,
+        visits: 0,
+      }
+      current.pre_visits += Number(row.pre_visits || 0)
+      current.visits += Number(row.visits || 0)
+      byWeek.set(row.week_start, current)
+    }
+    return Array.from(byWeek.values()).sort((a, b) => a.week_start.localeCompare(b.week_start))
+  }, [visibleWeeklyRows])
 
   const totals = useMemo(() => visibleRows.reduce(
     (acc, row) => ({
@@ -289,6 +333,79 @@ export default function SuperadminReportsPage() {
         <Metric label={tx('Pre-Visits', 'Pra-Kunjungan')} value={totals.preVisits} />
         <Metric label={tx('Visits', 'Kunjungan')} value={totals.visits} />
         <Metric label={tx('Attendance Days', 'Hari Absensi')} value={totals.attendance} />
+      </section>
+
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-4">
+          <div>
+            <div className="flex items-center gap-2 font-bold">
+              <CalendarDays className="h-5 w-5" />
+              {tx('Weekly Field Activity', 'Aktivitas Lapangan Mingguan')}
+            </div>
+            <p className="mt-1 text-xs text-base-content/55">
+              {tx(
+                'Weekly Pre-Visit and Visit counts in WIB, including a per-agent breakdown.',
+                'Jumlah Pra-Kunjungan dan Kunjungan mingguan dalam WIB, termasuk rincian per agen.'
+              )}
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-10"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></div>
+          ) : visibleWeeklyRows.length === 0 ? (
+            <div className="py-8 text-center text-sm text-base-content/60">
+              {tx('No weekly activity for this period.', 'Tidak ada aktivitas mingguan untuk periode ini.')}
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {weeklyTotals.map((week) => {
+                  const conversion = week.pre_visits > 0 ? (week.visits / week.pre_visits) * 100 : 0
+                  return (
+                    <div key={week.week_start} className="rounded-2xl border border-base-300 bg-base-200/40 p-4">
+                      <div className="text-xs font-bold uppercase tracking-wide text-base-content/50">
+                        {week.week_start} — {week.week_end}
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div><div className="text-xl font-black">{week.pre_visits}</div><div className="text-[11px] text-base-content/50">{tx('Pre-Visits', 'Pra-Kunjungan')}</div></div>
+                        <div><div className="text-xl font-black">{week.visits}</div><div className="text-[11px] text-base-content/50">{tx('Visits', 'Kunjungan')}</div></div>
+                        <div><div className="text-xl font-black">{conversion.toFixed(1)}%</div><div className="text-[11px] text-base-content/50">{tx('Conversion', 'Konversi')}</div></div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="dui-table dui-table-zebra min-w-[760px] text-xs sm:text-sm">
+                  <thead>
+                    <tr>
+                      <th>{tx('Agent', 'Agen')}</th>
+                      <th>{tx('Week', 'Minggu')}</th>
+                      <th>{tx('Pre-Visits', 'Pra-Kunjungan')}</th>
+                      <th>{tx('Visits', 'Kunjungan')}</th>
+                      <th>{tx('Visit Conversion', 'Konversi Kunjungan')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleWeeklyRows.map((row) => (
+                      <tr key={`${row.agent_email}-${row.week_start}`}>
+                        <td>
+                          <div className="font-bold">{row.agent_name || '—'}</div>
+                          <div className="text-[11px] text-base-content/50">{row.agent_email}</div>
+                        </td>
+                        <td>{row.week_start} — {row.week_end}</td>
+                        <td>{row.pre_visits}</td>
+                        <td>{row.visits}</td>
+                        <td>{Number(row.visit_conversion || 0).toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
       </section>
 
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
