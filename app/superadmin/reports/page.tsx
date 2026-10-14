@@ -18,6 +18,16 @@ type AgentOption = {
   organization: string | null
 }
 
+type WeeklyReportRow = {
+  agent_email: string
+  agent_name: string | null
+  week_start: string
+  week_end: string
+  pre_visits: number
+  visits: number
+  visit_conversion: number
+}
+
 type ReportRow = {
   agent_email: string
   agent_name: string | null
@@ -64,6 +74,7 @@ export default function SuperadminReportsPage() {
   const [agentEmail, setAgentEmail] = useState('')
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [rows, setRows] = useState<ReportRow[]>([])
+  const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -71,7 +82,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -79,6 +90,11 @@ export default function SuperadminReportsPage() {
         .eq('active', true)
         .order('agent_name'),
       supabase.rpc('get_superadmin_report', {
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('get_superadmin_weekly_report', {
         p_start_date: startDate,
         p_end_date: endDate,
         p_agent_email: agentEmail || null,
@@ -95,9 +111,15 @@ export default function SuperadminReportsPage() {
       setLoading(false)
       return
     }
+    if (weeklyResult.error) {
+      setError(weeklyResult.error.message)
+      setLoading(false)
+      return
+    }
 
     setAgents((agentResult.data ?? []) as AgentOption[])
     setRows((reportResult.data ?? []) as ReportRow[])
+    setWeeklyRows((weeklyResult.data ?? []) as WeeklyReportRow[])
     setLoading(false)
   }, [agentEmail, endDate, startDate, supabase])
 
@@ -122,6 +144,32 @@ export default function SuperadminReportsPage() {
     )
     return rows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
   }, [agents, organization, rows])
+
+  const visibleWeeklyRows = useMemo(() => {
+    if (!organization) return weeklyRows
+    const allowed = new Set(
+      agents
+        .filter((agent) => (agent.organization || '').trim() === organization)
+        .map((agent) => agent.email.toLowerCase())
+    )
+    return weeklyRows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
+  }, [agents, organization, weeklyRows])
+
+  const weeklyTotals = useMemo(() => {
+    const byWeek = new Map<string, { week_start: string; week_end: string; pre_visits: number; visits: number }>()
+    for (const row of visibleWeeklyRows) {
+      const current = byWeek.get(row.week_start) ?? {
+        week_start: row.week_start,
+        week_end: row.week_end,
+        pre_visits: 0,
+        visits: 0,
+      }
+      current.pre_visits += Number(row.pre_visits || 0)
+      current.visits += Number(row.visits || 0)
+      byWeek.set(row.week_start, current)
+    }
+    return Array.from(byWeek.values()).sort((a, b) => a.week_start.localeCompare(b.week_start))
+  }, [visibleWeeklyRows])
 
   const totals = useMemo(() => visibleRows.reduce(
     (acc, row) => ({
@@ -190,7 +238,26 @@ export default function SuperadminReportsPage() {
       [],
     ].map((line) => line.join(','))
 
-    const csv = `\uFEFF${[...metadata, headers.map(csvCell).join(','), ...body].join('\r\n')}`
+    const weeklyHeaders = ['Agent Name', 'Agent Email', 'Week Start', 'Week End', 'Pre-Visits', 'Visits', 'Visit Conversion %']
+    const weeklyBody = visibleWeeklyRows.map((row) => [
+      row.agent_name,
+      row.agent_email,
+      row.week_start,
+      row.week_end,
+      row.pre_visits,
+      row.visits,
+      Number(row.visit_conversion || 0).toFixed(1),
+    ].map(csvCell).join(','))
+
+    const csv = `\uFEFF${[
+      ...metadata,
+      headers.map(csvCell).join(','),
+      ...body,
+      '',
+      csvCell('Weekly Activity by Agent'),
+      weeklyHeaders.map(csvCell).join(','),
+      ...weeklyBody,
+    ].join('\r\n')}`
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -289,6 +356,69 @@ export default function SuperadminReportsPage() {
         <Metric label={tx('Pre-Visits', 'Pra-Kunjungan')} value={totals.preVisits} />
         <Metric label={tx('Visits', 'Kunjungan')} value={totals.visits} />
         <Metric label={tx('Attendance Days', 'Hari Absensi')} value={totals.attendance} />
+      </section>
+
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-3 p-0 sm:p-0">
+          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
+            <CalendarDays className="h-5 w-5" /> {tx('Weekly Field Activity', 'Aktivitas Lapangan Mingguan')}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="dui-table dui-table-zebra min-w-[640px] text-xs sm:text-sm">
+              <thead><tr>
+                <th>{tx('Week', 'Minggu')}</th>
+                <th>{tx('Pre-Visits', 'Pra-Kunjungan')}</th>
+                <th>{tx('Visits', 'Kunjungan')}</th>
+                <th>{tx('Visit Conversion', 'Konversi Kunjungan')}</th>
+              </tr></thead>
+              <tbody>
+                {weeklyTotals.map((row) => {
+                  const conversion = row.pre_visits > 0 ? (row.visits / row.pre_visits) * 100 : 0
+                  return <tr key={row.week_start}>
+                    <td className="font-bold">{row.week_start} — {row.week_end}</td>
+                    <td>{row.pre_visits}</td>
+                    <td>{row.visits}</td>
+                    <td>{conversion.toFixed(1)}%</td>
+                  </tr>
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-3 p-0 sm:p-0">
+          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
+            <Users className="h-5 w-5" /> {tx('Weekly Activity by Agent', 'Aktivitas Mingguan per Agen')}
+          </div>
+          {loading ? (
+            <div className="flex justify-center py-12"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></div>
+          ) : visibleWeeklyRows.length === 0 ? (
+            <div className="px-5 py-10 text-center text-sm text-base-content/60">{tx('No weekly activity for this period.', 'Tidak ada aktivitas mingguan untuk periode ini.')}</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="dui-table dui-table-zebra min-w-[820px] text-xs sm:text-sm">
+                <thead><tr>
+                  <th>{tx('Agent', 'Agen')}</th>
+                  <th>{tx('Week', 'Minggu')}</th>
+                  <th>{tx('Pre-Visits', 'Pra-Kunjungan')}</th>
+                  <th>{tx('Visits', 'Kunjungan')}</th>
+                  <th>{tx('Visit Conversion', 'Konversi Kunjungan')}</th>
+                </tr></thead>
+                <tbody>
+                  {visibleWeeklyRows.map((row) => <tr key={`${row.agent_email}-${row.week_start}`}>
+                    <td><div className="font-bold">{row.agent_name || '—'}</div><div className="text-[11px] text-base-content/50">{row.agent_email}</div></td>
+                    <td>{row.week_start} — {row.week_end}</td>
+                    <td>{row.pre_visits}</td>
+                    <td>{row.visits}</td>
+                    <td>{Number(row.visit_conversion || 0).toFixed(1)}%</td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
