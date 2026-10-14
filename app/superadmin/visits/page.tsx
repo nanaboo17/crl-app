@@ -34,7 +34,7 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
   const [agentsResult, visitsResult, totalVisitsResult, mismatchResult] = await Promise.all([
-    supabase.from('agents').select('email, agent_name, active').eq('role', 'agent').order('agent_name'),
+    supabase.from('agents').select('email, agent_name, active').eq('organization', 'Agent').order('agent_name'),
     supabase.from('visits').select('agent_email, visit_status_kunjungan, location_match, visit_date'),
     supabase.from('visits').select('*', { count: 'exact', head: true }),
     supabase.from('visits').select('*', { count: 'exact', head: true }).eq('location_match', false),
@@ -69,7 +69,26 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   const page = Math.min(requestedPage, totalPages)
   if (totalAgents > 0 && requestedPage !== page) redirect(`/superadmin/visits?mode=agent&filter=${filter}&page=${page}`)
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const agentData = agents.map((agent) => ({ ...agent, visit_count: (visitMap.get(agent.email.toLowerCase()) ?? []).length }))
+
+  // Count each visible agent directly in Supabase instead of counting the
+  // truncated visits payload returned by the Data API.
+  const visitCountResults = await Promise.all(
+    agents.map((agent) =>
+      supabase
+        .from('visits')
+        .select('*', { count: 'exact', head: true })
+        .eq('agent_email', agent.email)
+    )
+  )
+  const visitCountError = visitCountResults.find((result) => result.error)?.error
+  if (visitCountError) {
+    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={visitCountError.message} /></div>
+  }
+
+  const agentData = agents.map((agent, index) => ({
+    ...agent,
+    visit_count: visitCountResults[index]?.count ?? 0,
+  }))
 
   const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })
   const today = dateFormatter.format(new Date())
