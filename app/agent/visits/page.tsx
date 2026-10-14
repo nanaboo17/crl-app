@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronRight, CheckCircle2, MapPin, Route } from 'lucide-react'
+import { CalendarDays, ChevronRight, CheckCircle2, MapPin, Route, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { Visit } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -19,6 +19,7 @@ export default function VisitsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     ;(async () => {
@@ -30,10 +31,17 @@ export default function VisitsPage() {
     })()
   }, [])
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return rows
+    return rows.filter((row) => [row.customer_id, row.crl_id, row.visit_id, row.visit_address, row.visit_summary, row.visit_result]
+      .some((value) => String(value ?? '').toLowerCase().includes(query)))
+  }, [rows, search])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const start = (safePage - 1) * PAGE_SIZE
-  const pageRows = rows.slice(start, start + PAGE_SIZE)
+  const pageRows = filteredRows.slice(start, start + PAGE_SIZE)
 
   const grouped = useMemo(() => {
     const map = new Map<string, Visit[]>()
@@ -68,6 +76,14 @@ export default function VisitsPage() {
         <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
       </section>
 
+      {!loading && !error && rows.length > 0 && (
+        <div className="relative mb-5">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-base-content/50" />
+          <input type="search" aria-label={tx('Search visits', 'Cari kunjungan')} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder={tx('Search Customer ID, CRL ID, Visit ID, address…', 'Cari ID Pelanggan, ID CRL, ID Kunjungan, alamat…')} className="dui-input dui-input-bordered w-full rounded-xl pl-12" />
+          <p className="mt-2 text-sm text-base-content/60">{filteredRows.length} {tx('matching visits', 'kunjungan ditemukan')}</p>
+        </div>
+      )}
+      {!loading && !error && rows.length > 0 && filteredRows.length === 0 && <div className={styles.state}>{tx('No visits match your search.', 'Tidak ada kunjungan yang cocok dengan pencarian.')}</div>}
       {loading && <div className={styles.state}>{tx('Loading visit history…', 'Memuat riwayat kunjungan…')}</div>}
       {error && <div className={styles.error}>{error}</div>}
       {!loading && !error && rows.length === 0 && <div className={styles.state}><CrlRouteIllustration className="visit-empty-illustration" /><strong>{tx('No visit history yet', 'Belum ada riwayat kunjungan')}</strong><span>{tx('Completed visits will appear here.', 'Kunjungan yang selesai akan tampil di sini.')}</span></div>}
@@ -88,9 +104,9 @@ export default function VisitsPage() {
         </section>
       ))}
 
-      {!loading && !error && rows.length > 0 && (
+      {!loading && !error && filteredRows.length > 0 && (
         <nav className={styles.pagination} aria-label="Visit history pagination">
-          <p className={styles.paginationInfo}>{tx('Showing', 'Menampilkan')} {start + 1}–{Math.min(start + PAGE_SIZE, rows.length)} {tx('of', 'dari')} {rows.length}</p>
+          <p className={styles.paginationInfo}>{tx('Showing', 'Menampilkan')} {start + 1}–{Math.min(start + PAGE_SIZE, filteredRows.length)} {tx('of', 'dari')} {filteredRows.length}</p>
           <div className={styles.paginationControls}>
             <button type="button" className={styles.navButton} onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage === 1}>{tx('Previous', 'Sebelumnya')}</button>
             {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button key={pageNumber} type="button" className={`${styles.pageButton} ${pageNumber === safePage ? styles.activePage : ''}`} onClick={() => setPage(pageNumber)} aria-current={pageNumber === safePage ? 'page' : undefined}>{pageNumber}</button>)}
