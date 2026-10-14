@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ClipboardList, Clock3, PhoneCall } from 'lucide-react'
+import { CheckCircle2, ClipboardList, Clock3, PhoneCall, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { PreVisit } from '@/lib/types'
 import { dateTime } from '@/lib/format'
@@ -37,6 +37,7 @@ export default function PreVisitsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     ;(async () => {
@@ -61,10 +62,17 @@ export default function PreVisitsPage() {
     return Array.from(latestByCustomer.values())
   }, [records])
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return rows
+    return rows.filter((row) => [row.customer_id, row.crl_id, row.previsit_id, row.previsit_status]
+      .some((value) => String(value ?? '').toLowerCase().includes(query)))
+  }, [rows, search])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const start = (safePage - 1) * PAGE_SIZE
-  const pageRows = rows.slice(start, start + PAGE_SIZE)
+  const pageRows = filteredRows.slice(start, start + PAGE_SIZE)
   const ready = rows.filter((r) => r.previsit_status === 'Ready for Visit').length
   const followUp = rows.filter((r) => r.previsit_status === 'Need Follow-up').length
 
@@ -91,6 +99,14 @@ export default function PreVisitsPage() {
 
       <section className={styles.historyCard}>
         <div className={styles.sectionHead}><div><span>{tx('LATEST PER CUSTOMER', 'TERBARU PER PELANGGAN')}</span><h2>{tx('Pre-Visit customers', 'Pelanggan Pra-Kunjungan')}</h2></div><p>{rows.length} {tx('customers', 'pelanggan')}</p></div>
+        {!loading && !error && rows.length > 0 && (
+          <div className="relative mb-5">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-base-content/50" />
+            <input type="search" aria-label={tx('Search pre-visits', 'Cari pra-kunjungan')} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder={tx('Search Customer ID, CRL ID, Pre-Visit ID, status…', 'Cari ID Pelanggan, ID CRL, ID Pra-Kunjungan, status…')} className="dui-input dui-input-bordered w-full rounded-xl pl-12" />
+            <p className="mt-2 text-sm text-base-content/60">{filteredRows.length} {tx('matching customers', 'pelanggan ditemukan')}</p>
+          </div>
+        )}
+        {!loading && !error && rows.length > 0 && filteredRows.length === 0 && <p className="py-8 text-center text-base-content/60">{tx('No pre-visits match your search.', 'Tidak ada pra-kunjungan yang cocok dengan pencarian.')}</p>}
         <div className={styles.listStack}>
           {pageRows.map((r) => (
             <Link className={styles.card} href={`/agent/pre-visits/${encodeURIComponent(r.previsit_id)}`} key={r.crl_id || r.previsit_id}>
@@ -110,9 +126,9 @@ export default function PreVisitsPage() {
         </div>
       </section>
 
-      {!loading && !error && rows.length > 0 && (
+      {!loading && !error && filteredRows.length > 0 && (
         <nav className={styles.pagination} aria-label="Pre-visit pagination">
-          <p className={styles.paginationInfo}>{tx('Showing', 'Menampilkan')} {start + 1}–{Math.min(start + PAGE_SIZE, rows.length)} {tx('of', 'dari')} {rows.length}</p>
+          <p className={styles.paginationInfo}>{tx('Showing', 'Menampilkan')} {start + 1}–{Math.min(start + PAGE_SIZE, filteredRows.length)} {tx('of', 'dari')} {filteredRows.length}</p>
           <div className={styles.paginationControls}>
             <button type="button" className={styles.navButton} onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage === 1}>{tx('Previous', 'Sebelumnya')}</button>
             {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button key={pageNumber} type="button" className={`${styles.pageButton} ${pageNumber === safePage ? styles.activePage : ''}`} onClick={() => setPage(pageNumber)} aria-current={pageNumber === safePage ? 'page' : undefined}>{pageNumber}</button>)}
