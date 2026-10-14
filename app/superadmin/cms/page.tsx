@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Save, Settings2, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, LockKeyhole, Plus, Save, Settings2, ShieldCheck, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { useI18n } from '@/components/providers/i18n-provider'
@@ -129,15 +129,39 @@ export default function CmsPage() {
     else await load()
   }
 
-  function optionsText(field: CmsFormField) {
-    return (field.options || []).map((o) => `${o.value}|${o.label_en}|${o.label_id}`).join('\n')
+
+  function patchOption(fieldId: number, optionIndex: number, changes: Partial<CmsOption>) {
+    setFields((current) => current.map((field) => {
+      if (field.id !== fieldId) return field
+      const options = [...(field.options || [])]
+      options[optionIndex] = { ...options[optionIndex], ...changes }
+      return { ...field, options }
+    }))
   }
 
-  function parseOptions(value: string): CmsOption[] {
-    return value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
-      const [rawValue, en, id] = line.split('|').map((part) => part?.trim() || '')
-      return { value: rawValue, label_en: en || rawValue, label_id: id || en || rawValue }
+  function addOption(field: CmsFormField) {
+    const nextNumber = (field.options?.length ?? 0) + 1
+    const value = field.system_field ? `option_${nextNumber}` : `option_${Date.now()}`
+    patch(field.id, {
+      options: [...(field.options || []), {
+        value,
+        label_en: `Option ${nextNumber}`,
+        label_id: `Pilihan ${nextNumber}`,
+      }],
     })
+  }
+
+  function removeOption(field: CmsFormField, optionIndex: number) {
+    if (field.system_field) return
+    patch(field.id, { options: (field.options || []).filter((_, index) => index !== optionIndex) })
+  }
+
+  function moveOption(field: CmsFormField, optionIndex: number, direction: -1 | 1) {
+    const target = optionIndex + direction
+    if (target < 0 || target >= (field.options?.length ?? 0)) return
+    const options = [...field.options]
+    ;[options[optionIndex], options[target]] = [options[target], options[optionIndex]]
+    patch(field.id, { options })
   }
 
   return (
@@ -201,19 +225,101 @@ export default function CmsPage() {
               </div>
 
               {(field.field_type === 'select' || field.field_type === 'radio') && (
-                <label className="dui-form-control mt-3">
-                  <span className="dui-label-text mb-1 text-xs font-bold">{tx('Options', 'Pilihan')}</span>
-                  <textarea className="dui-textarea dui-textarea-bordered min-h-28 font-mono text-xs" value={optionsText(field)} onChange={(e) => patch(field.id, { options: parseOptions(e.target.value) })} placeholder="value|English label|Label Indonesia" />
-                  <span className="mt-1 text-xs text-base-content/50">value|English label|Label Indonesia — one option per line</span>
-                </label>
+                <div className="mt-4 rounded-2xl border border-base-300 bg-base-200/35 p-3 sm:p-4">
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black">{tx('Answer options', 'Pilihan jawaban')}</div>
+                      <p className="mt-1 text-xs text-base-content/55">
+                        {field.system_field
+                          ? tx('Edit what agents see. Internal values stay locked to keep workflow logic safe.', 'Ubah teks yang dilihat agent. Nilai internal dikunci agar logika workflow tetap aman.')
+                          : tx('Add, remove, rename, or reorder the choices shown in the form.', 'Tambah, hapus, ubah nama, atau atur urutan pilihan yang tampil di form.')}
+                      </p>
+                    </div>
+                    {!field.system_field && (
+                      <button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={() => addOption(field)}>
+                        <Plus className="size-4" />
+                        {tx('Add option', 'Tambah pilihan')}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3">
+                    {(field.options || []).map((option, optionIndex) => (
+                      <div key={`${field.id}-${optionIndex}`} className="rounded-xl border border-base-300 bg-base-100 p-3">
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <GripVertical className="size-4 shrink-0 text-base-content/35" aria-hidden="true" />
+                            <span className="text-xs font-black uppercase tracking-wide text-base-content/60">
+                              {tx('Option', 'Pilihan')} {optionIndex + 1}
+                            </span>
+                            {field.system_field && (
+                              <span className="dui-badge dui-badge-ghost dui-badge-sm gap-1">
+                                <LockKeyhole className="size-3" />
+                                {tx('Value locked', 'Value dikunci')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs" onClick={() => moveOption(field, optionIndex, -1)} disabled={optionIndex === 0} aria-label={tx('Move option up', 'Pindahkan pilihan ke atas')}>
+                              <ChevronUp className="size-4" />
+                            </button>
+                            <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs" onClick={() => moveOption(field, optionIndex, 1)} disabled={optionIndex === field.options.length - 1} aria-label={tx('Move option down', 'Pindahkan pilihan ke bawah')}>
+                              <ChevronDown className="size-4" />
+                            </button>
+                            {!field.system_field && (
+                              <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs text-error" onClick={() => removeOption(field, optionIndex)} aria-label={tx('Delete option', 'Hapus pilihan')}>
+                                <Trash2 className="size-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,.7fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                          <label className="dui-form-control">
+                            <span className="mb-1 text-[11px] font-bold uppercase tracking-wide text-base-content/55">{tx('Internal value', 'Nilai internal')}</span>
+                            <div className="relative">
+                              {field.system_field && <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-base-content/35" />}
+                              <input
+                                className={`dui-input dui-input-bordered w-full ${field.system_field ? 'pl-9 font-mono text-sm opacity-70' : ''}`}
+                                value={option.value}
+                                disabled={field.system_field}
+                                onChange={(e) => patchOption(field.id, optionIndex, { value: e.target.value })}
+                              />
+                            </div>
+                          </label>
+                          <label className="dui-form-control">
+                            <span className="mb-1 text-[11px] font-bold uppercase tracking-wide text-base-content/55">Label (ID)</span>
+                            <input className="dui-input dui-input-bordered w-full" value={option.label_id} onChange={(e) => patchOption(field.id, optionIndex, { label_id: e.target.value })} />
+                          </label>
+                          <label className="dui-form-control">
+                            <span className="mb-1 text-[11px] font-bold uppercase tracking-wide text-base-content/55">Label (EN)</span>
+                            <input className="dui-input dui-input-bordered w-full" value={option.label_en} onChange={(e) => patchOption(field.id, optionIndex, { label_en: e.target.value })} />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+
+                    {(field.options || []).length === 0 && (
+                      <div className="rounded-xl border border-dashed border-base-300 bg-base-100 px-4 py-6 text-center">
+                        <p className="text-sm font-bold">{tx('No options yet', 'Belum ada pilihan')}</p>
+                        <p className="mt-1 text-xs text-base-content/55">{tx('Add the first option for this field.', 'Tambahkan pilihan pertama untuk field ini.')}</p>
+                        {!field.system_field && (
+                          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm mt-3" onClick={() => addOption(field)}>
+                            <Plus className="size-4" />{tx('Add option', 'Tambah pilihan')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-4">
+              <div className="mt-4 flex flex-col gap-3 border-t border-base-300 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-4">
                   <label className="flex cursor-pointer items-center gap-2 text-sm font-bold"><input type="checkbox" className="dui-toggle dui-toggle-primary dui-toggle-sm" checked={field.visible} disabled={field.protected} onChange={(e) => patch(field.id, { visible: e.target.checked })} />{field.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}{tx('Visible', 'Tampil')}</label>
                   <label className="flex cursor-pointer items-center gap-2 text-sm font-bold"><input type="checkbox" className="dui-toggle dui-toggle-primary dui-toggle-sm" checked={field.required} disabled={field.protected} onChange={(e) => patch(field.id, { required: e.target.checked })} />{tx('Required', 'Wajib')}</label>
                 </div>
-                <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={() => saveField(field)} disabled={savingId === field.id}><Save className="size-4" />{savingId === field.id ? tx('Saving…', 'Menyimpan…') : tx('Save field', 'Simpan field')}</button>
+                <button type="button" className="dui-btn dui-btn-primary w-full sm:w-auto" onClick={() => saveField(field)} disabled={savingId === field.id}><Save className="size-4" />{savingId === field.id ? tx('Saving…', 'Menyimpan…') : tx('Save field', 'Simpan field')}</button>
               </div>
             </section>
           ))}
