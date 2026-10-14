@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   const normalizedEmail = user.email.trim().toLowerCase()
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('role, active')
+    .select('role, active, organization')
     .ilike('email', normalizedEmail)
     .maybeSingle()
 
@@ -53,6 +53,27 @@ export async function GET(request: Request) {
   if (!agent.active) {
     await supabase.auth.signOut()
     return NextResponse.redirect(`${origin}/login?error=account_inactive`)
+  }
+
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const ipAddress =
+    request.headers.get('cf-connecting-ip') ||
+    (forwardedFor ? forwardedFor.split(',')[0]?.trim() : null)
+
+  const { error: loginHistoryError } = await supabase
+    .from('account_login_history')
+    .insert({
+      user_id: user.id,
+      email: normalizedEmail,
+      role: agent.role,
+      organization: agent.organization,
+      provider: typeof user.app_metadata?.provider === 'string' ? user.app_metadata.provider : 'google',
+      ip_address: ipAddress,
+      user_agent: request.headers.get('user-agent'),
+    })
+
+  if (loginHistoryError) {
+    console.warn('Failed to record account login history:', loginHistoryError.message)
   }
 
   return NextResponse.redirect(`${origin}${next || rolePath(agent.role as AppRole)}`)
