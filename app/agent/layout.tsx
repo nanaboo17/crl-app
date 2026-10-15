@@ -55,7 +55,7 @@ export default async function AgentLayout({
         email={agent.email}
         mode="agent"
       >
-        <div className="mx-auto w-full max-w-5xl px-4 pt-4 sm:px-6"><AgentLocationTracker /></div>
+        <AgentLocationTracker />
         {children}
       </SuperadminShell>
     </div>
