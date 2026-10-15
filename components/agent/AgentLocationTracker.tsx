@@ -1,155 +1,160 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { useI18n } from '@/components/providers/i18n-provider'
 
-const INTERVAL_MS = 30 * 60 * 1000
+const INTERVAL = 30 * 60 * 1000
+const TIMEZONE = 'Asia/Jakarta'
+const ATTENDANCE_EVENT = 'crl:attendance-saved'
 
-type TrackingSession = { id: string; started_at: string; status: string }
-type Position = { coords: { latitude: number; longitude: number; accuracy: number }; timestamp: number }
+type Session = { id: string; started_at: string }
+type AttendanceEvent = CustomEvent<{ action: 'in' | 'out' }>
 
+function todayWib() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+}
+
+/**
+ * No visible agent controls. Attendance is the only shift start/stop mechanism.
+ * Browser GPS works only while the site is active; it is not background mobile tracking.
+ */
 export default function AgentLocationTracker() {
-  const { locale } = useI18n()
-  const tx = (en: string, id: string) => locale === 'id' ? id : en
-  const [session, setSession] = useState<TrackingSession | null>(null)
-  const [lastCaptured, setLastCaptured] = useState<string | null>(null)
-  const [status, setStatus] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [ready, setReady] = useState(false)
-  const [supabase] = useState(() => createClient())
-  const sessionRef = useRef<TrackingSession | null>(null)
-  const lastAttempt = useRef(0)
-  const inFlight = useRef(false)
-  const running = useRef(true)
+  const supabase = useMemo(() => createClient(), [])
   const userId = useRef<string | null>(null)
-
-  useEffect(() => { sessionRef.current = session }, [session])
-
-  const capture = useCallback(async (force = false) => {
-    if (!running.current || !sessionRef.current || inFlight.current || !userId.current) return
-    const now = Date.now()
-    if (!force && now - lastAttempt.current < INTERVAL_MS) return
-    lastAttempt.current = now
-    inFlight.current = true
-    try {
-      if (!navigator.geolocation) throw new Error('GPS is not available in this browser.')
-      const position: Position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true, timeout: 20000, maximumAge: 0,
-        })
-      })
-      if (!running.current || !sessionRef.current) return
-      const { error } = await supabase.from('agent_location_history').insert({
-        agent_user_id: userId.current,
-        tracking_session_id: sessionRef.current.id,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy_meters: position.coords.accuracy,
-        captured_at: new Date(position.timestamp).toISOString(),
-        device_event_id: crypto.randomUUID(),
-      })
-      if (error) throw error
-      setLastCaptured(new Date(position.timestamp).toISOString())
-      setStatus(tx('Location saved.', 'Lokasi tersimpan.'))
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : tx('Unable to collect location.', 'Gagal mengambil lokasi.'))
-    } finally {
-      inFlight.current = false
-    }
-  }, [supabase, locale])
+  const session = useRef<Session | null>(null)
+  const inFlight = useRef(false)
+  const syncing = useRef(false)
+  const lastAttempt = useRef(0)
+  const mounted = useRef(false)
 
   useEffect(() => {
-    running.current = true
+    mounted.current = true
     let cancelled = false
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || cancelled) return
-      userId.current = user.id
-      const { data, error } = await supabase.from('agent_tracking_sessions')
-        .select('id, started_at, status')
-        .eq('agent_user_id', user.id).eq('status', 'active')
-        .order('started_at', { ascending: false }).limit(1).maybeSingle()
-      if (cancelled) return
-      if (error) setStatus(error.message)
-      else if (data) { sessionRef.current = data; setSession(data) }
-      setReady(true)
+
+    async function endSessions(sessions: Session[]) {
+      for (const item of sessions) {
+        const { error } = await supabase.from('agent_tracking_sessions')
+          .update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', item.id)
+        if (error) console.warn('CRL GPS: unable to end tracking session:', error.message)
+      }
     }
-    void load()
-    return () => { cancelled = true; running.current = false }
+
+    async function reconcile(forceStop = false) {
+      if (cancelled || syncing.current) return
+      syncing.current = true
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user?.id || !user.email || cancelled) return
+        userId.current = user.id
+
+        const [{ data: attend, error: attendanceError }, { data: sessions, error: sessionError }] = await Promise.all([
+          supabase.from('agent_attendance')
+            .select('check_in_at,check_out_at')
+            .eq('agent_email', user.email.trim().toLowerCase())
+            .eq('attendance_date', todayWib()).maybeSingle(),
+          supabase.from('agent_tracking_sessions')
+            .select('id,started_at').eq('agent_user_id', user.id)
+            .eq('status', 'active').order('started_at', { ascending: false }),
+        ])
+        if (attendanceError || sessionError || cancelled) {
+          console.warn('CRL GPS: unable to read attendance/tracking state:', attendanceError?.message || sessionError?.message)
+          return
+        }
+        const active = (sessions ?? []) as Session[]
+        const shouldTrack = !forceStop && Boolean(attend?.check_in_at) && !attend?.check_out_at
+        if (!shouldTrack) {
+          session.current = null
+          if (active.length) await endSessions(active)
+          return
+        }
+
+        // Keep one session for this attendance day; close anything left from previous days.
+        const today = todayWib()
+        const current = active.find(s => new Intl.DateTimeFormat('en-CA', {
+          timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date(s.started_at)) === today)
+        await endSessions(active.filter(s => s.id !== current?.id))
+        if (cancelled) return
+        if (current) {
+          session.current = current
+        } else {
+          // Successful attendance check-in already required browser GPS permission.
+          // Check-in screen explicitly discloses shift-long tracking.
+          const now = new Date().toISOString()
+          const { data, error } = await supabase.from('agent_tracking_sessions')
+            .insert({ agent_user_id: user.id, started_at: now, consent_acknowledged_at: now, status: 'active' })
+            .select('id,started_at').single()
+          if (error) { console.warn('CRL GPS: unable to start tracking:', error.message); return }
+          session.current = data
+        }
+      } finally { syncing.current = false }
+    }
+
+    async function capture() {
+      const s = session.current
+      if (cancelled || !s || !userId.current || inFlight.current || document.visibilityState !== 'visible') return
+      const key = 'crl:gps:last-attempt:' + s.id
+      const previous = Number(window.localStorage.getItem(key) || 0)
+      if (Date.now() - Math.max(previous, lastAttempt.current) < INTERVAL) return
+      lastAttempt.current = Date.now()
+      window.localStorage.setItem(key, String(lastAttempt.current))
+      inFlight.current = true
+      try {
+        if (!navigator.geolocation) throw new Error('Geolocation unsupported')
+        const point = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true, timeout: 20000, maximumAge: 0,
+          }))
+        if (cancelled || session.current?.id !== s.id) return
+        const { error } = await supabase.from('agent_location_history').insert({
+          agent_user_id: userId.current,
+          tracking_session_id: s.id,
+          latitude: point.coords.latitude,
+          longitude: point.coords.longitude,
+          accuracy_meters: point.coords.accuracy,
+          captured_at: new Date(point.timestamp).toISOString(),
+          device_event_id: crypto.randomUUID(),
+        })
+        if (error) throw error
+      } catch (error) {
+        console.warn('CRL GPS: capture failed:', error)
+      } finally { inFlight.current = false }
+    }
+
+    async function tick() {
+      if (cancelled || document.visibilityState !== 'visible') return
+      await reconcile()
+      if (!cancelled) await capture()
+    }
+
+    function attendanceChanged(event: Event) {
+      const action = (event as AttendanceEvent).detail?.action
+      if (action === 'out') {
+        // Stop new captures immediately, even if the database update is delayed.
+        session.current = null
+        void reconcile(true)
+      } else if (action === 'in') {
+        void tick()
+      }
+    }
+
+    void tick()
+    const timer = window.setInterval(() => { void tick() }, 60_000)
+    const onFocus = () => { void tick() }
+    document.addEventListener('visibilitychange', onFocus)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener(ATTENDANCE_EVENT, attendanceChanged)
+    return () => {
+      cancelled = true
+      mounted.current = false
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onFocus)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener(ATTENDANCE_EVENT, attendanceChanged)
+    }
   }, [supabase])
 
-  useEffect(() => {
-    if (!session) return
-    const maybeCapture = () => { if (document.visibilityState === 'visible') void capture() }
-    maybeCapture()
-    const timer = window.setInterval(maybeCapture, 60 * 1000)
-    document.addEventListener('visibilitychange', maybeCapture)
-    window.addEventListener('focus', maybeCapture)
-    return () => {
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', maybeCapture)
-      window.removeEventListener('focus', maybeCapture)
-    }
-  }, [session, capture])
-
-  const start = async () => {
-    if (!userId.current || !navigator.geolocation || !window.isSecureContext) {
-      setStatus(tx('HTTPS and location access are required.', 'HTTPS dan akses lokasi diperlukan.'))
-      return
-    }
-    setBusy(true)
-    setStatus('')
-    try {
-      // Permission is requested through the browser before a session is created.
-      await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000 }))
-      const now = new Date().toISOString()
-      const { data, error } = await supabase.from('agent_tracking_sessions')
-        .insert({ agent_user_id: userId.current, consent_acknowledged_at: now, started_at: now, status: 'active' })
-        .select('id, started_at, status').single()
-      if (error) throw error
-      sessionRef.current = data
-      setSession(data)
-      lastAttempt.current = 0
-      // The interval effect will request the first tracked fix.
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to start tracking.')
-    } finally { setBusy(false) }
-  }
-
-  const stop = async () => {
-    if (!sessionRef.current) return
-    setBusy(true)
-    const current = sessionRef.current
-    // Prevent any further captures immediately.
-    sessionRef.current = null
-    const { error } = await supabase.from('agent_tracking_sessions')
-      .update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', current.id)
-    if (error) { sessionRef.current = current; setStatus(error.message) }
-    else { setSession(null); setStatus(tx('Shift ended; tracking stopped.', 'Shift berakhir; pelacakan berhenti.')) }
-    setBusy(false)
-  }
-
-  return (
-    <section className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm" aria-label={tx('Agent location tracking', 'Pelacakan lokasi agen')}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="font-bold">{tx('Field location tracking', 'Pelacakan lokasi lapangan')}</h2>
-          <p className="text-xs text-base-content/60">{tx('While this website is active, GPS is attempted every 30 minutes.', 'Selama situs aktif, GPS dicoba setiap 30 menit.')}</p>
-        </div>
-        <span className={`dui-badge ${session ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{session ? tx('On duty', 'Bertugas') : tx('Off duty', 'Tidak bertugas')}</span>
-      </div>
-      <p className="mt-2 text-xs text-base-content/70">{tx('During an active shift, your location, accuracy and capture time are stored for authorized operational monitoring. Stop tracking at any time. A locked phone or closed browser may prevent updates.', 'Selama shift aktif, lokasi, akurasi, dan waktu diambil disimpan untuk pemantauan operasional yang berwenang. Hentikan kapan saja. Ponsel terkunci atau browser tertutup dapat menghentikan pembaruan.')}</p>
-      <p className="mt-2 text-xs">{tx('Last successful GPS:', 'GPS terakhir berhasil:')} {lastCaptured ? new Date(lastCaptured).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB') : '—'}</p>
-      {status && <p role="status" className="mt-2 text-xs text-base-content/70">{status}</p>}
-      <div className="mt-3 flex gap-2">
-        {!session ? <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" disabled={!ready || busy} onClick={() => void start()}>{tx('Agree & Start Shift', 'Setuju & Mulai Shift')}</button>
-          : <>
-              <button type="button" className="dui-btn dui-btn-outline dui-btn-sm" disabled={busy} onClick={() => void capture(true)}>{tx('Update GPS now', 'Perbarui GPS')}</button>
-              <button type="button" className="dui-btn dui-btn-error dui-btn-sm" disabled={busy} onClick={() => void stop()}>{tx('End Shift', 'Akhiri Shift')}</button>
-            </>}
-      </div>
-    </section>
-  )
+  return null
 }
