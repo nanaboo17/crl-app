@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type MapCustomer = {
   crl_id: string
@@ -90,7 +90,7 @@ function popup(customer: MapCustomer, locale: string): HTMLElement {
 
 export default function CustomerPinMap({ customers, agentPosition, locale }: Props) {
   const elementRef = useRef<HTMLDivElement>(null)
-  const [status, setStatus] = ReactUseStatus()
+  const [status, setStatus] = useState('')
   useEffect(() => {
     let stopped = false
     let map: LeafletMap | null = null
@@ -134,5 +134,3 @@ export default function CustomerPinMap({ customers, agentPosition, locale }: Pro
     </div>
   )
 }
-
-import { useState as ReactUseStatus } from 'react'
