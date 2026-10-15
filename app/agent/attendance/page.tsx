@@ -370,6 +370,9 @@ export default function AgentAttendancePage() {
       }
       const row = data as Attendance
       setAttendance(row)
+      // Background web GPS tracks only after a successfully saved check-in,
+      // and stops immediately following a successfully saved check-out.
+      window.dispatchEvent(new CustomEvent('crl:attendance-saved', { detail: { action } }))
       setPhotos((current) => ({ ...current, [action]: null }))
       attendanceDiagnostic('attendance_saved', 'info', action === 'in' ? 'Check-in saved successfully' : 'Check-out saved successfully', {
         action,
@@ -427,6 +430,13 @@ export default function AgentAttendancePage() {
           </div>
         )}
       </section>
+
+      <p className={styles.note}>
+        {tx(
+          'Location notice: By checking in, you acknowledge that CRL will attempt to record your GPS coordinates, accuracy and timestamp approximately every 30 minutes while this website is active during your work shift. Authorized Superadmins can view your location history. Tracking ends when you check out. A locked phone or closed browser may interrupt updates. Contact your supervisor if you do not agree to shift-long location tracking.',
+          'Pemberitahuan lokasi: Dengan melakukan check-in, Anda mengetahui bahwa CRL akan mencoba merekam koordinat GPS, akurasi, dan waktu sekitar setiap 30 menit selama situs aktif saat jam kerja. Superadmin yang berwenang dapat melihat riwayat lokasi. Pelacakan berakhir saat check-out. Ponsel terkunci atau browser tertutup dapat mengganggu pembaruan. Hubungi atasan jika Anda tidak menyetujui pelacakan lokasi selama shift.'
+        )}
+      </p>
 
       <section className={styles.grid}>
         <AttendanceCard
