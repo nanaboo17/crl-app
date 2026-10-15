@@ -6,6 +6,10 @@ import { LocateFixed, MapPin, Navigation, Route, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
+import dynamic from 'next/dynamic'
+import type { MapCustomer } from '@/components/agent/CustomerPinMap'
+
+const CustomerPinMap = dynamic(() => import('@/components/agent/CustomerPinMap'), { ssr: false })
 
 type Customer = {
   crl_id: string
@@ -281,14 +285,14 @@ export default function AgentRoutePage() {
         </div>
       )}
 
-      {latitude !== null && longitude !== null && (
+      {availableCustomers.length > 0 && (
         <section className={styles.mapSection}>
           <div className={styles.sectionHeader}>
             <div><p className={styles.eyebrow}>{t('agent.route.mapTitle')}</p><h2>{t('agent.route.recommended')}</h2></div>
-            {route.length > 0 && <span className={styles.countBadge}>{route.length}</span>}
+            <span className={styles.countBadge}>{availableCustomers.length}</span>
           </div>
           <div className={styles.mapCard}>
-            <iframe title={t('agent.route.mapTitle')} src={`https://maps.google.com/maps?q=${latitude},${longitude}&z=14&output=embed`} loading="lazy" />
+            <CustomerPinMap customers={availableCustomers as MapCustomer[]} agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           </div>
           {route.length > 0 && <button type="button" className={styles.routeButton} onClick={openFullRoute}><Navigation size={17} /> {t('agent.route.openFullRoute')}</button>}
         </section>
