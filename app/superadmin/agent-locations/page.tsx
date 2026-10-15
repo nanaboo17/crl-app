@@ -12,7 +12,7 @@ type DisplayAgent = Agent & { point?: Point; tracking: boolean }
 export default function AgentLocationsPage() {
   const { locale } = useI18n()
   const tx = (en: string, id: string) => locale === 'id' ? id : en
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [agents, setAgents] = useState<DisplayAgent[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
