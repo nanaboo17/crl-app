@@ -142,10 +142,10 @@ export default function AgentLocationsPage() {
       {historyLoading ? <p className="p-6">{tx('Loading GPS points...', 'Memuat titik GPS...')}</p>
         : history.length ? <>
             <AgentMovementMap points={history} locale={locale}/>
-            <div className="flex flex-wrap items-center gap-4 p-3 text-xs"><span>🔵 {tx('First', 'Awal')}</span><span>🟣 {tx('Intermediate', 'Pertengahan')}</span><span>🔴 {tx('Latest', 'Terakhir')}</span><strong>{history.length} {tx('recorded points', 'titik terekam')}</strong></div>
+            <div className="flex flex-wrap items-center gap-4 p-3 text-xs"><span>🔵 {tx('First', 'Awal')}</span><span>🟣 {tx('Intermediate', 'Pertengahan')}</span><span>🔴 {tx('Latest', 'Terakhir')}</span><span>🟠 {tx('Low accuracy (excluded from trusted line)', 'Akurasi rendah (tidak masuk jalur tepercaya)')}</span><strong>{history.length} {tx('recorded points', 'titik terekam')}</strong></div>
             <div className="max-h-48 overflow-auto border-t border-base-300">
               <table className="dui-table dui-table-xs"><thead><tr><th>#</th><th>{tx('Time (WIB)', 'Waktu (WIB)')}</th><th>Latitude</th><th>Longitude</th><th>{tx('Accuracy', 'Akurasi')}</th></tr></thead>
-              <tbody>{history.map((p,i)=><tr key={p.captured_at+'-'+i}><td>{i+1}</td><td>{new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})}</td><td>{p.latitude.toFixed(6)}</td><td>{p.longitude.toFixed(6)}</td><td>{p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m'}</td></tr>)}</tbody></table>
+              <tbody>{history.map((p,i)=><tr key={p.captured_at+'-'+i}><td>{i+1}</td><td>{new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})}</td><td>{p.latitude.toFixed(6)}</td><td>{p.longitude.toFixed(6)}</td><td>{p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m'}{(p.accuracy_meters==null || p.accuracy_meters>100) && <span className="ml-1 text-warning">⚠</span>}</td></tr>)}</tbody></table>
             </div>
           </> : <p className="p-6 text-sm text-base-content/60">{tx('No recorded GPS points for this date.', 'Tidak ada titik GPS terekam pada tanggal ini.')}</p>}
       <p className="p-3 text-xs text-base-content/60">{tx('Line segments connect recorded GPS points, not actual roads. Missing updates do not imply movement.', 'Garis menghubungkan titik GPS yang tercatat, bukan jalan yang benar-benar dilalui. Pembaruan yang hilang tidak menunjukkan pergerakan.')}</p>
@@ -163,6 +163,7 @@ export default function AgentLocationsPage() {
           const state = !a.onDuty ? tx('Off duty', 'Tidak bertugas')
             : !a.tracking ? tx('No GPS session', 'Tidak ada sesi GPS')
             : !p ? tx('GPS missing', 'GPS belum ada')
+            : p.accuracy_meters == null || p.accuracy_meters > 100 ? tx('Low accuracy', 'Akurasi rendah')
             : since !== null && since > 40 ? tx('GPS stale', 'GPS terlambat')
             : tx('GPS healthy', 'GPS normal')
           const tone = !a.onDuty ? 'dui-badge-ghost' : (state === tx('GPS healthy', 'GPS normal') ? 'dui-badge-success' : 'dui-badge-warning')
