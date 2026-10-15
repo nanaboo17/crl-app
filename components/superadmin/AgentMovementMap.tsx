@@ -34,12 +34,19 @@ export default function AgentMovementMap({points,locale}:{points:HistoryPoint[];
       const coords: [number,number][]=points.map(p=>[p.latitude,p.longitude])
       map=L.map(root.current,{scrollWheelZoom:false}).setView(coords[0],14)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:19}).addTo(map)
-      if(coords.length>1)L.polyline(coords,{color:'#6944b5',weight:4,opacity:.85}).addTo(map)
+      // Connect only contiguous, accurate readings; never bridge an unreliable fix.
+      let segment: [number,number][] = []
+      const draw = () => { if(segment.length>1)L.polyline(segment,{color:'#6944b5',weight:4,opacity:.85}).addTo(map!) }
       points.forEach((p,i)=>{
-        const dot=L.circleMarker(coords[i],{radius:i===0||i===points.length-1?10:7,color:'#fff',weight:2,fillColor:i===0?'#1684d8':i===points.length-1?'#c93636':'#7751c5',fillOpacity:1}).addTo(map!)
+        if(p.accuracy_meters != null && p.accuracy_meters <= 100) segment.push(coords[i])
+        else { draw(); segment=[] }
+      })
+      draw()
+      points.forEach((p,i)=>{
+        const dot=L.circleMarker(coords[i],{radius:i===0||i===points.length-1?10:7,color:'#fff',weight:2,fillColor:p.accuracy_meters == null || p.accuracy_meters > 100?'#e58b27':i===0?'#1684d8':i===points.length-1?'#c93636':'#7751c5',fillOpacity:1}).addTo(map!)
         const info=document.createElement('div');info.style.cssText='min-width:165px;display:grid;gap:5px'
         const title=document.createElement('strong');title.textContent=(i===0?'Start':i===points.length-1?'Latest':'Point '+(i+1));info.appendChild(title)
-        for(const line of [new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})+' WIB',p.latitude.toFixed(6)+', '+p.longitude.toFixed(6),'Accuracy: '+(p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m')]){
+        for(const line of [new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})+' WIB',p.latitude.toFixed(6)+', '+p.longitude.toFixed(6),'Accuracy: '+(p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m'),(p.accuracy_meters==null||p.accuracy_meters>100?'Low accuracy — excluded from trusted line':'Accepted for trusted movement line')]){
           const div=document.createElement('span');div.textContent=line;info.appendChild(div)
         }
         dot.bindPopup(info)
