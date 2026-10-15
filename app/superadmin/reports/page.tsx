@@ -50,6 +50,22 @@ type ReportRow = {
   average_worked_minutes: number
 }
 
+type ProductivityRow = {
+  agent_email: string; agent_name: string | null; assigned_leads: number;
+  attendance_days: number; no_activity_attendance_days: number; pre_visit_days: number;
+  field_visit_days: number; pre_visit_customer_days: number; total_visits: number;
+  visits_per_attendance_day: number | null; visits_per_field_day: number | null;
+  target_attainment: number | null; met: number; ptp: number; missing_checkout_days: number;
+  long_gap_days: number; first_pre_visit: string | null; first_visit: string | null; review: string;
+}
+const productivityHeaders = ['CRL Agent','Email','Assigned Leads','Attendance Days','No-Activity Attendance Days','Pre-Visit Days','Field Visit Days','Pre-Visit Customer-Days','Total Visits','Visits / Attendance Day','Visits / Field Day','Target Attainment','Met','PTP','Missing Checkout Days','Long Gap Days >3h','First Pre-Visit','First Visit','Review'] as const
+function productivityValues(r:ProductivityRow) {
+ return [r.agent_name,r.agent_email,r.assigned_leads,r.attendance_days,r.no_activity_attendance_days,
+ r.pre_visit_days,r.field_visit_days,r.pre_visit_customer_days,r.total_visits,
+ r.visits_per_attendance_day,r.visits_per_field_day,r.target_attainment==null?'':r.target_attainment+'%',
+ r.met,r.ptp,r.missing_checkout_days,r.long_gap_days,r.first_pre_visit,r.first_visit,r.review]
+}
+
 function jakartaDate() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
@@ -75,6 +91,8 @@ export default function SuperadminReportsPage() {
   const [agentEmail, setAgentEmail] = useState('')
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [rows, setRows] = useState<ReportRow[]>([])
+  const [productivityRows, setProductivityRows] = useState<ProductivityRow[]>([])
+  const [dailyTarget, setDailyTarget] = useState('')
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -83,7 +101,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult, weeklyResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, productivityResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -99,6 +117,11 @@ export default function SuperadminReportsPage() {
         p_start_date: startDate,
         p_end_date: endDate,
         p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('get_superadmin_agent_productivity', {
+        p_start_date: startDate, p_end_date: endDate,
+        p_agent_email: agentEmail || null,
+        p_daily_visit_target: Number(dailyTarget)>0 ? Number(dailyTarget) : null,
       }),
     ])
 
@@ -118,11 +141,13 @@ export default function SuperadminReportsPage() {
       return
     }
 
+    if (productivityResult.error) { setError(productivityResult.error.message); setLoading(false); return }
+    setProductivityRows((productivityResult.data ?? []) as ProductivityRow[])
     setAgents((agentResult.data ?? []) as AgentOption[])
     setRows((reportResult.data ?? []) as ReportRow[])
     setWeeklyRows((weeklyResult.data ?? []) as WeeklyReportRow[])
     setLoading(false)
-  }, [agentEmail, endDate, startDate, supabase])
+  }, [agentEmail, endDate, startDate, dailyTarget, supabase])
 
   useEffect(() => {
     void load()
@@ -145,6 +170,12 @@ export default function SuperadminReportsPage() {
     )
     return rows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
   }, [agents, organization, rows])
+
+  const visibleProductivityRows = useMemo(() => {
+    if (!organization) return productivityRows
+    const allowed = new Set(agents.filter(a => (a.organization || '').trim() === organization).map(a => a.email.toLowerCase()))
+    return productivityRows.filter(r => allowed.has(r.agent_email.toLowerCase()))
+  }, [agents, organization, productivityRows])
 
   const visibleWeeklyRows = useMemo(() => {
     if (!organization) return weeklyRows
@@ -185,50 +216,8 @@ export default function SuperadminReportsPage() {
   ), [visibleRows])
 
   function downloadCsv() {
-    const headers = [
-      'Agent Name',
-      'Agent Email',
-      'Organization',
-      'Assigned Customers',
-      'Paid Customers',
-      'Unpaid Customers',
-      'P1',
-      'P2',
-      'P3',
-      'P4',
-      'P5',
-      'Pre-Visits',
-      'Ready for Visit',
-      'Direct Visit',
-      'Visits',
-      'Paid Conversations',
-      'Promise to Pay',
-      'Attendance Days',
-      'Average Worked Minutes',
-    ]
-
-    const organizationByEmail = new Map(agents.map((agent) => [agent.email.toLowerCase(), agent.organization || '']))
-    const body = visibleRows.map((row) => [
-      row.agent_name,
-      row.agent_email,
-      organizationByEmail.get(row.agent_email.toLowerCase()) || '',
-      row.assigned_customers,
-      row.paid_customers,
-      row.unpaid_customers,
-      row.p1_customers,
-      row.p2_customers,
-      row.p3_customers,
-      row.p4_customers,
-      row.p5_customers,
-      row.pre_visits,
-      row.ready_for_visit,
-      row.direct_visit,
-      row.visits,
-      row.paid_conversations,
-      row.promise_to_pay,
-      row.attendance_days,
-      row.average_worked_minutes,
-    ].map(csvCell).join(','))
+    const headers = [...productivityHeaders]
+    const body = visibleProductivityRows.map(r=>productivityValues(r).map(csvCell).join(','))
 
     const metadata = [
       [csvCell('CRL Superadmin Report')],
@@ -302,7 +291,7 @@ export default function SuperadminReportsPage() {
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm print:hidden">
         <div className="dui-card-body gap-4">
           <div className="flex items-center gap-2 font-bold"><CalendarDays className="h-5 w-5" />{tx('Report Filters', 'Filter Laporan')}</div>
-          <div className="grid gap-3 md:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-6">
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Start date', 'Tanggal mulai')}</span>
               <input type="date" className="dui-input w-full" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -331,6 +320,10 @@ export default function SuperadminReportsPage() {
                 <option value="">{tx('All agents', 'Semua agen')}</option>
                 {filteredAgents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name || agent.email}</option>)}
               </select>
+            </label>
+            <label className="dui-fieldset">
+              <span className="dui-fieldset-legend">{tx('Daily visit target (optional)', 'Target kunjungan harian (opsional)')}</span>
+              <input type="number" min="0" step="0.5" className="dui-input w-full" placeholder="—" value={dailyTarget} onChange={e=>setDailyTarget(e.target.value)}/>
             </label>
             <div className="flex items-end">
               <button type="button" className="dui-btn dui-btn-outline w-full" onClick={() => void load()} disabled={loading}>
@@ -392,62 +385,17 @@ export default function SuperadminReportsPage() {
 
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
         <div className="dui-card-body gap-3 p-0 sm:p-0">
-          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
-            <Users className="h-5 w-5" /> {tx('Agent Performance', 'Kinerja Agen')}
-          </div>
-          {loading ? (
-            <div className="flex justify-center py-16"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></div>
-          ) : visibleRows.length === 0 ? (
-            <div className="px-5 py-12 text-center text-sm text-base-content/60">{tx('No report data for this period.', 'Tidak ada data laporan untuk periode ini.')}</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="dui-table dui-table-zebra min-w-[1350px] text-xs sm:text-sm">
-                <thead>
-                  <tr>
-                    <th>{tx('Agent', 'Agen')}</th>
-                    <th>{tx('Organization', 'Organisasi')}</th>
-                    <th>{tx('Assigned', 'Ditugaskan')}</th>
-                    <th>{tx('Paid', 'Lunas')}</th>
-                    <th>{tx('Unpaid', 'Belum Bayar')}</th>
-                    <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th>
-                    <th>{tx('Pre-Visits', 'Pra-Kunjungan')}</th>
-                    <th>{tx('Ready', 'Siap')}</th>
-                    <th>{tx('Direct', 'Langsung')}</th>
-                    <th>{tx('Visits', 'Kunjungan')}</th>
-                    <th>{tx('Paid Conv.', 'Percakapan Lunas')}</th>
-                    <th>PTP</th>
-                    <th>{tx('Attendance', 'Absensi')}</th>
-                    <th>{tx('Avg. Work', 'Rata-rata Kerja')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleRows.map((row) => {
-                    const agent = agents.find((item) => item.email.toLowerCase() === row.agent_email.toLowerCase())
-                    return (
-                      <tr key={row.agent_email}>
-                        <td><div className="font-bold">{row.agent_name || '—'}</div><div className="text-[11px] text-base-content/50">{row.agent_email}</div></td>
-                        <td>{agent?.organization || '—'}</td>
-                        <td>{row.assigned_customers}</td>
-                        <td>{row.paid_customers}</td>
-                        <td>{row.unpaid_customers}</td>
-                        <td>{row.p1_customers}</td><td>{row.p2_customers}</td><td>{row.p3_customers}</td><td>{row.p4_customers}</td><td>{row.p5_customers}</td>
-                        <td>{row.pre_visits}</td>
-                        <td>{row.ready_for_visit}</td>
-                        <td>{row.direct_visit}</td>
-                        <td>{row.visits}</td>
-                        <td>{row.paid_conversations}</td>
-                        <td>{row.promise_to_pay}</td>
-                        <td>{row.attendance_days}</td>
-                        <td>{formatMinutes(Number(row.average_worked_minutes || 0), locale)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5"><Users className="h-5 w-5"/> {tx('Agent Productivity & Review', 'Produktivitas dan Evaluasi Agen')}</div>
+          {loading ? <div className="py-12 text-center"><span className="dui-loading dui-loading-spinner dui-loading-lg"/></div>
+          : <div className="max-w-full overflow-x-auto"><table className="dui-table dui-table-zebra min-w-[2450px] text-xs">
+            <thead><tr>{productivityHeaders.map(h=><th key={h} className="whitespace-normal">{h}</th>)}</tr></thead>
+            <tbody>{visibleProductivityRows.map(r=><tr key={r.agent_email} className={r.review==='Review'?'bg-warning/5':''}>
+              {productivityValues(r).map((v,i)=><td key={i} className={i===0?'font-bold':''}>{(i===16||i===17) && v ? new Date(String(v)).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'}):v ?? '—'}</td>)}
+            </tr>)}</tbody>
+          </table>{visibleProductivityRows.length===0&&<div className="p-6 text-sm">{tx('No report data.', 'Tidak ada data laporan.')}</div>}</div>}
         </div>
       </section>
+      <p className="text-xs text-base-content/60">{tx('Target attainment is blank until a daily visit target is entered. Missing checkout excludes today. Long gap means more than 3 hours between check-in and successive recorded pre-visit/visit events, not proof of inactivity.', 'Pencapaian target kosong sampai target harian diisi. Checkout hilang tidak menghitung hari ini. Jeda >3 jam dihitung dari check-in dan antar aktivitas pra-kunjungan/kunjungan yang tercatat, bukan bukti tidak bekerja.')}</p>
 
       <p className="text-xs text-base-content/50">
         {tx(
