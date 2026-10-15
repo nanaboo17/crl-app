@@ -291,6 +291,13 @@ export default function AgentRoutePage() {
             <div><p className={styles.eyebrow}>{t('agent.route.mapTitle')}</p><h2>{t('agent.route.recommended')}</h2></div>
             <span className={styles.countBadge}>{availableCustomers.length}</span>
           </div>
+          <div className={styles.pinLegend} aria-label={tx('Map pin color legend', 'Keterangan warna pin peta')}>
+            <span className={styles.pinLegendTitle}>{tx('Pin colors:', 'Warna pin:')}</span>
+            <span className={styles.pinLegendItem}><i className={styles.pinRed} aria-hidden="true" />{tx('P1 · Critical', 'P1 · Kritis')}</span>
+            <span className={styles.pinLegendItem}><i className={styles.pinOrange} aria-hidden="true" />{tx('P2 · High', 'P2 · Tinggi')}</span>
+            <span className={styles.pinLegendItem}><i className={styles.pinPurple} aria-hidden="true" />{tx('P3–P5 / Unranked', 'P3–P5 / Tanpa prioritas')}</span>
+            <span className={styles.pinLegendItem}><i className={styles.pinBlue} aria-hidden="true" />{tx('My location (GPS)', 'Lokasi saya (GPS)')}</span>
+          </div>
           <div className={styles.mapCard}>
             <CustomerPinMap customers={availableCustomers as MapCustomer[]} agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           </div>
