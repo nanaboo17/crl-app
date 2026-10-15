@@ -11,7 +11,8 @@ const AgentMovementMap = dynamic(() => import('@/components/superadmin/AgentMove
 type Agent = { email: string; agent_name: string | null; region: string | null; lead_email: string | null }
 type Point = { agent_user_id: string; latitude: number; longitude: number; accuracy_meters: number | null; captured_at: string; received_at: string }
 type AuthUser = { id: string; email: string | null }
-type DisplayAgent = Agent & { point?: Point; tracking: boolean; onDuty: boolean }
+type Diagnostic = { agent_user_id: string; stage: string; error_code: string; error_message: string | null; occurred_at: string }
+type DisplayAgent = Agent & { point?: Point; tracking: boolean; onDuty: boolean; diagnostic?: Diagnostic }
 
 export default function AgentLocationsPage() {
   const { locale } = useI18n()
@@ -36,15 +37,16 @@ export default function AgentLocationsPage() {
     let stopped = false
     async function refresh() {
       const todayWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-      const [agentResult, locationResult, sessionResult, attendanceResult] = await Promise.all([
+      const [agentResult, locationResult, sessionResult, attendanceResult, diagnosticsResult] = await Promise.all([
         supabase.from('agents').select('email,agent_name,region,lead_email').eq('role', 'agent').eq('active', true),
         supabase.from('agent_location_history').select('agent_user_id,latitude,longitude,accuracy_meters,captured_at,received_at').order('captured_at', { ascending: false }).limit(10000),
         supabase.from('agent_tracking_sessions').select('agent_user_id,status').eq('status', 'active'),
         supabase.from('agent_attendance').select('agent_email,check_in_at,check_out_at').eq('attendance_date', todayWib),
+        supabase.from('agent_gps_diagnostics').select('agent_user_id,stage,error_code,error_message,occurred_at').order('occurred_at', { ascending: false }).limit(1000),
       ])
       if (stopped) return
-      if (agentResult.error || locationResult.error || sessionResult.error || attendanceResult.error) {
-        setError(agentResult.error?.message || locationResult.error?.message || sessionResult.error?.message || attendanceResult.error?.message || 'Unable to load GPS data.')
+      if (agentResult.error || locationResult.error || sessionResult.error || attendanceResult.error || diagnosticsResult.error) {
+        setError(agentResult.error?.message || locationResult.error?.message || sessionResult.error?.message || attendanceResult.error?.message || diagnosticsResult.error?.message || 'Unable to load GPS data.')
         setLoading(false)
         return
       }
@@ -57,10 +59,12 @@ export default function AgentLocationsPage() {
       const latest = new Map<string, Point>()
       for (const p of locationResult.data ?? []) if (!latest.has(p.agent_user_id)) latest.set(p.agent_user_id, p)
       const active = new Set((sessionResult.data ?? []).map((s) => s.agent_user_id))
+      const failures = new Map<string, Diagnostic>()
+      for (const d of (diagnosticsResult.data ?? [])) if (!failures.has(d.agent_user_id)) failures.set(d.agent_user_id, d)
       const onDuty = new Set((attendanceResult.data ?? []).filter(a => Boolean(a.check_in_at) && !a.check_out_at).map(a => a.agent_email?.trim().toLowerCase()))
       setAgents((agentResult.data ?? []).map((agent) => {
         const id = idByEmail.get(agent.email.toLowerCase())
-        return { ...agent, point: id ? latest.get(id) : undefined, tracking: id ? active.has(id) : false, onDuty: onDuty.has(agent.email.trim().toLowerCase()) }
+        return { ...agent, point: id ? latest.get(id) : undefined, tracking: id ? active.has(id) : false, onDuty: onDuty.has(agent.email.trim().toLowerCase()), diagnostic: id ? failures.get(id) : undefined }
       }))
       setError('')
       setLoading(false)
@@ -147,12 +151,24 @@ export default function AgentLocationsPage() {
       <p className="p-3 text-xs text-base-content/60">{tx('Line segments connect recorded GPS points, not actual roads. Missing updates do not imply movement.', 'Garis menghubungkan titik GPS yang tercatat, bukan jalan yang benar-benar dilalui. Pembaruan yang hilang tidak menunjukkan pergerakan.')}</p>
     </section>}
     {loading ? <p>{tx('Loading...', 'Memuat...')}</p> : <div className="overflow-x-auto rounded-xl border border-base-300 bg-base-100">
-      <table className="dui-table"><thead><tr><th>{tx('Agent', 'Agen')}</th><th>Region</th><th>{tx('Attendance', 'Absensi')}</th><th>{tx('GPS session', 'Sesi GPS')}</th><th>{tx('Last GPS', 'GPS terakhir')}</th><th>{tx('Accuracy', 'Akurasi')}</th><th>{tx('Location', 'Lokasi')}</th></tr></thead>
+      <table className="dui-table"><thead><tr><th>{tx('Agent', 'Agen')}</th><th>Region</th><th>{tx('Attendance', 'Absensi')}</th><th>{tx('GPS session', 'Sesi GPS')}</th><th>{tx('GPS health', 'Kondisi GPS')}</th><th>{tx('Last GPS', 'GPS terakhir')}</th><th>{tx('Accuracy', 'Akurasi')}</th><th>{tx('Location', 'Lokasi')}</th></tr></thead>
       <tbody>{filtered.map((a) => { const p = a.point; const mins = p ? age(p) : null; return <tr key={a.email}>
         <td><strong>{a.agent_name || a.email}</strong><div className="text-xs opacity-60">{a.email}</div></td>
         <td>{a.region || '—'}</td>
         <td><span className={`dui-badge dui-badge-sm ${a.onDuty ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{a.onDuty ? tx('On duty', 'Bertugas') : tx('Off duty', 'Tidak bertugas')}</span></td>
         <td><span className={`dui-badge dui-badge-sm ${a.tracking ? 'dui-badge-info' : 'dui-badge-ghost'}`}>{a.tracking ? tx('Active', 'Aktif') : tx('Not active', 'Tidak aktif')}</span></td>
+        <td>{(() => {
+          const since = p ? age(p) : null
+          const failed = a.diagnostic && (!p || Date.parse(a.diagnostic.occurred_at) > Date.parse(p.captured_at))
+          const state = !a.onDuty ? tx('Off duty', 'Tidak bertugas')
+            : !a.tracking ? tx('No GPS session', 'Tidak ada sesi GPS')
+            : !p ? tx('GPS missing', 'GPS belum ada')
+            : since !== null && since > 40 ? tx('GPS stale', 'GPS terlambat')
+            : tx('GPS healthy', 'GPS normal')
+          const tone = !a.onDuty ? 'dui-badge-ghost' : (state === tx('GPS healthy', 'GPS normal') ? 'dui-badge-success' : 'dui-badge-warning')
+          const detail = failed ? [a.diagnostic?.stage, a.diagnostic?.error_code, a.diagnostic?.error_message].filter(Boolean).join(' · ') : ''
+          return <><span className={`dui-badge dui-badge-sm ${tone}`}>{state}</span>{detail && <div className="mt-1 max-w-64 break-words text-xs text-error" title={detail}>{detail}</div>}</>
+        })()}</td>
         <td>{p ? <><div>{new Date(p.captured_at).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB')}</div><span className={`dui-badge dui-badge-sm ${mins! > 60 ? 'dui-badge-error' : mins! > 40 ? 'dui-badge-warning' : 'dui-badge-success'}`}>{mins}m {tx('ago', 'lalu')}</span></> : '—'}</td>
         <td>{p?.accuracy_meters != null ? Math.round(p.accuracy_meters) + ' m' : '—'}</td>
         <td>{p ? <><a className="dui-link dui-link-primary" href={`https://www.google.com/maps?q=${encodeURIComponent(p.latitude + ',' + p.longitude)}`} target="_blank" rel="noopener noreferrer">{tx('External map', 'Peta eksternal')}</a> <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs" onClick={() => { setSelectedAgent(a.email); setHistory([]); setHistoryLoading(true) }}>{tx('Show here', 'Tampilkan')}</button></> : '—'}</td>
