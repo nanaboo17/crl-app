@@ -27,10 +27,8 @@ export default function AgentLocationTracker() {
   const inFlight = useRef(false)
   const syncing = useRef(false)
   const lastAttempt = useRef(0)
-  const mounted = useRef(false)
 
   useEffect(() => {
-    mounted.current = true
     let cancelled = false
 
     async function endSessions(sessions: Session[]) {
@@ -148,7 +146,6 @@ export default function AgentLocationTracker() {
     window.addEventListener(ATTENDANCE_EVENT, attendanceChanged)
     return () => {
       cancelled = true
-      mounted.current = false
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', onFocus)
       window.removeEventListener('focus', onFocus)
