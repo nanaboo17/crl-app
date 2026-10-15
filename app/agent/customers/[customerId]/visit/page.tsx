@@ -62,6 +62,7 @@ function formatVisitTimestamp(iso: string) {
 
 export default function VisitPage() {
   const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => locale === 'id' ? id : en
   const params = useParams()
   const router = useRouter()
   const customerId = decodeURIComponent(params.customerId as string)
