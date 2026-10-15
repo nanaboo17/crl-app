@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
+import dynamic from 'next/dynamic'
+import type { HistoryPoint } from '@/components/superadmin/AgentMovementMap'
+
+const AgentMovementMap = dynamic(() => import('@/components/superadmin/AgentMovementMap'), { ssr: false })
 
 type Agent = { email: string; agent_name: string | null; region: string | null; lead_email: string | null }
 type Point = { agent_user_id: string; latitude: number; longitude: number; accuracy_meters: number | null; captured_at: string; received_at: string }
@@ -18,7 +22,14 @@ export default function AgentLocationsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
-  const [region, setRegion] = useState('all')
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([])
+  const [directory, setDirectory] = useState<AuthUser[]>([])
+  const [history, setHistory] = useState<HistoryPoint[]>([])
+  const [historyError, setHistoryError] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [day, setDay] = useState(() => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date()))
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -39,6 +50,7 @@ export default function AgentLocationsPage() {
       const { data: users, error: userError } = await supabase.rpc('crl_agent_location_directory')
       if (stopped) return
       if (userError) { setError(userError.message); setLoading(false); return }
+      setDirectory((users as AuthUser[]) ?? [])
       const idByEmail = new Map((users as AuthUser[] ?? []).map((u) => [(u.email ?? '').toLowerCase(), u.id]))
       const latest = new Map<string, Point>()
       for (const p of locationResult.data ?? []) if (!latest.has(p.agent_user_id)) latest.set(p.agent_user_id, p)
@@ -58,15 +70,33 @@ export default function AgentLocationsPage() {
 
   const filtered = useMemo(() => agents.filter((a) => {
     const q = search.toLowerCase().trim()
-    return (region === 'all' || a.region === region) &&
+    return (selectedRegions.length === 0 || (a.region != null && selectedRegions.includes(a.region))) &&
       (!q || [a.agent_name, a.email, a.region, a.lead_email].some((x) => x?.toLowerCase().includes(q)))
-  }), [agents, search, region])
-  const selected = filtered.find((agent) => agent.email === selectedAgent && agent.point)?.point
-  const mapUrl = selected
-    ? 'https://www.openstreetmap.org/export/embed.html?bbox=' +
-      encodeURIComponent([selected.longitude - 0.008, selected.latitude - 0.006, selected.longitude + 0.008, selected.latitude + 0.006].join(',')) +
-      '&layer=mapnik&marker=' + encodeURIComponent(selected.latitude + ',' + selected.longitude)
-    : null
+  }), [agents, search, selectedRegions])
+  const selectedUserId = directory.find((u) => u.email?.toLowerCase() === selectedAgent?.toLowerCase())?.id
+  useEffect(() => {
+    if (!selectedUserId) { setHistory([]); return }
+    let cancelled = false
+    async function loadHistory() {
+      setHistoryLoading(true)
+      setHistoryError('')
+      // Local WIB day boundaries, converted to timestamptz by PostgREST.
+      const start = day + 'T00:00:00+07:00'
+      const end = new Date(new Date(start).getTime() + 86400000).toISOString()
+      const { data, error } = await supabase.from('agent_location_history')
+        .select('latitude,longitude,accuracy_meters,captured_at')
+        .eq('agent_user_id', selectedUserId)
+        .gte('captured_at', start).lt('captured_at', end)
+        .order('captured_at', { ascending: true }).limit(1000)
+      if (cancelled) return
+      if (error) { setHistoryError(error.message); setHistory([]) }
+      else setHistory((data ?? []).filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)))
+      setHistoryLoading(false)
+    }
+    void loadHistory()
+    const timer = window.setInterval(() => void loadHistory(), 5 * 60 * 1000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [selectedUserId, day, supabase])
   const regions = Array.from(new Set(agents.map((a) => a.region).filter((x): x is string => Boolean(x)))).sort()
   const age = (p: Point) => Math.max(0, Math.floor((now - Date.parse(p.captured_at)) / 60000))
   const fresh = filtered.filter((a) => a.point && age(a.point) <= 40).length
@@ -81,9 +111,38 @@ export default function AgentLocationsPage() {
     ].map(([label, value]) => <div key={label} className="rounded-xl border border-base-300 bg-base-100 p-3"><div className="text-xs opacity-60">{label}</div><div className="text-2xl font-bold">{value}</div></div>)}</div>
     <div className="flex flex-wrap gap-2">
       <input className="dui-input flex-1" type="search" aria-label={tx('Search agents', 'Cari agen')} placeholder={tx('Search agent, email or lead', 'Cari agen, email atau lead')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <select className="dui-select" value={region} onChange={(e) => setRegion(e.target.value)} aria-label="Region"><option value="all">{tx('All regions', 'Semua region')}</option>{regions.map((r) => <option key={r} value={r}>{r}</option>)}</select>
+      <details className="dropdown dropdown-end">
+        <summary className="dui-btn dui-btn-outline">{tx('Regions', 'Region')} {selectedRegions.length ? '(' + selectedRegions.length + ')' : tx('— All', '— Semua')}</summary>
+        <div className="dropdown-content z-30 mt-2 max-h-72 w-64 overflow-y-auto rounded-xl border border-base-300 bg-base-100 p-3 shadow-xl">
+          <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs mb-2" onClick={() => setSelectedRegions([])}>{tx('Clear / All regions', 'Hapus / Semua region')}</button>
+          {regions.map(r => <label key={r} className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 hover:bg-base-200">
+            <input type="checkbox" className="dui-checkbox dui-checkbox-sm" checked={selectedRegions.includes(r)}
+              onChange={e => setSelectedRegions(current => e.target.checked ? [...current,r] : current.filter(item => item !== r))} />
+            <span>{r}</span>
+          </label>)}
+        </div>
+      </details>
     </div>
-    {mapUrl && <section aria-label={tx('Selected agent location map', 'Peta lokasi agen terpilih')} className="overflow-hidden rounded-xl border border-base-300 bg-base-100"><div className="flex justify-between gap-2 p-3"><strong>{selectedAgent}</strong><button className="dui-btn dui-btn-ghost dui-btn-xs" onClick={() => setSelectedAgent(null)}>{tx('Close map', 'Tutup peta')}</button></div><iframe title={tx('Last recorded agent location', 'Lokasi terakhir agen')} src={mapUrl} loading="lazy" className="h-80 w-full border-0" referrerPolicy="no-referrer" /></section>}
+    {selectedAgent && <section className="overflow-hidden rounded-xl border border-base-300 bg-base-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div><h2 className="font-bold">{selectedAgent}</h2><p className="text-xs text-base-content/60">{tx('Recorded GPS movement by timestamp (WIB)', 'Pergerakan GPS berdasarkan waktu (WIB)')}</p></div>
+        <div className="flex items-center gap-2">
+          <input type="date" className="dui-input dui-input-sm" aria-label={tx('Movement date', 'Tanggal pergerakan')} value={day} onChange={e=>setDay(e.target.value)} />
+          <button className="dui-btn dui-btn-ghost dui-btn-sm" type="button" onClick={()=>setSelectedAgent(null)}>{tx('Close', 'Tutup')}</button>
+        </div>
+      </div>
+      {historyError && <p role="alert" className="p-3 text-error">{historyError}</p>}
+      {historyLoading ? <p className="p-6">{tx('Loading GPS points...', 'Memuat titik GPS...')}</p>
+        : history.length ? <>
+            <AgentMovementMap points={history} locale={locale}/>
+            <div className="flex flex-wrap items-center gap-4 p-3 text-xs"><span>🔵 {tx('First', 'Awal')}</span><span>🟣 {tx('Intermediate', 'Pertengahan')}</span><span>🔴 {tx('Latest', 'Terakhir')}</span><strong>{history.length} {tx('recorded points', 'titik terekam')}</strong></div>
+            <div className="max-h-48 overflow-auto border-t border-base-300">
+              <table className="dui-table dui-table-xs"><thead><tr><th>#</th><th>{tx('Time (WIB)', 'Waktu (WIB)')}</th><th>Latitude</th><th>Longitude</th><th>{tx('Accuracy', 'Akurasi')}</th></tr></thead>
+              <tbody>{history.map((p,i)=><tr key={p.captured_at+'-'+i}><td>{i+1}</td><td>{new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})}</td><td>{p.latitude.toFixed(6)}</td><td>{p.longitude.toFixed(6)}</td><td>{p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m'}</td></tr>)}</tbody></table>
+            </div>
+          </> : <p className="p-6 text-sm text-base-content/60">{tx('No recorded GPS points for this date.', 'Tidak ada titik GPS terekam pada tanggal ini.')}</p>}
+      <p className="p-3 text-xs text-base-content/60">{tx('Line segments connect recorded GPS points, not actual roads. Missing updates do not imply movement.', 'Garis menghubungkan titik GPS yang tercatat, bukan jalan yang benar-benar dilalui. Pembaruan yang hilang tidak menunjukkan pergerakan.')}</p>
+    </section>}
     {loading ? <p>{tx('Loading...', 'Memuat...')}</p> : <div className="overflow-x-auto rounded-xl border border-base-300 bg-base-100">
       <table className="dui-table"><thead><tr><th>{tx('Agent', 'Agen')}</th><th>Region</th><th>{tx('Tracking', 'Pelacakan')}</th><th>{tx('Last GPS', 'GPS terakhir')}</th><th>{tx('Accuracy', 'Akurasi')}</th><th>{tx('Location', 'Lokasi')}</th></tr></thead>
       <tbody>{filtered.map((a) => { const p = a.point; const mins = p ? age(p) : null; return <tr key={a.email}>
@@ -92,7 +151,7 @@ export default function AgentLocationsPage() {
         <td><span className={`dui-badge dui-badge-sm ${a.tracking ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{a.tracking ? tx('On duty', 'Bertugas') : tx('Off duty', 'Tidak bertugas')}</span></td>
         <td>{p ? <><div>{new Date(p.captured_at).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB')}</div><span className={`dui-badge dui-badge-sm ${mins! > 60 ? 'dui-badge-error' : mins! > 40 ? 'dui-badge-warning' : 'dui-badge-success'}`}>{mins}m {tx('ago', 'lalu')}</span></> : '—'}</td>
         <td>{p?.accuracy_meters != null ? Math.round(p.accuracy_meters) + ' m' : '—'}</td>
-        <td>{p ? <><a className="dui-link dui-link-primary" href={`https://www.google.com/maps?q=${encodeURIComponent(p.latitude + ',' + p.longitude)}`} target="_blank" rel="noopener noreferrer">{tx('External map', 'Peta eksternal')}</a> <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs" onClick={() => setSelectedAgent(a.email)}>{tx('Show here', 'Tampilkan')}</button></> : '—'}</td>
+        <td>{p ? <><a className="dui-link dui-link-primary" href={`https://www.google.com/maps?q=${encodeURIComponent(p.latitude + ',' + p.longitude)}`} target="_blank" rel="noopener noreferrer">{tx('External map', 'Peta eksternal')}</a> <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs" onClick={() => { setSelectedAgent(a.email); setHistory([]); setHistoryLoading(true) }}>{tx('Show here', 'Tampilkan')}</button></> : '—'}</td>
       </tr> })}</tbody></table>
     </div>}
     <p className="text-xs text-base-content/50">{tx('GPS can pause when browsers are closed or phones are locked. Old coordinates are not proof of current position. Updated every five minutes while this page is open.', 'GPS dapat berhenti ketika browser ditutup atau ponsel dikunci. Koordinat lama bukan bukti posisi saat ini. Diperbarui setiap lima menit selama halaman ini terbuka.')}</p>
