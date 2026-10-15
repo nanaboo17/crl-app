@@ -102,7 +102,7 @@ export default function PreVisitsPage() {
         {!loading && !error && rows.length > 0 && (
           <div className="mb-5">
             <div className="relative">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-base-content/50" />
+          <span className="pointer-events-none absolute inset-y-0 left-4 z-10 flex items-center text-base-content/60"><Search aria-hidden="true" className="size-5" /></span>
             <input type="search" aria-label={tx('Search pre-visits', 'Cari pra-kunjungan')} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder={tx('Search Customer ID, CRL ID, Pre-Visit ID, status…', 'Cari ID Pelanggan, ID CRL, ID Pra-Kunjungan, status…')} className="dui-input dui-input-bordered w-full rounded-xl !pl-12" style={{ paddingLeft: "3rem" }} />
           </div>
             <p className="mt-2 text-sm text-base-content/60">{filteredRows.length} {tx('matching customers', 'pelanggan ditemukan')}</p>
