@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 
 const INTERVAL = 30 * 60 * 1000
+const RETRY_INTERVAL = 2 * 60 * 1000
 const TIMEZONE = 'Asia/Jakarta'
 const ATTENDANCE_EVENT = 'crl:attendance-saved'
 
@@ -26,7 +27,6 @@ export default function AgentLocationTracker() {
   const session = useRef<Session | null>(null)
   const inFlight = useRef(false)
   const syncing = useRef(false)
-  const lastAttempt = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -93,12 +93,12 @@ export default function AgentLocationTracker() {
     async function capture() {
       const s = session.current
       if (cancelled || !s || !userId.current || inFlight.current || document.visibilityState !== 'visible') return
-      const key = 'crl:gps:last-attempt:' + s.id
-      const previous = Number(window.localStorage.getItem(key) || 0)
-      if (Date.now() - Math.max(previous, lastAttempt.current) < INTERVAL) return
-      lastAttempt.current = Date.now()
-      window.localStorage.setItem(key, String(lastAttempt.current))
+      const key = 'crl:gps:next-attempt:' + s.id
+      const next = Number(window.localStorage.getItem(key) || 0)
+      if (Date.now() < next) return
+      window.localStorage.setItem(key, String(Date.now() + RETRY_INTERVAL))
       inFlight.current = true
+      let stage: 'capture' | 'upload' = 'capture'
       try {
         if (!navigator.geolocation) throw new Error('Geolocation unsupported')
         const point = await new Promise<GeolocationPosition>((resolve, reject) =>
@@ -106,6 +106,7 @@ export default function AgentLocationTracker() {
             enableHighAccuracy: true, timeout: 20000, maximumAge: 0,
           }))
         if (cancelled || session.current?.id !== s.id) return
+        stage = 'upload'
         const { error } = await supabase.from('agent_location_history').insert({
           agent_user_id: userId.current,
           tracking_session_id: s.id,
@@ -116,8 +117,18 @@ export default function AgentLocationTracker() {
           device_event_id: crypto.randomUUID(),
         })
         if (error) throw error
+        window.localStorage.setItem(key, String(Date.now() + INTERVAL))
       } catch (error) {
-        console.warn('CRL GPS: capture failed:', error)
+        console.warn('CRL GPS: capture/upload failed:', error)
+        const message = error instanceof Error ? error.message : 'GPS capture/upload failed'
+        const code = typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code ?? 'UNKNOWN') : 'UNKNOWN'
+        // Only Superadmins can read diagnostics; never store coordinates in error logs.
+        const { error: diagnosticError } = await supabase.from('agent_gps_diagnostics').insert({
+          agent_user_id: userId.current, tracking_session_id: s.id,
+          stage, error_code: code.slice(0, 80), error_message: message.slice(0, 300),
+        })
+        if (diagnosticError) console.warn('CRL GPS diagnostic save failed:', diagnosticError.message)
       } finally { inFlight.current = false }
     }
 
