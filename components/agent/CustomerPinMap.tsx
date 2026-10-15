@@ -41,7 +41,7 @@ let leafletLoading: Promise<LeafletInstance> | null = null
 function loadLeaflet(): Promise<LeafletInstance> {
   if (window.L) return Promise.resolve(window.L)
   if (leafletLoading) return leafletLoading
-  leafletLoading = new Promise((resolve, reject) => {
+  leafletLoading = new Promise<LeafletInstance>((resolve, reject) => {
     if (!document.querySelector('link[data-crl-leaflet]')) {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
