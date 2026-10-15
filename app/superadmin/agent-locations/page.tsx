@@ -116,11 +116,11 @@ export default function AgentLocationsPage() {
     <div className="grid grid-cols-3 gap-2">{[
       [tx('Agents', 'Agen'), filtered.length], [tx('Fresh ≤40m', 'Baru ≤40m'), fresh], [tx('Stale >60m', 'Lama >60m'), stale],
     ].map(([label, value]) => <div key={label} className="rounded-xl border border-base-300 bg-base-100 p-3"><div className="text-xs opacity-60">{label}</div><div className="text-2xl font-bold">{value}</div></div>)}</div>
-    <div className="flex flex-wrap gap-2">
-      <input className="dui-input flex-1" type="search" aria-label={tx('Search agents', 'Cari agen')} placeholder={tx('Search agent, email or lead', 'Cari agen, email atau lead')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <details className="dropdown dropdown-end">
+    <div className="flex flex-wrap items-start gap-2">
+      <input className="dui-input min-w-48 flex-1" type="search" aria-label={tx('Search agents', 'Cari agen')} placeholder={tx('Search agent, email or lead', 'Cari agen, email atau lead')} value={search} onChange={(e) => setSearch(e.target.value)} />
+      <details className="relative z-40 shrink-0">
         <summary className="dui-btn dui-btn-outline">{tx('Regions', 'Region')} {selectedRegions.length ? '(' + selectedRegions.length + ')' : tx('— All', '— Semua')}</summary>
-        <div className="dropdown-content z-30 mt-2 max-h-72 w-64 overflow-y-auto rounded-xl border border-base-300 bg-base-100 p-3 shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-2 max-h-72 w-64 overflow-y-auto rounded-xl border border-base-300 bg-base-100 p-3 shadow-xl">
           <button type="button" className="dui-btn dui-btn-ghost dui-btn-xs mb-2" onClick={() => setSelectedRegions([])}>{tx('Clear / All regions', 'Hapus / Semua region')}</button>
           {regions.map(r => <label key={r} className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 hover:bg-base-200">
             <input type="checkbox" className="dui-checkbox dui-checkbox-sm" checked={selectedRegions.includes(r)}
