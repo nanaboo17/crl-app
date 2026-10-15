@@ -97,6 +97,10 @@ export default function AgentCustomersPage() {
   const [sort, setSort] = useState('priority')
   const [pendingPage, setPendingPage] = useState(1)
   const [visitedPage, setVisitedPage] = useState(1)
+  const [preVisitedPage, setPreVisitedPage] = useState(1)
+  const [activeTab, setActiveTab] = useState<'customers' | 'previsited' | 'visited'>('customers')
+  const [preVisitedKeys, setPreVisitedKeys] = useState<Set<string>>(new Set())
+  const [visitedKeys, setVisitedKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function loadData() {
@@ -129,7 +133,20 @@ export default function AgentCustomersPage() {
         .order('priority_rank', { ascending: true })
 
       if (customerError) setError(customerError.message)
-      else setCustomers(customerData ?? [])
+      else {
+        setCustomers(customerData ?? [])
+        const [{ data: preVisits, error: preError }, { data: visits, error: visitError }] = await Promise.all([
+          supabase.from('pre_visits').select('crl_id, customer_id').ilike('agent_email', email),
+          supabase.from('visits').select('crl_id, customer_id').ilike('agent_email', email),
+        ])
+        if (preError || visitError) setError(preError?.message || visitError?.message || '')
+        else {
+          const keys = (rows: { crl_id: string | null; customer_id: string | null }[]) =>
+            new Set(rows.map((row) => row.crl_id || (row.customer_id ? 'customer:' + row.customer_id : '')).filter(Boolean))
+          setPreVisitedKeys(keys(preVisits ?? []))
+          setVisitedKeys(keys(visits ?? []))
+        }
+      }
 
       setAgent(agentData)
       setLoading(false)
@@ -141,6 +158,7 @@ export default function AgentCustomersPage() {
   useEffect(() => {
     setPendingPage(1)
     setVisitedPage(1)
+    setPreVisitedPage(1)
   }, [search, paymentFilter, priorityFilter, sort])
 
   const filtered = useMemo(() => {
@@ -175,29 +193,33 @@ export default function AgentCustomersPage() {
     )
   }, [customers, search, paymentFilter, priorityFilter, sort])
 
-  const allPending = filtered.filter(
-    (customer) => (customer.visit_status ?? '').trim().toLowerCase() !== 'visited'
-  )
-  const allVisited = filtered.filter(
-    (customer) => (customer.visit_status ?? '').trim().toLowerCase() === 'visited'
-  )
-
-  const pendingTotalPages = Math.max(1, Math.ceil(allPending.length / PAGE_SIZE))
-  const visitedTotalPages = Math.max(1, Math.ceil(allVisited.length / PAGE_SIZE))
-  const safePendingPage = Math.min(pendingPage, pendingTotalPages)
-  const safeVisitedPage = Math.min(visitedPage, visitedTotalPages)
-  const pendingStart = (safePendingPage - 1) * PAGE_SIZE
-  const visitedStart = (safeVisitedPage - 1) * PAGE_SIZE
-  const pending = allPending.slice(pendingStart, pendingStart + PAGE_SIZE)
-  const visited = allVisited.slice(visitedStart, visitedStart + PAGE_SIZE)
+  const stageOf = (customer: CustomerRow) => {
+    const key = customer.crl_id
+    const fallback = 'customer:' + customer.customer_id
+    if ((customer.visit_status ?? '').trim().toLowerCase() === 'visited' ||
+      visitedKeys.has(key) || visitedKeys.has(fallback)) return 'visited'
+    if (preVisitedKeys.has(key) || preVisitedKeys.has(fallback)) return 'previsited'
+    return 'customers'
+  }
+  const allPending = filtered.filter((customer) => stageOf(customer) === 'customers')
+  const allPreVisited = filtered.filter((customer) => stageOf(customer) === 'previsited')
+  const allVisited = filtered.filter((customer) => stageOf(customer) === 'visited')
+  const displayed = activeTab === 'visited' ? allVisited : activeTab === 'previsited' ? allPreVisited : allPending
+  const currentPage = activeTab === 'visited' ? visitedPage : activeTab === 'previsited' ? preVisitedPage : pendingPage
+  const setCurrentPage = activeTab === 'visited' ? setVisitedPage : activeTab === 'previsited' ? setPreVisitedPage : setPendingPage
+  const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const start = (safePage - 1) * PAGE_SIZE
+  const pageCustomers = displayed.slice(start, start + PAGE_SIZE)
 
   const hasActiveFilter =
     search !== '' || paymentFilter !== 'all' || priorityFilter !== 'all'
 
   const stats = [
     { label: t('agent.customers.statTotal'), value: customers.length, icon: Users, current: false },
-    { label: t('agent.customers.statPending'), value: allPending.length, icon: MapPin, current: true },
-    { label: t('agent.customers.statVisited'), value: allVisited.length, icon: ClipboardList, current: false },
+    { label: tx('Customers', 'Pelanggan'), value: allPending.length, icon: MapPin, current: activeTab === 'customers' },
+    { label: tx('Pre-visited', 'Pra-kunjungan'), value: allPreVisited.length, icon: ClipboardList, current: activeTab === 'previsited' },
+    { label: tx('Visited', 'Dikunjungi'), value: allVisited.length, icon: ClipboardList, current: activeTab === 'visited' },
   ]
 
   return (
@@ -385,41 +407,29 @@ export default function AgentCustomersPage() {
         </div>
       </section>
 
+      <div role="tablist" aria-label={tx('Customer visit stages', 'Tahap kunjungan pelanggan')} className="dui-tabs dui-tabs-box flex flex-wrap gap-2 bg-base-100 p-2">
+        {([
+          ['customers', tx('Customers', 'Pelanggan'), allPending.length],
+          ['previsited', tx('Pre-visited', 'Pra-kunjungan'), allPreVisited.length],
+          ['visited', tx('Visited', 'Dikunjungi'), allVisited.length],
+        ] as const).map(([key, label, count]) => (
+          <button key={key} type="button" role="tab" aria-selected={activeTab === key}
+            onClick={() => setActiveTab(key)}
+            className={`dui-tab h-auto min-h-11 flex-1 gap-2 rounded-lg px-3 py-2 ${activeTab === key ? 'dui-tab-active bg-primary text-primary-content' : ''}`}>
+            {label} <span className="dui-badge dui-badge-sm">{count}</span>
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <CustomerSkeleton t={t} />
       ) : (
         <>
-          <CustomerSection
-            t={t}
-            title={t('agent.customers.sectionNeedsVisit')}
-            count={allPending.length}
-            customers={pending}
-            visited={false}
-          />
-          <SectionPagination
-            label="Needs visit pagination"
-            totalItems={allPending.length}
-            page={safePendingPage}
-            totalPages={pendingTotalPages}
-            start={pendingStart}
-            setPage={setPendingPage}
-          />
-
-          <CustomerSection
-            t={t}
-            title={t('agent.customers.sectionVisited')}
-            count={allVisited.length}
-            customers={visited}
-            visited
-          />
-          <SectionPagination
-            label="Visited customers pagination"
-            totalItems={allVisited.length}
-            page={safeVisitedPage}
-            totalPages={visitedTotalPages}
-            start={visitedStart}
-            setPage={setVisitedPage}
-          />
+          <CustomerSection t={t}
+            title={activeTab === 'customers' ? tx('Customers — Not yet pre-visited', 'Pelanggan — Belum pra-kunjungan') : activeTab === 'previsited' ? tx('Pre-visited — Not yet visited', 'Sudah pra-kunjungan — Belum dikunjungi') : tx('Visited customers', 'Pelanggan sudah dikunjungi')}
+            count={displayed.length} customers={pageCustomers} visited={activeTab === 'visited'} />
+          <SectionPagination label={tx('Customer stage pagination', 'Halaman tahap pelanggan')}
+            totalItems={displayed.length} page={safePage} totalPages={totalPages} start={start} setPage={setCurrentPage} />
         </>
       )}
     </div>
