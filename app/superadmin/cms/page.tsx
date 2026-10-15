@@ -256,7 +256,15 @@ export default function CmsPage() {
 
                   <div className="grid gap-3">
                     {(field.options || []).map((option, optionIndex) => (
-                      <div key={`${field.id}-${optionIndex}`} className="rounded-xl border border-base-300 bg-base-100 p-3">
+                      <div key={`${field.id}-${optionIndex}`}>
+                        {field.field_key === 'approved_offer' && (
+                          <div className="mb-2 text-xs font-bold text-base-content/70">
+                            {String(option.value).includes('selama 1 bulan') ? tx('10-digit customer ID — 1-month offers', 'Customer ID 10 digit — offer 1 bulan')
+                              : String(option.value).includes('selama 3 bulan') ? tx('8-digit customer ID — 3-month offers', 'Customer ID 8 digit — offer 3 bulan')
+                              : tx('Common / fallback offer', 'Offer umum / alternatif')}
+                          </div>
+                        )}
+                      <div className="rounded-xl border border-base-300 bg-base-100 p-3">
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2">
                             <GripVertical className="size-4 shrink-0 text-base-content/35" aria-hidden="true" />
@@ -307,6 +315,7 @@ export default function CmsPage() {
                             <input className="dui-input dui-input-bordered w-full" value={option.label_en} onChange={(e) => patchOption(field.id, optionIndex, { label_en: e.target.value })} />
                           </label>
                         </div>
+                      </div>
                       </div>
                     ))}
 
