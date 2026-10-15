@@ -17,7 +17,7 @@ export default function AgentLocationTracker() {
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [ready, setReady] = useState(false)
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const sessionRef = useRef<TrackingSession | null>(null)
   const lastAttempt = useRef(0)
   const inFlight = useRef(false)
