@@ -101,10 +101,34 @@ export default function AgentLocationTracker() {
       let stage: 'capture' | 'upload' = 'capture'
       try {
         if (!navigator.geolocation) throw new Error('Geolocation unsupported')
-        const point = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true, timeout: 20000, maximumAge: 0,
-          }))
+        // Collect multiple fixes and select the best reported accuracy.
+        // This does not force precise GPS on a device configured for approximate location.
+        const point = await new Promise<GeolocationPosition>((resolve, reject) => {
+          let best: GeolocationPosition | null = null
+          let watchId: number | null = null
+          let settled = false
+          const finish = (error?: GeolocationPositionError) => {
+            if (settled) return
+            settled = true
+            window.clearTimeout(timer)
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+            if (best) resolve(best)
+            else reject(error ?? new Error('No GPS position within 40 seconds'))
+          }
+          const timer = window.setTimeout(() => finish(), 40000)
+          watchId = navigator.geolocation.watchPosition(
+            (candidate) => {
+              if (!best || candidate.coords.accuracy < best.coords.accuracy) best = candidate
+              if (candidate.coords.accuracy <= 50) finish()
+            },
+            (error) => {
+              if (error.code === error.PERMISSION_DENIED) finish(error)
+              // Other transient GPS errors are allowed to recover within the window.
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 40000 },
+          )
+          if (settled && watchId !== null) navigator.geolocation.clearWatch(watchId)
+        })
         if (cancelled || session.current?.id !== s.id) return
         stage = 'upload'
         const { error } = await supabase.from('agent_location_history').insert({
@@ -117,7 +141,8 @@ export default function AgentLocationTracker() {
           device_event_id: crypto.randomUUID(),
         })
         if (error) throw error
-        window.localStorage.setItem(key, String(Date.now() + INTERVAL))
+        // Keep low-confidence fixes as evidence, but retry after two minutes.
+        window.localStorage.setItem(key, String(Date.now() + (point.coords.accuracy <= 100 ? INTERVAL : RETRY_INTERVAL)))
       } catch (error) {
         console.warn('CRL GPS: capture/upload failed:', error)
         const message = error instanceof Error ? error.message : 'GPS capture/upload failed'
