@@ -14,12 +14,14 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
+import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
 
 export default function EditVisitPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const id = decodeURIComponent(params.id)
   const [row, setRow] = useState<any>(null)
+  const eligibleOffers = retentionOffersForCustomer(row?.customer_id)
   const [currentSpeed, setCurrentSpeed] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -86,6 +88,11 @@ export default function EditVisitPage() {
     if (!row) return
     if (!form.visit_status_kunjungan || !form.conversation_result) {
       setError('Visit status and conversation result are required.')
+      return
+    }
+
+    if (form.approved_offer && form.approved_offer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === form.approved_offer)) {
+      setError('Selected offer is not available for this Customer ID.')
       return
     }
 
@@ -309,12 +316,18 @@ export default function EditVisitPage() {
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Approved offer">
-                <input
-                  className="dui-input dui-input-bordered w-full"
+                <select
+                  className="dui-select dui-select-bordered w-full"
                   value={form.approved_offer}
-                  onChange={(e) => setForm({ ...form, approved_offer: e.target.value })}
-                  placeholder="Approved retention offer"
-                />
+                  onChange={(event) => setForm({ ...form, approved_offer: event.target.value })}
+                >
+                  <option value="">Select offer</option>
+                  {eligibleOffers.map((offer) => <option key={offer.value} value={offer.value}>{offer.label}</option>)}
+                  <option value={NO_APPROVED_OFFER}>No approved offer yet</option>
+                  {form.approved_offer && form.approved_offer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === form.approved_offer) && (
+                    <option value={form.approved_offer} disabled>{form.approved_offer} (previous offer — unavailable)</option>
+                  )}
+                </select>
               </FormField>
 
               <FormField label="Planned payment date" icon={<CalendarDays className="h-4 w-4" />}>

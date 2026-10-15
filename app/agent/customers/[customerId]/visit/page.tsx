@@ -20,6 +20,7 @@ import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { useI18n } from '@/components/providers/i18n-provider'
 import CmsCustomFields, { validateCmsCustomFields } from '@/components/forms/CmsCustomFields'
 import { cmsField, cmsLabel, cmsOptions, loadCmsFormFields, type CmsFormField } from '@/lib/form-cms'
+import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
 import styles from './page.module.css'
 
 const LOCATION_LIMIT_METERS = 200
@@ -112,6 +113,11 @@ export default function VisitPage() {
   const visitStatusField = visitField('visit_status_kunjungan')
   const conversationField = visitField('conversation_result')
   const approvedOfferField = visitField('approved_offer')
+  const eligibleOffers = retentionOffersForCustomer(customer?.customer_id)
+  const offerChoices = eligibleOffers.map((offer) => ({
+    ...offer,
+    label: cmsOptions(approvedOfferField, locale).find((item) => item.value === offer.value)?.label || offer.label,
+  }))
   const plannedPaymentField = visitField('planned_payment_date')
   const unpaidReasonField = visitField('unpaid_reason')
   const additionalNotesField = visitField('additional_notes')
@@ -547,6 +553,9 @@ export default function VisitPage() {
     if (!visitStatusKunjungan) return setError(t('agent.visit.err.selectVisitStatus'))
     if (!conversationResult) return setError(t('agent.visit.err.selectConversation'))
     if (conversationResult !== 'Tidak bertemu pelanggan' && !approvedOffer) return setError(t('agent.visit.err.selectOffer'))
+    if (conversationResult !== 'Tidak bertemu pelanggan' && approvedOffer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === approvedOffer)) {
+      return setError(tx('Selected offer is not available for this Customer ID.', 'Offer tidak tersedia untuk ID Pelanggan ini.'))
+    }
     if (conversationResult === 'Bersedia bayar / Promise to Pay' && !plannedPaymentDate) return setError(t('agent.visit.err.plannedDate'))
     if (
       conversationResult !== 'Sudah melakukan pembayaran' &&
@@ -893,7 +902,7 @@ export default function VisitPage() {
         {conversationField?.visible !== false && <Field label={cmsLabel(conversationField, locale, t('agent.visit.fieldConversation'), t('agent.visit.fieldConversation'))}><select value={conversationResult} onChange={(e) => setConversationResult(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.conversationPlaceholder')}</option>{(cmsOptions(conversationField, locale).length ? cmsOptions(conversationField, locale) : [{value:'Sudah melakukan pembayaran',label:t('agent.visit.conv.paid')},{value:'Bersedia bayar / Promise to Pay',label:t('agent.visit.conv.promiseToPay')},{value:'Masih mempertimbangkan',label:t('agent.visit.conv.stillConsidering')},{value:'Tidak bersedia melanjutkan layanan',label:t('agent.visit.conv.notWilling')},{value:'Tidak bertemu pelanggan',label:t('agent.visit.conv.notMet')}]).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>}
       </StepCard>
 
-      {conversationResult !== 'Tidak bertemu pelanggan' && approvedOfferField?.visible !== false && <StepCard t={t} step="5" title={t('agent.visit.step5')}><p className="text-sm text-base-content/60">{t('agent.visit.offerHint')}</p><Field label={cmsLabel(approvedOfferField, locale, t('agent.visit.fieldApprovedOffer'), t('agent.visit.fieldApprovedOffer'))}><select value={approvedOffer} onChange={(e) => setApprovedOffer(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.offerPlaceholder')}</option>{(cmsOptions(approvedOfferField, locale).length ? cmsOptions(approvedOfferField, locale) : [{value:'Diskon 20% selama 3 bulan + Voucher Rp100.000',label:t('agent.visit.offer.discount20')},{value:'Diskon 30% selama 3 bulan + Voucher Rp100.000',label:t('agent.visit.offer.discount30100')},{value:'Diskon 30% selama 3 bulan + Voucher Rp200.000',label:t('agent.visit.offer.discount30200')},{value:'Belum ada offer yang disetujui',label:t('agent.visit.offer.none')}]).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field></StepCard>}
+      {conversationResult !== 'Tidak bertemu pelanggan' && approvedOfferField?.visible !== false && <StepCard t={t} step="5" title={t('agent.visit.step5')}><p className="text-sm text-base-content/60">{t('agent.visit.offerHint')}</p><Field label={cmsLabel(approvedOfferField, locale, t('agent.visit.fieldApprovedOffer'), t('agent.visit.fieldApprovedOffer'))}><select value={approvedOffer} onChange={(e) => setApprovedOffer(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.offerPlaceholder')}</option>{offerChoices.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}<option value={NO_APPROVED_OFFER}>{tx('No approved offer yet', 'Belum ada offer yang disetujui')}</option></select></Field></StepCard>}
 
       <StepCard t={t} step="6" title={t('agent.visit.step6')}>
         {conversationResult === 'Bersedia bayar / Promise to Pay' && plannedPaymentField?.visible !== false && <Field label={cmsLabel(plannedPaymentField, locale, t('agent.visit.fieldPlannedDate'), t('agent.visit.fieldPlannedDate'))}><input type="date" value={plannedPaymentDate} onChange={(e) => setPlannedPaymentDate(e.target.value)} className="dui-input w-full" /></Field>}
