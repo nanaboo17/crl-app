@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminShell from '@/components/superadmin/SuperadminShell'
 import AgentFormTooltips from '@/components/agent/AgentFormTooltips'
+import AgentLocationTracker from '@/components/agent/AgentLocationTracker'
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -54,6 +55,7 @@ export default async function AgentLayout({
         email={agent.email}
         mode="agent"
       >
+        <div className="mx-auto w-full max-w-5xl px-4 pt-4 sm:px-6"><AgentLocationTracker /></div>
         {children}
       </SuperadminShell>
     </div>

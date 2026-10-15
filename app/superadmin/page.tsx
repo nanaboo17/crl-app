@@ -116,6 +116,7 @@ export default async function SuperadminPage() {
 
   const quickAccess = [
     { href: '/superadmin/agents', title: tx('Manage Agents', 'Kelola Agen'), icon: Users, tone: 'purple' },
+    { href: '/superadmin/agent-locations', title: tx('Agent GPS Locations', 'Lokasi GPS Agen'), icon: MapPin, tone: 'blue' },
     { href: '/superadmin/customers', title: tx('Customer List', 'Daftar Pelanggan'), icon: Building2, tone: 'green' },
     { href: '/superadmin/pre-visits', title: tx('Pre-Visit Monitor', 'Monitor Pra-Kunjungan'), icon: ClipboardList, tone: 'yellow' },
     { href: '/superadmin/visits', title: tx('Visit Monitor', 'Monitor Kunjungan'), icon: MapPin, tone: 'blue' },
