@@ -132,7 +132,7 @@ export default function SuperadminReportsPage() {
         p_end_date: endDate,
         p_agent_email: agentEmail || null,
       }),
-      supabase.rpc('get_superadmin_report_payment_conversions', {
+      supabase.rpc('crl_circle_report_payment_conversions_v2', {
         p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
       }),
       supabase.rpc('get_superadmin_agent_productivity', {
@@ -250,7 +250,7 @@ export default function SuperadminReportsPage() {
     async function loadHistory() {
       setLocationLoading(true)
       setLocationError('')
-      const {data: directory, error: directoryError} = await supabase.rpc('crl_agent_location_directory')
+      const {data: directory, error: directoryError} = await supabase.rpc('crl_circle_agent_location_directory_v2')
       if(cancelled) return
       if(directoryError) { setLocationError(directoryError.message); setLocationLoading(false); return }
       const user = ((directory ?? []) as AuthDirectoryUser[]).find(u=>u.email?.trim().toLowerCase()===selectedAgentEmail)
