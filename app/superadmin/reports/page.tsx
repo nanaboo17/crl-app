@@ -111,7 +111,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult, weeklyResult, productivityResult, conversionResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
