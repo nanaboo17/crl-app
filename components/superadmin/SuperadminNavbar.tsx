@@ -15,6 +15,7 @@ import chrome from './SuperadminChrome.module.css'
 export default function SuperadminNavbar({
   agentName,
   email,
+  scopeLabel,
   navigationOpen,
   onOpenNavigation,
   menuButtonRef,
@@ -22,6 +23,7 @@ export default function SuperadminNavbar({
 }: {
   agentName: string
   email: string
+  scopeLabel?: string
   navigationOpen: boolean
   onOpenNavigation: () => void
   menuButtonRef: React.RefObject<HTMLButtonElement | null>
@@ -104,6 +106,7 @@ export default function SuperadminNavbar({
       ) : null}
 
       <div className="ml-auto flex items-center gap-2">
+        {playful && scopeLabel && <span className="hidden rounded-full border border-base-content/20 px-2.5 py-1 text-[11px] font-bold tracking-wide sm:inline-flex" title="Configured administration scope">{scopeLabel}</span>}
         {playful ? <FieldModeToggle /> : null}
 
         {playful ? (

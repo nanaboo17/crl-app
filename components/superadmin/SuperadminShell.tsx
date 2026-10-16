@@ -17,11 +17,15 @@ import shellTheme from './SuperadminShellTheme.module.css'
 export default function SuperadminShell({
   agentName,
   email,
+  scopeLabel,
+  scopePending = false,
   children,
   mode = 'superadmin',
 }: {
   agentName: string
   email: string
+  scopeLabel?: string
+  scopePending?: boolean
   children: React.ReactNode
   mode?: 'agent' | 'admin' | 'superadmin'
 }) {
@@ -122,11 +126,13 @@ export default function SuperadminShell({
         <SuperadminNavbar
           agentName={agentName}
           email={email}
+          scopeLabel={scopeLabel}
           navigationOpen={navOpen}
           onOpenNavigation={() => setNavOpen(true)}
           menuButtonRef={menuButtonRef}
           config={config}
         />
+        {scopePending && <div role="status" className="border-b border-warning/30 bg-warning/10 px-4 py-2 text-center text-xs font-semibold text-base-content sm:px-6">Circle mapping configured · Access restrictions are not active yet / Mapping Circle tersedia · Pembatasan akses belum aktif</div>}
         <main className={`flex-1 ${playful ? shellTheme.content : ''} ${mode === 'agent' ? shellTheme.agentContent : ''}`}>
           {children}
         </main>
