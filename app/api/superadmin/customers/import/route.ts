@@ -124,12 +124,12 @@ async function authorize() {
 
   const { data: profile } = await supabase
     .from('agents')
-    .select('role,active')
+    .select('role,active,circle_id')
     .ilike('email', user.email.trim())
     .maybeSingle()
 
-  if (!profile?.active || profile.role !== 'superadmin') {
-    return { error: NextResponse.json({ error: 'Superadmin access required.' }, { status: 403 }) }
+  if (!profile?.active || profile.role !== 'superadmin' || profile.circle_id !== null) {
+    return { error: NextResponse.json({ error: 'National Superadmin access required.' }, { status: 403 }) }
   }
 
   return { supabase }
