@@ -245,6 +245,7 @@ export default function SuperadminReportsPage() {
 
   useEffect(() => {
     if (!locationAgent) return
+    const selectedAgentEmail = locationAgent.agent_email.trim().toLowerCase()
     let cancelled = false
     async function loadHistory() {
       setLocationLoading(true)
@@ -252,7 +253,7 @@ export default function SuperadminReportsPage() {
       const {data: directory, error: directoryError} = await supabase.rpc('crl_agent_location_directory')
       if(cancelled) return
       if(directoryError) { setLocationError(directoryError.message); setLocationLoading(false); return }
-      const user = ((directory ?? []) as AuthDirectoryUser[]).find(u=>u.email?.trim().toLowerCase()===locationAgent.agent_email.trim().toLowerCase())
+      const user = ((directory ?? []) as AuthDirectoryUser[]).find(u=>u.email?.trim().toLowerCase()===selectedAgentEmail)
       if(!user) { setLocationRows([]); setLocationError(tx('No GPS account associated with this agent.','Akun GPS agen tidak ditemukan.')); setLocationLoading(false); return }
       const start = locationDay + 'T00:00:00+07:00'
       const end = new Date(new Date(start).getTime()+86400000).toISOString()
