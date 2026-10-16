@@ -70,3 +70,21 @@ FOR DELETE TO authenticated USING (
  public.current_role()='admin'
  OR (public.current_role()='superadmin' AND public.crl_can_access_region(region))
 );
+
+-- Track session SELECT must match GPS history scoping.
+-- INSERT and UPDATE policies for agent tracking remain unchanged.
+DROP POLICY IF EXISTS "tracking_agent_read_sessions" ON public.agent_tracking_sessions;
+CREATE POLICY "crl_circle_tracking_sessions_read"
+ON public.agent_tracking_sessions
+FOR SELECT TO authenticated USING (
+ agent_user_id = (SELECT auth.uid())
+ OR (
+  public.current_role() = 'superadmin'
+  AND EXISTS (
+   SELECT 1
+   FROM auth.users u
+   WHERE u.id = agent_user_id
+     AND public.crl_can_access_agent_email(u.email::text)
+  )
+ )
+);
