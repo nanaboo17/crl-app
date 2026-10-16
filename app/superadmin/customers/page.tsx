@@ -96,6 +96,9 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) redirect('/login')
 
+  const { data: nationalAccess, error: nationalAccessError } = await supabase.rpc('crl_is_national_superadmin')
+  const canUploadCustomers = !nationalAccessError && nationalAccess === true
+
   const buildCustomersHref = (nextStatus: StatusFilter = status, nextPage = 1, nextRegion = region, nextLeadEmail = leadEmail, nextSearch = search) => {
     const query = new URLSearchParams()
     query.set('status', nextStatus)
@@ -240,7 +243,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString('id-ID') : '—'
 
   return <div className={styles.page}>
-    <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('Customers are grouped by Customer ID. Open a customer to see every CRL cycle linked to the same account.', 'Pelanggan dikelompokkan berdasarkan Customer ID. Buka pelanggan untuk melihat seluruh CRL cycle pada akun yang sama.')} actions={<><Link href="/superadmin/customers/upload" className={styles.addButton}><Upload aria-hidden="true" className="size-4" />{tx('Upload Data', 'Upload Data')}</Link><Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link></>} />
+    <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('Customers are grouped by Customer ID. Open a customer to see every CRL cycle linked to the same account.', 'Pelanggan dikelompokkan berdasarkan Customer ID. Buka pelanggan untuk melihat seluruh CRL cycle pada akun yang sama.')} actions={<>{canUploadCustomers && <Link href="/superadmin/customers/upload" className={styles.addButton}><Upload aria-hidden="true" className="size-4" />{tx('Upload Data', 'Upload Data')}</Link>}<Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link></>} />
 
     <section className={styles.hero}><div><span className={styles.heroEyebrow}>{tx('Customer journey', 'Perjalanan pelanggan')}</span><h2>{tx('One customer, multiple CRL cycles.', 'Satu pelanggan, beberapa CRL cycle.')}</h2><p>{tx('The customer list is unique by Customer ID. Each CRL record stays available inside the customer card.', 'Daftar pelanggan unik berdasarkan Customer ID. Setiap record CRL tetap tersedia di dalam kartu pelanggan.')}</p></div><div className={styles.heroScene} aria-hidden="true"><span className={styles.house}>🏡</span><span className={styles.pin}>📍</span><span className={styles.tree}>🌳</span></div></section>
 
