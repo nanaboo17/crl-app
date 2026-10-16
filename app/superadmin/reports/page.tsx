@@ -14,6 +14,9 @@ import {
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import WeeklyAgentActivity from './WeeklyAgentActivity'
+import dynamic from 'next/dynamic'
+import type { HistoryPoint } from '@/components/superadmin/AgentMovementMap'
+const AgentMovementMap = dynamic(() => import('@/components/superadmin/AgentMovementMap'), { ssr: false })
 
 type AgentOption = {
   email: string
@@ -53,7 +56,7 @@ type ReportRow = {
 }
 
 type PaymentConversion = { agent_email: string; paid_after_visit: number; paid_after_previsit: number }
-type VisitLocation = { crl_id: string | null; visit_date: string; latitude: number | null; longitude: number | null }
+type AuthDirectoryUser = { id: string; email: string | null }
 
 type ProductivityRow = {
   agent_email: string; agent_name: string | null; assigned_leads: number;
@@ -101,7 +104,8 @@ export default function SuperadminReportsPage() {
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
   const [conversionRows, setConversionRows] = useState<PaymentConversion[]>([])
   const [locationAgent, setLocationAgent] = useState<ProductivityRow | null>(null)
-  const [locationRows, setLocationRows] = useState<VisitLocation[]>([])
+  const [locationRows, setLocationRows] = useState<HistoryPoint[]>([])
+  const [locationDay, setLocationDay] = useState(today)
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -232,18 +236,39 @@ export default function SuperadminReportsPage() {
 
   const conversionsByEmail = useMemo(() => new Map(conversionRows.map(r=>[r.agent_email.toLowerCase(),r])), [conversionRows])
 
-  async function openLocations(agent:ProductivityRow) {
+  function openLocations(agent:ProductivityRow) {
     setLocationAgent(agent)
+    setLocationDay(endDate > today ? today : endDate)
     setLocationRows([])
     setLocationError('')
-    setLocationLoading(true)
-    const {data,error} = await supabase.rpc('get_superadmin_report_visit_locations',{
-      p_start_date:startDate,p_end_date:endDate,p_agent_email:agent.agent_email,
-    })
-    if(error) setLocationError(error.message)
-    else setLocationRows((data??[]) as VisitLocation[])
-    setLocationLoading(false)
   }
+
+  useEffect(() => {
+    if (!locationAgent) return
+    let cancelled = false
+    async function loadHistory() {
+      setLocationLoading(true)
+      setLocationError('')
+      const {data: directory, error: directoryError} = await supabase.rpc('crl_agent_location_directory')
+      if(cancelled) return
+      if(directoryError) { setLocationError(directoryError.message); setLocationLoading(false); return }
+      const user = ((directory ?? []) as AuthDirectoryUser[]).find(u=>u.email?.trim().toLowerCase()===locationAgent.agent_email.trim().toLowerCase())
+      if(!user) { setLocationRows([]); setLocationError(tx('No GPS account associated with this agent.','Akun GPS agen tidak ditemukan.')); setLocationLoading(false); return }
+      const start = locationDay + 'T00:00:00+07:00'
+      const end = new Date(new Date(start).getTime()+86400000).toISOString()
+      const {data,error} = await supabase.from('agent_location_history')
+        .select('latitude,longitude,accuracy_meters,captured_at')
+        .eq('agent_user_id',user.id)
+        .gte('captured_at',start).lt('captured_at',end)
+        .order('captured_at',{ascending:true}).limit(1000)
+      if(cancelled) return
+      if(error) {setLocationError(error.message);setLocationRows([])}
+      else setLocationRows(((data??[]) as HistoryPoint[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)))
+      setLocationLoading(false)
+    }
+    void loadHistory()
+    return ()=>{cancelled=true}
+  },[locationAgent,locationDay,supabase])
 
   function downloadCsv() {
     const headers = [...productivityHeaders]
@@ -420,16 +445,28 @@ export default function SuperadminReportsPage() {
           : <div className="max-w-full overflow-x-auto"><table className="dui-table dui-table-zebra min-w-[2450px] text-xs">
             <thead><tr>{productivityHeaders.map(h=><th key={h} className="whitespace-normal">{h}</th>)}</tr></thead>
             <tbody>{visibleProductivityRows.map(r=><tr key={r.agent_email} className={r.review==='Review'?'bg-warning/5':''}>
-              {productivityValues(r,conversionsByEmail.get(r.agent_email.toLowerCase())).map((v,i)=><td key={i} className={i===0?'font-bold':''}>{i===8 ? <div className="flex items-center gap-2 whitespace-nowrap"><span>{v ?? '—'}</span><button type="button" className="dui-btn dui-btn-outline dui-btn-xs print:hidden" onClick={()=>void openLocations(r)} disabled={Number(r.total_visits)===0}><MapPin className="h-3 w-3"/>{tx('Show Location','Lihat Lokasi')}</button></div> : (i===18||i===19) && v ? new Date(String(v)).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'}):v ?? '—'}</td>)}
+              {productivityValues(r,conversionsByEmail.get(r.agent_email.toLowerCase())).map((v,i)=><td key={i} className={i===0?'font-bold':''}>{i===8 ? <div className="flex items-center gap-2 whitespace-nowrap"><span>{v ?? '—'}</span><button type="button" className="dui-btn dui-btn-outline dui-btn-xs print:hidden" onClick={()=>void openLocations(r)} disabled={Number(r.total_visits)===0}><MapPin className="h-3 w-3"/>{tx('Show here','Tampilkan')}</button></div> : (i===18||i===19) && v ? new Date(String(v)).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'}):v ?? '—'}</td>)}
             </tr>)}</tbody>
           </table>{visibleProductivityRows.length===0&&<div className="p-6 text-sm">{tx('No report data.', 'Tidak ada data laporan.')}</div>}</div>}
         </div>
       </section>
       {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
-        <section role="dialog" aria-modal="true" aria-label={tx('Visit Locations','Lokasi Kunjungan')} className="dui-card max-h-[85vh] w-full max-w-3xl overflow-y-auto bg-base-100 shadow-xl">
+        <section role="dialog" aria-modal="true" aria-label={tx('Agent GPS Movement','Pergerakan GPS Agen')} className="dui-card max-h-[90vh] w-full max-w-4xl overflow-y-auto bg-base-100 shadow-xl">
           <div className="dui-card-body gap-3">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">{tx('Visit Locations','Lokasi Kunjungan')}</h2><p className="text-sm text-base-content/60">{locationAgent.agent_name || locationAgent.agent_email} · {startDate} — {endDate}</p></div><button className="dui-btn dui-btn-ghost dui-btn-sm" type="button" onClick={()=>setLocationAgent(null)} aria-label={tx('Close','Tutup')}><X className="h-5 w-5"/></button></div>
-            {locationLoading ? <span className="dui-loading dui-loading-spinner"/> : locationError ? <div className="dui-alert dui-alert-error">{locationError}</div> : <><p className="text-xs text-base-content/60">{locationRows.length} {tx('visit records; only visits with recorded GPS can open a location. Maximum 2,000 most recent records.','data kunjungan; hanya kunjungan dengan GPS tercatat yang bisa dibuka lokasinya. Maksimum 2.000 data terbaru.')}</p><div className="overflow-x-auto"><table className="dui-table dui-table-zebra text-sm"><thead><tr><th>CRL ID</th><th>{tx('Visit Date','Tanggal Kunjungan')}</th><th>GPS</th><th>{tx('Location','Lokasi')}</th></tr></thead><tbody>{locationRows.map((v,i)=><tr key={v.crl_id+'-'+v.visit_date+'-'+i}><td>{v.crl_id || '—'}</td><td>{new Date(v.visit_date).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'})}</td><td>{v.latitude!=null&&v.longitude!=null ? `${Number(v.latitude).toFixed(5)}, ${Number(v.longitude).toFixed(5)}` : '—'}</td><td>{v.latitude!=null&&v.longitude!=null ? <a className="dui-link dui-link-primary whitespace-nowrap" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.latitude+','+v.longitude)}`} target="_blank" rel="noopener noreferrer">{tx('Open Map','Buka Peta')}</a> : tx('No GPS','Tanpa GPS')}</td></tr>)}</tbody></table>{locationRows.length===0&&<p className="p-4 text-sm">{tx('No visit records in this period.','Tidak ada kunjungan pada periode ini.')}</p>}</div></>}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-lg font-bold">{locationAgent.agent_name || locationAgent.agent_email}</h2><p className="text-xs text-base-content/60">{tx('Recorded GPS movement by timestamp (WIB)','Pergerakan GPS berdasarkan waktu (WIB)')}</p></div>
+              <div className="flex items-center gap-2">
+                <input type="date" className="dui-input dui-input-sm" aria-label={tx('Movement date','Tanggal pergerakan')} min={startDate} max={endDate > today ? today : endDate} value={locationDay} onChange={e=>setLocationDay(e.target.value)}/>
+                <button type="button" className="dui-btn dui-btn-ghost dui-btn-sm" onClick={()=>setLocationAgent(null)}><X className="h-4 w-4"/>{tx('Close','Tutup')}</button>
+              </div>
+            </div>
+            {locationError && <p role="alert" className="text-sm text-error">{locationError}</p>}
+            {locationLoading ? <p className="p-6">{tx('Loading GPS points...','Memuat titik GPS...')}</p>
+            : locationRows.length ? <>
+              <AgentMovementMap points={locationRows} locale={locale}/>
+              <div className="flex flex-wrap items-center gap-3 text-xs"><span>🔵 {tx('First','Awal')}</span><span>🟣 {tx('Intermediate','Pertengahan')}</span><span>🔴 {tx('Latest','Terakhir')}</span><span>🟠 {tx('Low accuracy','Akurasi rendah')}</span><strong>{locationRows.length} {tx('recorded points','titik terekam')}</strong></div>
+              <div className="max-h-48 overflow-auto"><table className="dui-table dui-table-xs"><thead><tr><th>#</th><th>{tx('Time (WIB)','Waktu (WIB)')}</th><th>Latitude</th><th>Longitude</th><th>{tx('Accuracy','Akurasi')}</th></tr></thead><tbody>{locationRows.map((p,i)=><tr key={p.captured_at+'-'+i}><td>{i+1}</td><td>{new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})}</td><td>{p.latitude.toFixed(6)}</td><td>{p.longitude.toFixed(6)}</td><td>{p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m'}</td></tr>)}</tbody></table></div>
+            </> : !locationLoading && !locationError ? <p className="p-6 text-sm">{tx('No recorded GPS points for this date.','Tidak ada titik GPS tercatat pada tanggal ini.')}</p> : null}
           </div>
         </section>
       </div>}
