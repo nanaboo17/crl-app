@@ -51,7 +51,7 @@ export default function AgentLocationsPage() {
         return
       }
       // Auth user IDs are resolved through a restricted, server-side lookup in the RPC.
-      const { data: users, error: userError } = await supabase.rpc('crl_agent_location_directory')
+      const { data: users, error: userError } = await supabase.rpc('crl_circle_agent_location_directory_v2')
       if (stopped) return
       if (userError) { setError(userError.message); setLoading(false); return }
       setDirectory((users as AuthUser[]) ?? [])
