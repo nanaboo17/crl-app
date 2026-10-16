@@ -110,36 +110,34 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   }
 
   const loadPage = async (page: number): Promise<CustomerCache> => {
-    // Fetch in bounded parallel batches rather than making every batch wait
-    // for the previous one. Each query still uses this user's RLS session.
-    const chunkSize = 1000
+    // Avoid a costly exact-count query before loading any customers.
+    // Small RLS-scoped batches minimize individual statement timeouts.
+    const chunkSize = 250
     const fields = 'crl_id, customer_id, case_month, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date'
-    const { count: totalRows, error: countError } = await supabase
-      .from('customers')
-      .select('crl_id', { count: 'exact', head: true })
-    if (countError || totalRows === null) throw countError ?? new Error('Customer count unavailable')
-
-    const chunkCount = Math.ceil(totalRows / chunkSize)
-    const batches: CustomerRow[][] = Array.from({ length: chunkCount }, () => [])
-    const concurrency = Math.min(4, chunkCount)
-    let nextChunk = 0
-
-    async function fetchBatch() {
-      while (nextChunk < chunkCount) {
-        const index = nextChunk++
-        const from = index * chunkSize
+    const rows: CustomerRow[] = []
+    const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+    for (let from = 0; ; from += chunkSize) {
+      let chunk: CustomerRow[] | null = null
+      for (let attempt = 0; attempt < 4; attempt++) {
         const { data, error } = await supabase
           .from('customers')
           .select(fields)
           .order('customer_id')
           .order('crl_id')
           .range(from, from + chunkSize - 1)
-        if (error) throw error
-        batches[index] = (data ?? []) as CustomerRow[]
+        if (!error) {
+          chunk = (data ?? []) as CustomerRow[]
+          break
+        }
+        // Never retry authorization failures or invalid requests.
+        const transient = /timeout|timed out|canceling statement|temporarily unavailable|fetch failed/i.test(error.message)
+        if (!transient || attempt === 3) throw error
+        await pause(Math.min(4000, 500 * 2 ** attempt))
       }
+      if (!chunk) throw new Error('Could not load customer batch')
+      rows.push(...chunk)
+      if (chunk.length < chunkSize) break
     }
-    await Promise.all(Array.from({ length: concurrency }, () => fetchBatch()))
-    const rows = batches.flat()
 
     const allGroups = groupCustomers(rows)
 
@@ -205,7 +203,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     const cacheRegion = encodeURIComponent(region.toLowerCase())
     const cacheLead = encodeURIComponent(leadEmail.toLowerCase())
     const cacheSearch = encodeURIComponent(safeSearch)
-    payload = await cacheGetOrSet(`crl:superadmin:customers:v8-user:${user.id}:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
+    payload = await cacheGetOrSet(`crl:superadmin:customers:v9-batch-retry-user:${user.id}:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
   } catch (error) {
     console.error('superadmin/customers load failure:', error instanceof Error ? { message: error.message, stack: error.stack } : error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} /></div>
