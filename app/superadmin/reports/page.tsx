@@ -7,6 +7,8 @@ import {
   FileBarChart2,
   Printer,
   RefreshCw,
+  MapPin,
+  X,
   Users,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
@@ -50,6 +52,9 @@ type ReportRow = {
   average_worked_minutes: number
 }
 
+type PaymentConversion = { agent_email: string; paid_after_visit: number; paid_after_previsit: number }
+type VisitLocation = { crl_id: string | null; visit_date: string; latitude: number | null; longitude: number | null }
+
 type ProductivityRow = {
   agent_email: string; agent_name: string | null; assigned_leads: number;
   attendance_days: number; no_activity_attendance_days: number; pre_visit_days: number;
@@ -58,11 +63,11 @@ type ProductivityRow = {
   target_attainment: number | null; met: number; ptp: number; missing_checkout_days: number;
   long_gap_days: number; first_pre_visit: string | null; first_visit: string | null; review: string;
 }
-const productivityHeaders = ['CRL Agent','Email','Assigned Leads','Attendance Days','No-Activity Attendance Days','Pre-Visit Days','Field Visit Days','Pre-Visit Customer-Days','Total Visits','Visits / Attendance Day','Visits / Field Day','Target Attainment','Met','PTP','Missing Checkout Days','Long Gap Days >3h','First Pre-Visit','First Visit','Review'] as const
-function productivityValues(r:ProductivityRow) {
+const productivityHeaders = ['CRL Agent','Email','Assigned Leads','Attendance Days','No-Activity Attendance Days','Pre-Visit Days','Field Visit Days','Pre-Visit Customer-Days','Total Visits','Paid After Visit','Paid After Previsit','Visits / Attendance Day','Visits / Field Day','Target Attainment','Met','PTP','Missing Checkout Days','Long Gap Days >3h','First Pre-Visit','First Visit','Review'] as const
+function productivityValues(r:ProductivityRow, conversion?:PaymentConversion) {
  return [r.agent_name,r.agent_email,r.assigned_leads,r.attendance_days,r.no_activity_attendance_days,
  r.pre_visit_days,r.field_visit_days,r.pre_visit_customer_days,r.total_visits,
- r.visits_per_attendance_day,r.visits_per_field_day,r.target_attainment==null?'':r.target_attainment+'%',
+ conversion?.paid_after_visit ?? 0,conversion?.paid_after_previsit ?? 0,r.visits_per_attendance_day,r.visits_per_field_day,r.target_attainment==null?'':r.target_attainment+'%',
  r.met,r.ptp,r.missing_checkout_days,r.long_gap_days,r.first_pre_visit,r.first_visit,r.review]
 }
 
@@ -94,6 +99,11 @@ export default function SuperadminReportsPage() {
   const [productivityRows, setProductivityRows] = useState<ProductivityRow[]>([])
   const [dailyTarget, setDailyTarget] = useState('')
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
+  const [conversionRows, setConversionRows] = useState<PaymentConversion[]>([])
+  const [locationAgent, setLocationAgent] = useState<ProductivityRow | null>(null)
+  const [locationRows, setLocationRows] = useState<VisitLocation[]>([])
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -101,7 +111,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult, weeklyResult, productivityResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -117,6 +127,9 @@ export default function SuperadminReportsPage() {
         p_start_date: startDate,
         p_end_date: endDate,
         p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('get_superadmin_report_payment_conversions', {
+        p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
       }),
       supabase.rpc('get_superadmin_agent_productivity', {
         p_start_date: startDate, p_end_date: endDate,
@@ -141,6 +154,8 @@ export default function SuperadminReportsPage() {
       return
     }
 
+    if (conversionResult.error) { setError(conversionResult.error.message); setLoading(false); return }
+    setConversionRows((conversionResult.data ?? []) as PaymentConversion[])
     if (productivityResult.error) { setError(productivityResult.error.message); setLoading(false); return }
     setProductivityRows((productivityResult.data ?? []) as ProductivityRow[])
     setAgents((agentResult.data ?? []) as AgentOption[])
@@ -215,9 +230,24 @@ export default function SuperadminReportsPage() {
     { assigned: 0, paid: 0, unpaid: 0, preVisits: 0, visits: 0, attendance: 0 }
   ), [visibleRows])
 
+  const conversionsByEmail = useMemo(() => new Map(conversionRows.map(r=>[r.agent_email.toLowerCase(),r])), [conversionRows])
+
+  async function openLocations(agent:ProductivityRow) {
+    setLocationAgent(agent)
+    setLocationRows([])
+    setLocationError('')
+    setLocationLoading(true)
+    const {data,error} = await supabase.rpc('get_superadmin_report_visit_locations',{
+      p_start_date:startDate,p_end_date:endDate,p_agent_email:agent.agent_email,
+    })
+    if(error) setLocationError(error.message)
+    else setLocationRows((data??[]) as VisitLocation[])
+    setLocationLoading(false)
+  }
+
   function downloadCsv() {
     const headers = [...productivityHeaders]
-    const body = visibleProductivityRows.map(r=>productivityValues(r).map(csvCell).join(','))
+    const body = visibleProductivityRows.map(r=>productivityValues(r,conversionsByEmail.get(r.agent_email.toLowerCase())).map(csvCell).join(','))
 
     const metadata = [
       [csvCell('CRL Superadmin Report')],
@@ -390,11 +420,20 @@ export default function SuperadminReportsPage() {
           : <div className="max-w-full overflow-x-auto"><table className="dui-table dui-table-zebra min-w-[2450px] text-xs">
             <thead><tr>{productivityHeaders.map(h=><th key={h} className="whitespace-normal">{h}</th>)}</tr></thead>
             <tbody>{visibleProductivityRows.map(r=><tr key={r.agent_email} className={r.review==='Review'?'bg-warning/5':''}>
-              {productivityValues(r).map((v,i)=><td key={i} className={i===0?'font-bold':''}>{(i===16||i===17) && v ? new Date(String(v)).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'}):v ?? '—'}</td>)}
+              {productivityValues(r,conversionsByEmail.get(r.agent_email.toLowerCase())).map((v,i)=><td key={i} className={i===0?'font-bold':''}>{i===8 ? <div className="flex items-center gap-2 whitespace-nowrap"><span>{v ?? '—'}</span><button type="button" className="dui-btn dui-btn-outline dui-btn-xs print:hidden" onClick={()=>void openLocations(r)} disabled={Number(r.total_visits)===0}><MapPin className="h-3 w-3"/>{tx('Show Location','Lihat Lokasi')}</button></div> : (i===18||i===19) && v ? new Date(String(v)).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'}):v ?? '—'}</td>)}
             </tr>)}</tbody>
           </table>{visibleProductivityRows.length===0&&<div className="p-6 text-sm">{tx('No report data.', 'Tidak ada data laporan.')}</div>}</div>}
         </div>
       </section>
+      {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
+        <section role="dialog" aria-modal="true" aria-label={tx('Visit Locations','Lokasi Kunjungan')} className="dui-card max-h-[85vh] w-full max-w-3xl overflow-y-auto bg-base-100 shadow-xl">
+          <div className="dui-card-body gap-3">
+            <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">{tx('Visit Locations','Lokasi Kunjungan')}</h2><p className="text-sm text-base-content/60">{locationAgent.agent_name || locationAgent.agent_email} · {startDate} — {endDate}</p></div><button className="dui-btn dui-btn-ghost dui-btn-sm" type="button" onClick={()=>setLocationAgent(null)} aria-label={tx('Close','Tutup')}><X className="h-5 w-5"/></button></div>
+            {locationLoading ? <span className="dui-loading dui-loading-spinner"/> : locationError ? <div className="dui-alert dui-alert-error">{locationError}</div> : <><p className="text-xs text-base-content/60">{locationRows.length} {tx('visit records; only visits with recorded GPS can open a location. Maximum 2,000 most recent records.','data kunjungan; hanya kunjungan dengan GPS tercatat yang bisa dibuka lokasinya. Maksimum 2.000 data terbaru.')}</p><div className="overflow-x-auto"><table className="dui-table dui-table-zebra text-sm"><thead><tr><th>CRL ID</th><th>{tx('Visit Date','Tanggal Kunjungan')}</th><th>GPS</th><th>{tx('Location','Lokasi')}</th></tr></thead><tbody>{locationRows.map((v,i)=><tr key={v.crl_id+'-'+v.visit_date+'-'+i}><td>{v.crl_id || '—'}</td><td>{new Date(v.visit_date).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'})}</td><td>{v.latitude!=null&&v.longitude!=null ? `${Number(v.latitude).toFixed(5)}, ${Number(v.longitude).toFixed(5)}` : '—'}</td><td>{v.latitude!=null&&v.longitude!=null ? <a className="dui-link dui-link-primary whitespace-nowrap" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.latitude+','+v.longitude)}`} target="_blank" rel="noopener noreferrer">{tx('Open Map','Buka Peta')}</a> : tx('No GPS','Tanpa GPS')}</td></tr>)}</tbody></table>{locationRows.length===0&&<p className="p-4 text-sm">{tx('No visit records in this period.','Tidak ada kunjungan pada periode ini.')}</p>}</div></>}
+          </div>
+        </section>
+      </div>}
+      <p className="text-xs text-base-content/60">{tx('Paid after visit/previsit is attributed to the most recent eligible activity, preferring a prior visit, when payment_date exists and payment happened afterward. The selected date range applies to the activity date.','Pembayaran setelah visit/previsit diatribusikan ke aktivitas terkait (mendahulukan visit), jika payment_date tersedia dan pembayaran terjadi setelahnya. Rentang tanggal berlaku pada tanggal aktivitas.')}</p>
       <p className="text-xs text-base-content/60">{tx('Target attainment is blank until a daily visit target is entered. Missing checkout excludes today. Long gap means more than 3 hours between check-in and successive recorded pre-visit/visit events, not proof of inactivity.', 'Pencapaian target kosong sampai target harian diisi. Checkout hilang tidak menghitung hari ini. Jeda >3 jam dihitung dari check-in dan antar aktivitas pra-kunjungan/kunjungan yang tercatat, bukan bukti tidak bekerja.')}</p>
 
       <p className="text-xs text-base-content/50">
