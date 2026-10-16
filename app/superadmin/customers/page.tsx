@@ -110,21 +110,36 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   }
 
   const loadPage = async (page: number): Promise<CustomerCache> => {
-    const rows: CustomerRow[] = []
+    // Fetch in bounded parallel batches rather than making every batch wait
+    // for the previous one. Each query still uses this user's RLS session.
     const chunkSize = 1000
+    const fields = 'crl_id, customer_id, case_month, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date'
+    const { count: totalRows, error: countError } = await supabase
+      .from('customers')
+      .select('crl_id', { count: 'exact', head: true })
+    if (countError || totalRows === null) throw countError ?? new Error('Customer count unavailable')
 
-    for (let from = 0; ; from += chunkSize) {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('crl_id, customer_id, case_month, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date')
-        .order('customer_id')
-        .range(from, from + chunkSize - 1)
+    const chunkCount = Math.ceil(totalRows / chunkSize)
+    const batches: CustomerRow[][] = Array.from({ length: chunkCount }, () => [])
+    const concurrency = Math.min(4, chunkCount)
+    let nextChunk = 0
 
-      if (error) throw error
-      const chunk = (data ?? []) as CustomerRow[]
-      rows.push(...chunk)
-      if (chunk.length < chunkSize) break
+    async function fetchBatch() {
+      while (nextChunk < chunkCount) {
+        const index = nextChunk++
+        const from = index * chunkSize
+        const { data, error } = await supabase
+          .from('customers')
+          .select(fields)
+          .order('customer_id')
+          .order('crl_id')
+          .range(from, from + chunkSize - 1)
+        if (error) throw error
+        batches[index] = (data ?? []) as CustomerRow[]
+      }
     }
+    await Promise.all(Array.from({ length: concurrency }, () => fetchBatch()))
+    const rows = batches.flat()
 
     const allGroups = groupCustomers(rows)
 
