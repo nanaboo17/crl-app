@@ -107,12 +107,19 @@ export default async function SuperadminPage() {
   const checkedInAgents = new Set(attendance.map((item) => item.agent_email)).size
   const gpsMismatchToday = todayVisits.filter((item) => item.location_match === false).length
 
+  // Never represent a failed Circle-scoped count as zero: zero means a
+  // successful query found no visible records for this signed-in user.
   const stats = [
-    { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), count: agentsResult.count ?? 0, icon: Users, tone: 'purple' },
-    { href: '/superadmin/customers', label: tl('superadmin.dashboard.statCustomers'), count: customersResult.count ?? 0, icon: Building2, tone: 'green' },
-    { href: '/superadmin/pre-visits', label: tl('superadmin.dashboard.statPreVisits'), count: preVisitsResult.count ?? 0, icon: ClipboardList, tone: 'yellow' },
-    { href: '/superadmin/visits', label: tl('superadmin.dashboard.statVisits'), count: visitsResult.count ?? 0, icon: MapPin, tone: 'blue' },
+    { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), count: agentsResult.error ? null : agentsResult.count, icon: Users, tone: 'purple' },
+    { href: '/superadmin/customers', label: tl('superadmin.dashboard.statCustomers'), count: customersResult.error ? null : customersResult.count, icon: Building2, tone: 'green' },
+    { href: '/superadmin/pre-visits', label: tl('superadmin.dashboard.statPreVisits'), count: preVisitsResult.error ? null : preVisitsResult.count, icon: ClipboardList, tone: 'yellow' },
+    { href: '/superadmin/visits', label: tl('superadmin.dashboard.statVisits'), count: visitsResult.error ? null : visitsResult.count, icon: MapPin, tone: 'blue' },
   ]
+  const countErrors = [agentsResult, customersResult, preVisitsResult, visitsResult]
+    .filter((result) => result.error)
+  if (countErrors.length > 0) {
+    console.error('Superadmin dashboard counts failed:', countErrors.map((result) => result.error?.message))
+  }
 
   const quickAccess = [
     { href: '/superadmin/agents', title: tx('Manage Agents', 'Kelola Agen'), icon: Users, tone: 'purple' },
@@ -214,8 +221,9 @@ export default async function SuperadminPage() {
         {stats.map(({ href, label, count, icon: Icon, tone }) => (
           <Link key={href} href={href} className={`${styles.statCard} ${styles[`tone_${tone}`]} ${mode.themeCard}`}>
             <div className={styles.statIcon}><Icon aria-hidden="true" /></div>
-            <strong>{count.toLocaleString('id-ID')}</strong>
+            <strong>{count == null ? '—' : count.toLocaleString('id-ID')}</strong>
             <span>{label}</span>
+            {count == null && <small role="status">{tx('Unable to load', 'Gagal memuat')}</small>}
             <small>↗ {tx('Open details', 'Buka detail')}</small>
           </Link>
         ))}
