@@ -187,9 +187,9 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     const cacheRegion = encodeURIComponent(region.toLowerCase())
     const cacheLead = encodeURIComponent(leadEmail.toLowerCase())
     const cacheSearch = encodeURIComponent(safeSearch)
-    payload = await cacheGetOrSet(`crl:superadmin:customers:v7-grouped:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
+    payload = await cacheGetOrSet(`crl:superadmin:customers:v8-user:${user.id}:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
   } catch (error) {
-    console.error('superadmin/customers:', error)
+    console.error('superadmin/customers load failure:', error instanceof Error ? { message: error.message, stack: error.stack } : error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} /></div>
   }
 
