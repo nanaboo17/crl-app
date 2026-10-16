@@ -19,6 +19,7 @@ import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import styles from './page.module.css'
 import mode from './dashboard-mode.module.css'
+import DashboardCount from './DashboardCount'
 
 function startOfTodayWib() {
   const now = new Date()
@@ -56,10 +57,6 @@ export default async function SuperadminPage() {
 
   const todayStart = startOfTodayWib()
   const [
-    agentsResult,
-    customersResult,
-    preVisitsResult,
-    visitsResult,
     activeAgentsResult,
     todayVisitsResult,
     todayPreVisitsResult,
@@ -67,10 +64,6 @@ export default async function SuperadminPage() {
     recentVisitsResult,
     recentPreVisitsResult,
   ] = await Promise.all([
-    supabase.from('agents').select('*', { count: 'exact', head: true }).eq('active', true),
-    supabase.from('customers').select('*', { count: 'exact', head: true }),
-    supabase.from('pre_visits').select('*', { count: 'exact', head: true }),
-    supabase.from('visits').select('*', { count: 'exact', head: true }),
     supabase.from('agents').select('email,agent_name').eq('active', true).eq('role', 'agent').order('agent_name').limit(5),
     supabase.from('visits').select('agent_email,visit_date,location_match').gte('visit_date', todayStart),
     supabase.from('pre_visits').select('agent_email,contact_attempt_date,previsit_status').gte('contact_attempt_date', todayStart),
@@ -107,19 +100,14 @@ export default async function SuperadminPage() {
   const checkedInAgents = new Set(attendance.map((item) => item.agent_email)).size
   const gpsMismatchToday = todayVisits.filter((item) => item.location_match === false).length
 
-  // Never represent a failed Circle-scoped count as zero: zero means a
-  // successful query found no visible records for this signed-in user.
+  // Counts load independently in the browser so slow Circle-scoped RLS counts
+  // never block the initial dashboard response or display false zeros.
   const stats = [
-    { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), count: agentsResult.error ? null : agentsResult.count, icon: Users, tone: 'purple' },
-    { href: '/superadmin/customers', label: tl('superadmin.dashboard.statCustomers'), count: customersResult.error ? null : customersResult.count, icon: Building2, tone: 'green' },
-    { href: '/superadmin/pre-visits', label: tl('superadmin.dashboard.statPreVisits'), count: preVisitsResult.error ? null : preVisitsResult.count, icon: ClipboardList, tone: 'yellow' },
-    { href: '/superadmin/visits', label: tl('superadmin.dashboard.statVisits'), count: visitsResult.error ? null : visitsResult.count, icon: MapPin, tone: 'blue' },
+    { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), table: 'agents' as const, icon: Users, tone: 'purple' },
+    { href: '/superadmin/customers', label: tl('superadmin.dashboard.statCustomers'), table: 'customers' as const, icon: Building2, tone: 'green' },
+    { href: '/superadmin/pre-visits', label: tl('superadmin.dashboard.statPreVisits'), table: 'pre_visits' as const, icon: ClipboardList, tone: 'yellow' },
+    { href: '/superadmin/visits', label: tl('superadmin.dashboard.statVisits'), table: 'visits' as const, icon: MapPin, tone: 'blue' },
   ]
-  const countErrors = [agentsResult, customersResult, preVisitsResult, visitsResult]
-    .filter((result) => result.error)
-  if (countErrors.length > 0) {
-    console.error('Superadmin dashboard counts failed:', countErrors.map((result) => result.error?.message))
-  }
 
   const quickAccess = [
     { href: '/superadmin/agents', title: tx('Manage Agents', 'Kelola Agen'), icon: Users, tone: 'purple' },
@@ -218,12 +206,11 @@ export default async function SuperadminPage() {
       </section>
 
       <section aria-label={tl('superadmin.dashboard.statisticsAria')} className={`${styles.statsGrid} ${mode.generalOnly}`}>
-        {stats.map(({ href, label, count, icon: Icon, tone }) => (
+        {stats.map(({ href, label, table, icon: Icon, tone }) => (
           <Link key={href} href={href} className={`${styles.statCard} ${styles[`tone_${tone}`]} ${mode.themeCard}`}>
             <div className={styles.statIcon}><Icon aria-hidden="true" /></div>
-            <strong>{count == null ? '—' : count.toLocaleString('id-ID')}</strong>
+            <DashboardCount table={table} />
             <span>{label}</span>
-            {count == null && <small role="status">{tx('Unable to load', 'Gagal memuat')}</small>}
             <small>↗ {tx('Open details', 'Buka detail')}</small>
           </Link>
         ))}
