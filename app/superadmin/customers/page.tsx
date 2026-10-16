@@ -114,32 +114,41 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     // for the previous one. Each query still uses this user's RLS session.
     const chunkSize = 1000
     const fields = 'crl_id, customer_id, case_month, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date'
-    const { count: totalRows, error: countError } = await supabase
-      .from('customers')
-      .select('crl_id', { count: 'exact', head: true })
-    if (countError || totalRows === null) throw countError ?? new Error('Customer count unavailable')
+    // Do not run an exact COUNT before loading. Under Circle RLS,
+    // counting the full table can exceed the database statement timeout.
+    // Request batches in small waves, ending when the final short batch
+    // arrives. This also avoids concurrent count + data query pressure.
+    const rows: CustomerRow[] = []
+    const waveSize = 2
+    let offset = 0
+    let finished = false
 
-    const chunkCount = Math.ceil(totalRows / chunkSize)
-    const batches: CustomerRow[][] = Array.from({ length: chunkCount }, () => [])
-    const concurrency = Math.min(4, chunkCount)
-    let nextChunk = 0
-
-    async function fetchBatch() {
-      while (nextChunk < chunkCount) {
-        const index = nextChunk++
-        const from = index * chunkSize
-        const { data, error } = await supabase
-          .from('customers')
-          .select(fields)
-          .order('customer_id')
-          .order('crl_id')
-          .range(from, from + chunkSize - 1)
-        if (error) throw error
-        batches[index] = (data ?? []) as CustomerRow[]
+    while (!finished) {
+      const batchOffsets = Array.from({ length: waveSize }, (_, index) => offset + index * chunkSize)
+      const results = await Promise.all(batchOffsets.map(async (from) => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { data, error } = await supabase
+            .from('customers')
+            .select(fields)
+            .order('customer_id')
+            .order('crl_id')
+            .range(from, from + chunkSize - 1)
+          if (!error) return (data ?? []) as CustomerRow[]
+          console.warn('Customer batch retry:', { from, attempt: attempt + 1, message: error.message })
+          if (attempt === 2) throw error
+          await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)))
+        }
+        return [] as CustomerRow[]
+      }))
+      for (const chunk of results) {
+        rows.push(...chunk)
+        if (chunk.length < chunkSize) {
+          finished = true
+          break
+        }
       }
+      offset += waveSize * chunkSize
     }
-    await Promise.all(Array.from({ length: concurrency }, () => fetchBatch()))
-    const rows = batches.flat()
 
     const allGroups = groupCustomers(rows)
 
