@@ -56,10 +56,12 @@ function validDate(value: string) {
 function normalizeDate(value: string) {
   const trimmed = value.trim()
   if (validDate(trimmed)) return trimmed
-  const match = /^(\d{1,2})\\/(\d{1,2})\\/(\d{2}|\d{4})$/.exec(trimmed)
-  if (!match) return ''
-  const year = match[3].length === 2 ? '20' + match[3] : match[3]
-  const normalized = `${year}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`
+  const parts = trimmed.split('/')
+  if (parts.length !== 3 || parts.some((part) => !part || !Array.from(part).every((char) => char >= '0' && char <= '9'))) return ''
+  const [day, month, rawYear] = parts
+  if (day.length > 2 || month.length > 2 || ![2, 4].includes(rawYear.length)) return ''
+  const year = rawYear.length === 2 ? '20' + rawYear : rawYear
+  const normalized = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
   return validDate(normalized) ? normalized : ''
 }
 
