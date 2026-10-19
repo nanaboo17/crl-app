@@ -59,3 +59,23 @@
  .routeShell{height:var(--route-mobile-height,calc(100dvh - 86px));min-height:0;max-height:none;overflow:hidden;border-bottom:0}
  .mapPane,.sidebar{height:100%;min-height:0}
 }
+
+/* Preserve usable map area on small screens. */
+.fatDetails{display:block!important}
+.fatDetails summary{cursor:pointer;list-style:revert;font-weight:700;line-height:1.35}
+.fatDetails:not([open]) > :not(summary){display:none!important}
+@media(max-width:750px){
+ .bottomSheet.collapsed{height:196px}
+ .bottomSheet.half{height:47%}
+ .bottomSheet.expanded{height:85%}
+ .bottomSheet .selectedPreview{overflow-y:auto;overscroll-behavior:contain;flex-shrink:1}
+ .bottomSheet .fatDetails{margin:6px 0;padding:8px 10px}
+ .bottomSheet .sheetStops{display:none}
+ .bottomSheet.expanded .sheetStops{display:block}
+ .mapToolbar{right:76px;min-width:0}
+ .mapToolbar>div:first-child{max-width:95px;flex:1}
+ .mapActions{flex-shrink:0}
+ .mapToolbar .mapActions button:first-child{max-width:105px;font-size:10px}
+ .fatStatus{top:73px;white-space:normal}
+ .mapLegend,.routeHint{display:none}
+}
