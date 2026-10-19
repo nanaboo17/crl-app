@@ -167,27 +167,23 @@ export default function AgentRoutePage() {
     if (!shell) return
 
     const resize = () => {
-      if (window.innerWidth > 750) {
-        shell.style.removeProperty('--route-mobile-height')
-        return
-      }
-      // Measure the real space beneath the corporate navbar on iOS Safari,
-      // rather than assuming the navbar always has the same pixel height.
-      // iOS Safari's visualViewport.height can exclude the bottom browser
-      // chrome while the layout viewport still extends below it. Subtracting
-      // the element's layout position from that smaller viewport created a
-      // blank strip below the map. Measure in one (layout) coordinate space.
-      const availableHeight = window.innerHeight
+      // Use the same viewport coordinate system as getBoundingClientRect.
+      // Calculate available height below the corporate navbar for every device.
       const top = shell.getBoundingClientRect().top
-      const remaining = Math.max(320, Math.floor(availableHeight - top))
-      shell.style.setProperty('--route-mobile-height', `${remaining}px`)
+      const height = Math.max(0, Math.floor(window.innerHeight - top))
+      shell.style.setProperty('--route-available-height', `${height}px`)
     }
 
     resize()
+    const observer = new ResizeObserver(resize)
+    if (shell.parentElement) observer.observe(shell.parentElement)
     window.addEventListener('resize', resize)
+    window.addEventListener('orientationchange', resize)
     window.visualViewport?.addEventListener('resize', resize)
     return () => {
+      observer.disconnect()
       window.removeEventListener('resize', resize)
+      window.removeEventListener('orientationchange', resize)
       window.visualViewport?.removeEventListener('resize', resize)
     }
   }, [loading])
