@@ -351,7 +351,7 @@ export default function AgentRoutePage() {
               onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
               agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
-        <div className={styles.mapLegend}><span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT</span> <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
+        <div className={styles.mapLegend}><span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT · 200 m radius (illustrative)</span> <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
         <div className={styles.routeHint}>{tx('Dashed line: suggested stop order, not a driving route.', 'Garis putus-putus: urutan kunjungan, bukan rute berkendara.')}</div>
         <div className={`${styles.bottomSheet} ${styles[sheetPosition]}`}>
           <div className={styles.sheetHandle} role="group" aria-label={tx('Customer sheet size', 'Ukuran panel pelanggan')}>
