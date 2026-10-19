@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { LocateFixed, MapPin, Navigation, Route, UserRound, Search, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
@@ -64,7 +64,6 @@ export default function AgentRoutePage() {
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const supabase = useMemo(() => createClient(), [])
 
-  const routeShellRef = useRef<HTMLElement>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [agentName, setAgentName] = useState('')
   const [latitude, setLatitude] = useState<number | null>(null)
@@ -162,31 +161,6 @@ export default function AgentRoutePage() {
     return () => { cancelled = true }
   }, [supabase, selectedStopId, showFat])
 
-  useEffect(() => {
-    const shell = routeShellRef.current
-    if (!shell) return
-
-    const resize = () => {
-      // Use the same viewport coordinate system as getBoundingClientRect.
-      // Calculate available height below the corporate navbar for every device.
-      const top = shell.getBoundingClientRect().top
-      const height = Math.max(0, Math.floor(window.innerHeight - top))
-      shell.style.setProperty('--route-available-height', `${height}px`)
-    }
-
-    resize()
-    const observer = new ResizeObserver(resize)
-    if (shell.parentElement) observer.observe(shell.parentElement)
-    window.addEventListener('resize', resize)
-    window.addEventListener('orientationchange', resize)
-    window.visualViewport?.addEventListener('resize', resize)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', resize)
-      window.removeEventListener('orientationchange', resize)
-      window.visualViewport?.removeEventListener('resize', resize)
-    }
-  }, [loading])
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -312,7 +286,7 @@ export default function AgentRoutePage() {
   if (loading) return <main className={styles.page}><div className={styles.loadingCard}>{t('agent.route.loading')}</div></main>
 
   return (
-    <main ref={routeShellRef} className={styles.routeShell}>
+    <main className={styles.routeShell}>
       <aside className={`${styles.sidebar} ${mobileMap ? styles.mobileHidden : ''}`}>
         <div className={styles.sidebarTop}>
           <span className={styles.brandMark}><Route size={21} /></span>
