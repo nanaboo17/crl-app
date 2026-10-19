@@ -41,7 +41,7 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   }
   type VisitAgentSummary = AgentRow & { total: number; met: number; absent: number; gps: number }
   const summary = activity as unknown as { agents: VisitAgentSummary[]; totalVisits: number; todayVisits: number; gpsMismatches: number }
-  const allAgents = summary.agents ?? []
+  const allAgents = (summary.agents ?? []).filter((agent) => agent.active === true)
   const matches = (agent: VisitAgentSummary) => filter === 'all' ||
     (filter === 'none' && agent.total === 0) ||
     (filter === 'gps' && agent.gps > 0) ||
