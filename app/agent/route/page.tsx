@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 import dynamic from 'next/dynamic'
-import type { MapCustomer } from '@/components/agent/CustomerPinMap'
+import type { MapCustomer, FatCandidate } from '@/components/agent/CustomerPinMap'
 
 const CustomerPinMap = dynamic(() => import('@/components/agent/CustomerPinMap'), { ssr: false })
 
@@ -76,6 +76,9 @@ export default function AgentRoutePage() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [mobileMap, setMobileMap] = useState(true)
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null)
+  const [fatCandidates, setFatCandidates] = useState<FatCandidate[]>([])
+  const [fatLoading, setFatLoading] = useState(false)
+  const [fatError, setFatError] = useState('')
   const [sheetPosition, setSheetPosition] = useState<'collapsed' | 'half' | 'expanded'>('collapsed')
 
   useEffect(() => {
@@ -131,6 +134,30 @@ export default function AgentRoutePage() {
     void loadData()
     return () => { cancelled = true }
   }, [supabase, locale])
+
+  useEffect(() => {
+    if (!selectedStopId) {
+      setFatCandidates([])
+      setFatError('')
+      setFatLoading(false)
+      return
+    }
+    let cancelled = false
+    setFatCandidates([])
+    setFatError('')
+    setFatLoading(true)
+    void (async () => {
+      const { data, error } = await supabase.rpc('crl_customer_fat_candidates_v1', {
+        p_crl_id: selectedStopId,
+        p_limit: 30,
+      })
+      if (cancelled) return
+      if (error) setFatError(error.message)
+      else setFatCandidates(Array.isArray(data) ? (data as FatCandidate[]) : [])
+      setFatLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [supabase, selectedStopId])
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -319,11 +346,12 @@ export default function AgentRoutePage() {
         {availableCustomers.length > 0
           ? <CustomerPinMap customers={mappedCustomers as MapCustomer[]}
               routeStops={routeForMap as MapCustomer[]}
+              fatCandidates={selectedStopId ? fatCandidates : []}
               selectedCustomerId={selectedStopId}
               onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
               agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
-        <div className={styles.mapLegend}><i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
+        <div className={styles.mapLegend}><span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT</span> <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
         <div className={styles.routeHint}>{tx('Dashed line: suggested stop order, not a driving route.', 'Garis putus-putus: urutan kunjungan, bukan rute berkendara.')}</div>
         <div className={`${styles.bottomSheet} ${styles[sheetPosition]}`}>
           <div className={styles.sheetHandle} role="group" aria-label={tx('Customer sheet size', 'Ukuran panel pelanggan')}>
@@ -336,6 +364,17 @@ export default function AgentRoutePage() {
           {selectedStop && <div className={styles.selectedPreview}>
             <span>{selectedStop.priority_rank || '—'} · {selectedStop.days_left_to_churn ?? '—'} {tx('days to churn', 'hari menuju churn')}</span>
             <p>{selectedStop.service_address || selectedStop.district || selectedStop.city || '—'}</p>
+            <div className="mt-2 rounded-xl border border-[#cce9e4] bg-[#f2faf7] p-3 text-xs text-[#155e58]">
+              <strong>{tx('Same-site FAT candidates · connection unverified', 'Kandidat FAT satu site · koneksi belum terverifikasi')}</strong>
+              <p className="mt-1">{fatLoading
+                ? tx('Loading FAT locations…', 'Memuat lokasi FAT…')
+                : fatError
+                  ? tx('Unable to load FAT candidates.', 'Tidak dapat memuat kandidat FAT.')
+                  : `${fatCandidates.length} ${tx('candidates on map (up to 30)', 'kandidat di peta (maks. 30)')}`}</p>
+              {!fatLoading && !fatError && fatCandidates.slice(0, 3).map((fat, index) =>
+                <p key={`${fat.fat_id}-${index}`} className="mt-1">{fat.fat_id} · {tx('Available', 'Tersedia')}: {fat.available ?? '—'}/{fat.capacity ?? '—'} · {fat.distance_meters == null ? '—' : formatDistance(fat.distance_meters)}</p>
+              )}
+            </div>
             <div><Link href={`/agent/customers/${encodeURIComponent(selectedStop.crl_id)}`}>{t('agent.route.customerDetail')}</Link>
               {hasValidCoordinates(selectedStop) && <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedStop.given_latitude},${selectedStop.given_longitude}&travelmode=driving`} target="_blank" rel="noopener noreferrer">{t('agent.route.navigate')}</a>}</div>
           </div>}
