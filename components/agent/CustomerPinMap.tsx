@@ -48,6 +48,7 @@ type LeafletInstance = {
   polyline: (points: [number,number][], options: Record<string,unknown>) => { addTo: (map: LeafletMap) => void }
   divIcon: (options: Record<string,unknown>) => unknown
   marker: (point: [number,number], options: Record<string,unknown>) => { addTo: (map: LeafletMap) => { on: (name:string,fn:()=>void)=>void; bindPopup:(content:HTMLElement)=>void; openPopup:()=>void } }
+  circle: (point: [number, number], options: Record<string, unknown>) => { addTo: (map: LeafletMap) => void }
   circleMarker: (point: [number, number], options: Record<string, unknown>) => {
     addTo: (map: LeafletMap) => { bindPopup: (content: HTMLElement) => void }
   }
@@ -182,6 +183,7 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
           line.textContent = item
           root.appendChild(line)
         }
+        L.circle([lat, lng], { radius: 200, color: '#0d9488', weight: 2, fillColor: '#14b8a6', fillOpacity: 0.12, interactive: false }).addTo(map)
         L.marker([lat, lng], { icon }).addTo(map).bindPopup(root)
       }
       if (agentPosition) {
