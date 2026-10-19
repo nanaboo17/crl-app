@@ -30,3 +30,26 @@
 }
 
 @media(max-width:750px){.fatStatus{top:112px;left:12px;max-width:calc(100% - 24px)}.mapToolbar{left:12px;top:12px;gap:7px;padding:7px;max-width:calc(100% - 24px)}.mapToolbar button{font-size:10px;min-width:30px;padding:0 7px}}
+
+/* Mobile FAT route layout: prevent controls, popup and details from overlapping. */
+.mapActions{display:flex!important;align-items:center;gap:8px;min-width:0}
+.fatDetails{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:6px!important;min-width:0;width:100%;margin:10px 0;padding:12px;border:1px solid #cce9e4;border-radius:12px;background:#f2faf7;color:#155e58;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.fatDetails strong{display:block;line-height:1.4}
+.fatSummary{margin:0!important;color:#155e58!important}
+.fatEntry{display:block;margin:0!important;padding:6px 0;border-top:1px solid #d8ebe6;color:#155e58!important;font-variant-numeric:tabular-nums}
+@media(max-width:750px){
+ .mapToolbar{left:12px;right:76px;top:12px;max-width:none;width:auto;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;gap:6px}
+ .mapToolbar>div:first-child{min-width:0;max-width:115px}
+ .mapToolbar>div:first-child strong,.mapToolbar>div:first-child span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+ .mapActions{flex-shrink:0;gap:5px}
+ .mapToolbar .mapActions button{height:36px;min-width:36px;max-width:115px;overflow:hidden;text-overflow:ellipsis;padding:0 8px;font-size:11px}
+ .mapToolbar .mapActions button:last-child{width:36px;flex-shrink:0}
+ .fatStatus{top:78px;left:12px;max-width:calc(100% - 24px);padding:7px 10px;font-size:11px}
+ .mapPane :global(.leaflet-popup){max-width:calc(100vw - 48px)}
+ .bottomSheet{z-index:601}
+ .selectedPreview{overflow:auto;min-height:0}
+ .selectedPreview>div:not(.fatDetails){display:flex;gap:8px;flex-wrap:wrap}
+ .fatDetails{flex:none}
+ .mapLegend{max-width:calc(100% - 24px);flex-wrap:wrap;gap:5px;padding:7px 9px}
+ .routeHint{max-width:calc(100% - 24px)}
+}

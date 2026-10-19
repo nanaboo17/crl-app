@@ -123,7 +123,7 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
       if (stopped || !elementRef.current) return
       const valid = customers.filter((c) => c.given_latitude != null && c.given_longitude != null)
       if (!valid.length) return
-      map = L.map(elementRef.current, { scrollWheelZoom: false }).setView([Number(valid[0].given_latitude), Number(valid[0].given_longitude)], 13)
+      map = L.map(elementRef.current, { scrollWheelZoom: false, zoomControl: false }).setView([Number(valid[0].given_latitude), Number(valid[0].given_longitude)], 13)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
@@ -154,7 +154,7 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
         const marker = L.marker(pos,{icon}).addTo(map)
         marker.bindPopup(popup(customer, locale))
         marker.on('click', () => selectionRef.current?.(customer.crl_id))
-        if (chosen) { map.panTo(pos); marker.openPopup() }
+        if (chosen) { map.panTo(pos); if (window.innerWidth > 750) marker.openPopup() }
       }
       for (const fat of fatCandidates) {
         const lat = Number(fat.fat_lat)
@@ -194,7 +194,14 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
         L.circleMarker(pos, { radius: 9, color: '#fff', weight: 2, fillColor: '#1684d8', fillOpacity: 1 })
           .addTo(map).bindPopup(userPopup)
       }
-      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 })
+      if (selectedCustomerId) {
+        const selected = valid.find((customer) => customer.crl_id === selectedCustomerId)
+        if (selected?.given_latitude != null && selected.given_longitude != null) {
+          map.setView([Number(selected.given_latitude), Number(selected.given_longitude)], 16)
+        }
+      } else {
+        map.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 })
+      }
     }).catch((error: unknown) => {
       if (!stopped) setStatus(error instanceof Error ? error.message : 'Map unavailable')
     })
