@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LocateFixed, MapPin, Navigation, Route, UserRound, Search, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
@@ -64,6 +64,7 @@ export default function AgentRoutePage() {
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const supabase = useMemo(() => createClient(), [])
 
+  const routeShellRef = useRef<HTMLElement>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [agentName, setAgentName] = useState('')
   const [latitude, setLatitude] = useState<number | null>(null)
@@ -159,6 +160,31 @@ export default function AgentRoutePage() {
     })()
     return () => { cancelled = true }
   }, [supabase, selectedStopId, showFat])
+
+  useEffect(() => {
+    const shell = routeShellRef.current
+    if (!shell) return
+
+    const resize = () => {
+      if (window.innerWidth > 750) {
+        shell.style.removeProperty('--route-mobile-height')
+        return
+      }
+      // Measure the real space beneath the corporate navbar on iOS Safari,
+      // rather than assuming the navbar always has the same pixel height.
+      const availableHeight = window.visualViewport?.height ?? window.innerHeight
+      const top = shell.getBoundingClientRect().top
+      shell.style.setProperty('--route-mobile-height', `${Math.max(320, Math.floor(availableHeight - top))}px`)
+    }
+
+    resize()
+    window.addEventListener('resize', resize)
+    window.visualViewport?.addEventListener('resize', resize)
+    return () => {
+      window.removeEventListener('resize', resize)
+      window.visualViewport?.removeEventListener('resize', resize)
+    }
+  }, [])
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -284,7 +310,7 @@ export default function AgentRoutePage() {
   if (loading) return <main className={styles.page}><div className={styles.loadingCard}>{t('agent.route.loading')}</div></main>
 
   return (
-    <main className={styles.routeShell}>
+    <main ref={routeShellRef} className={styles.routeShell}>
       <aside className={`${styles.sidebar} ${mobileMap ? styles.mobileHidden : ''}`}>
         <div className={styles.sidebarTop}>
           <span className={styles.brandMark}><Route size={21} /></span>
