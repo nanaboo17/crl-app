@@ -74,7 +74,9 @@ export default function AgentRoutePage() {
   const [error, setError] = useState('')
   const [searchText, setSearchText] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
-  const [mobileMap, setMobileMap] = useState(false)
+  const [mobileMap, setMobileMap] = useState(true)
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(null)
+  const [sheetPosition, setSheetPosition] = useState<'collapsed' | 'half' | 'expanded'>('collapsed')
 
   useEffect(() => {
     let cancelled = false
@@ -239,13 +241,17 @@ export default function AgentRoutePage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const listedCustomers = visibleCustomers.filter((customer) => {
+  const listedCustomers = useMemo(() => visibleCustomers.filter((customer) => {
     if (priorityFilter !== 'all' && customer.priority_rank !== priorityFilter) return false
     const term = searchText.trim().toLowerCase()
     if (!term) return true
     return [customer.customer_name, customer.customer_id, customer.service_address, customer.city, customer.district]
       .some((value) => String(value ?? '').toLowerCase().includes(term))
-  })
+  }), [visibleCustomers, priorityFilter, searchText])
+
+  const selectedStop = visibleCustomers.find((stop) => stop.crl_id === selectedStopId) ?? null
+  const routeForMap = useMemo(() => route.filter((stop) => listedCustomers.some((visible) => visible.crl_id === stop.crl_id)), [route, listedCustomers])
+  const mappedCustomers = useMemo(() => listedCustomers.filter(hasValidCoordinates), [listedCustomers])
 
   if (loading) return <main className={styles.page}><div className={styles.loadingCard}>{t('agent.route.loading')}</div></main>
 
@@ -287,7 +293,7 @@ export default function AgentRoutePage() {
         <div className={styles.stopList}>
           {listedCustomers.length === 0 && <div className={styles.emptyStops}>{tx('No customers match your filters.', 'Tidak ada pelanggan yang sesuai filter.')}</div>}
           {listedCustomers.map((customer) => (
-            <article key={customer.crl_id} className={styles.stopItem}>
+            <article key={customer.crl_id} className={styles.stopItem} data-selected={selectedStopId === customer.crl_id} onClick={() => setSelectedStopId(customer.crl_id)}>
               <div className={styles.stopNumber}>{customer.sequence}</div>
               <div className={styles.stopDetails}>
                 <div className={styles.stopHeading}><strong>{customer.customer_name || customer.customer_id}</strong><span className={styles.priority}>{customer.priority_rank || '—'}</span></div>
@@ -311,11 +317,34 @@ export default function AgentRoutePage() {
           <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
         </div>
         {availableCustomers.length > 0
-          ? <CustomerPinMap customers={availableCustomers as MapCustomer[]} agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
+          ? <CustomerPinMap customers={mappedCustomers as MapCustomer[]}
+              routeStops={routeForMap as MapCustomer[]}
+              selectedCustomerId={selectedStopId}
+              onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
+              agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
         <div className={styles.mapLegend}><i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
+        <div className={styles.routeHint}>{tx('Dashed line: suggested stop order, not a driving route.', 'Garis putus-putus: urutan kunjungan, bukan rute berkendara.')}</div>
+        <div className={`${styles.bottomSheet} ${styles[sheetPosition]}`}>
+          <div className={styles.sheetHandle} role="group" aria-label={tx('Customer sheet size', 'Ukuran panel pelanggan')}>
+            <button type="button" onClick={() => setSheetPosition(sheetPosition === 'collapsed' ? 'half' : sheetPosition === 'half' ? 'expanded' : 'collapsed')} aria-label={tx('Expand or collapse customer panel', 'Buka atau tutup panel pelanggan')}><span /></button>
+          </div>
+          <div className={styles.sheetHeader}>
+            <div><strong>{selectedStop?.customer_name || tx('Your route stops', 'Daftar tujuan')}</strong><small>{selectedStop ? selectedStop.customer_id : `${listedCustomers.length} ${tx('customers', 'pelanggan')}`}</small></div>
+            <button type="button" onClick={() => setSheetPosition(sheetPosition === 'expanded' ? 'collapsed' : 'expanded')}>{sheetPosition === 'expanded' ? tx('Minimize', 'Perkecil') : tx('All stops', 'Semua tujuan')}</button>
+          </div>
+          {selectedStop && <div className={styles.selectedPreview}>
+            <span>{selectedStop.priority_rank || '—'} · {selectedStop.days_left_to_churn ?? '—'} {tx('days to churn', 'hari menuju churn')}</span>
+            <p>{selectedStop.service_address || selectedStop.district || selectedStop.city || '—'}</p>
+            <div><Link href={`/agent/customers/${encodeURIComponent(selectedStop.crl_id)}`}>{t('agent.route.customerDetail')}</Link>
+              {hasValidCoordinates(selectedStop) && <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedStop.given_latitude},${selectedStop.given_longitude}&travelmode=driving`} target="_blank" rel="noopener noreferrer">{t('agent.route.navigate')}</a>}</div>
+          </div>}
+          <div className={styles.sheetStops}>
+            {listedCustomers.map((stop) => <button type="button" key={stop.crl_id} data-selected={stop.crl_id === selectedStopId} onClick={() => {setSelectedStopId(stop.crl_id);setSheetPosition('half')}}><b>{stop.sequence}</b><span>{stop.customer_name || stop.customer_id}<small>{stop.priority_rank || '—'} · {stop.district || stop.city || '—'}</small></span></button>)}
+          </div>
+        </div>
       </section>
-      <button type="button" className={styles.mobileToggle} onClick={() => setMobileMap(!mobileMap)}>{mobileMap ? tx('View stops', 'Lihat daftar') : tx('View map', 'Lihat peta')}</button>
+      <button type="button" className={styles.mobileToggle} onClick={() => setMobileMap(!mobileMap)}>{mobileMap ? tx('List', 'Daftar') : tx('Map', 'Peta')}</button>
     </main>
   )
 }
