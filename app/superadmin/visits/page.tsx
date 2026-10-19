@@ -33,82 +33,40 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', email).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  // Load RLS-visible visits in bounded batches. A single unpaginated
-  // PostgREST read silently stops at the default API row limit.
-  const agentsResult = await supabase.from('agents')
-    .select('email, agent_name, active').eq('organization', 'Agent').order('agent_name')
-  const allVisitRows: VisitRow[] = []
-  let visitsError: string | null = null
-  const batchSize = 500
-  if (!agentsResult.error) {
-    for (let from = 0; ; from += batchSize) {
-      const { data, error } = await supabase.from('visits')
-        .select('agent_email, visit_status_kunjungan, location_match, visit_date')
-        .order('visit_id')
-        .range(from, from + batchSize - 1)
-      if (error) {
-        visitsError = error.message
-        break
-      }
-      const batch = (data ?? []) as VisitRow[]
-      allVisitRows.push(...batch)
-      if (batch.length < batchSize) break
-    }
+  const { data: activity, error: activityError } = await supabase.rpc('crl_superadmin_activity_summary_v1', { p_kind: 'visits' })
+  if (activityError || !activity || typeof activity !== 'object' || Array.isArray(activity)) {
+    const message = activityError?.message ?? 'Visit summary unavailable'
+    console.error('superadmin/visits:', message)
+    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={message} /></div>
   }
-
-  const loadError = agentsResult.error?.message ?? visitsError
-  if (loadError) {
-    console.error('superadmin/visits fetch:', loadError)
-    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={loadError} /></div>
-  }
-
-  const allAgents = (agentsResult.data ?? []) as AgentRow[]
-  const visits = allVisitRows
-  const visitMap = new Map<string, VisitRow[]>()
-  for (const visit of visits) {
-    const key = (visit.agent_email || '').toLowerCase()
-    if (!key) continue
-    visitMap.set(key, [...(visitMap.get(key) ?? []), visit])
-  }
-
-  const matches = (agentEmail: string) => {
-    const rows = visitMap.get(agentEmail.toLowerCase()) ?? []
-    if (filter === 'all') return true
-    if (filter === 'none') return rows.length === 0
-    if (filter === 'gps') return rows.some((row) => row.location_match === false)
-    if (filter === 'met') return rows.some((row) => row.visit_status_kunjungan === 'Bertemu dengan pelanggan')
-    return rows.some((row) => row.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')
-  }
-
-  const filteredAgents = allAgents.filter((agent) => matches(agent.email))
+  type VisitAgentSummary = AgentRow & { total: number; met: number; absent: number; gps: number }
+  const summary = activity as unknown as { agents: VisitAgentSummary[]; totalVisits: number; todayVisits: number; gpsMismatches: number }
+  const allAgents = summary.agents ?? []
+  const matches = (agent: VisitAgentSummary) => filter === 'all' ||
+    (filter === 'none' && agent.total === 0) ||
+    (filter === 'gps' && agent.gps > 0) ||
+    (filter === 'met' && agent.met > 0) ||
+    (filter === 'absent' && agent.absent > 0)
+  const filteredAgents = allAgents.filter(matches)
   const totalAgents = filteredAgents.length
-  const totalPages = Math.max(1, Math.ceil(totalAgents / PAGE_SIZE))
-  const page = Math.min(requestedPage, totalPages)
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(totalAgents / PAGE_SIZE)))
   if (totalAgents > 0 && requestedPage !== page) redirect(`/superadmin/visits?mode=agent&filter=${filter}&page=${page}`)
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  // Counts for the visible agents use the same complete RLS-scoped dataset.
-  // Avoid N additional exact COUNT queries on each page.
-  const agentData = agents.map((agent) => ({
-    ...agent,
-    visit_count: (visitMap.get(agent.email.toLowerCase()) ?? []).length,
-  }))
-
+  const agentData = agents.map((agent) => ({ ...agent, visit_count: agent.total }))
   const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })
   const today = dateFormatter.format(new Date())
-  const todayVisits = visits.filter((visit) => dateFormatter.format(new Date(visit.visit_date)) === today).length
   const filters: { key: VisitFilter; label: string; count: number }[] = [
     { key: 'all', label: tx('All agents', 'Semua agen'), count: allAgents.length },
-    { key: 'met', label: tx('Met customer', 'Bertemu pelanggan'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Bertemu dengan pelanggan')).length },
-    { key: 'absent', label: tx('Customer absent', 'Pelanggan tidak di tempat'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')).length },
-    { key: 'gps', label: tx('GPS mismatch', 'GPS tidak sesuai'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.location_match === false)).length },
-    { key: 'none', label: tx('No visits', 'Belum ada kunjungan'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).length === 0).length },
+    { key: 'met', label: tx('Met customer', 'Bertemu pelanggan'), count: allAgents.filter(a => a.met > 0).length },
+    { key: 'absent', label: tx('Customer absent', 'Pelanggan tidak di tempat'), count: allAgents.filter(a => a.absent > 0).length },
+    { key: 'gps', label: tx('GPS mismatch', 'GPS tidak sesuai'), count: allAgents.filter(a => a.gps > 0).length },
+    { key: 'none', label: tx('No visits', 'Belum ada kunjungan'), count: allAgents.filter(a => a.total === 0).length },
   ]
   const summaries = [
     { label: t('superadmin.visits.totalAgents'), value: allAgents.length, icon: Users, tone: 'purple' },
-    { label: t('superadmin.visits.totalVisits'), value: visits.length, icon: MapPin, tone: 'blue' },
-    { label: tx('Visits Today', 'Kunjungan Hari Ini'), value: todayVisits, icon: CalendarDays, tone: 'green' },
-    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: visits.filter((visit) => visit.location_match === false).length, icon: Route, tone: 'yellow' },
+    { label: t('superadmin.visits.totalVisits'), value: summary.totalVisits, icon: MapPin, tone: 'blue' },
+    { label: tx('Visits Today', 'Kunjungan Hari Ini'), value: summary.todayVisits, icon: CalendarDays, tone: 'green' },
+    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: summary.gpsMismatches, icon: Route, tone: 'yellow' },
   ]
 
   return <div className={styles.page}>
