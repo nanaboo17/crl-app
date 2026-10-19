@@ -170,8 +170,11 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
         const root = document.createElement('div')
         root.style.cssText = 'min-width:190px;display:grid;gap:5px'
         const name = document.createElement('strong')
-        name.textContent = `FAT ${fat.fat_id}`
+        name.textContent = `FAT ID: ${fat.fat_id}`
         root.appendChild(name)
+        const site = document.createElement('span')
+        site.textContent = `Site ID: ${fat.siteid || '—'}`
+        root.appendChild(site)
         for (const item of [
           locale === 'id' ? 'Kandidat satu site · koneksi belum terverifikasi' : 'Same-site candidate · connection unverified',
           `${locale === 'id' ? 'Port tersedia' : 'Available ports'}: ${fat.available ?? '—'} / ${fat.capacity ?? '—'}`,
