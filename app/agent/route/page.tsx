@@ -241,16 +241,17 @@ export default function AgentRoutePage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const listedCustomers = visibleCustomers.filter((customer) => {
+  const listedCustomers = useMemo(() => visibleCustomers.filter((customer) => {
     if (priorityFilter !== 'all' && customer.priority_rank !== priorityFilter) return false
     const term = searchText.trim().toLowerCase()
     if (!term) return true
     return [customer.customer_name, customer.customer_id, customer.service_address, customer.city, customer.district]
       .some((value) => String(value ?? '').toLowerCase().includes(term))
-  })
+  }), [visibleCustomers, priorityFilter, searchText])
 
   const selectedStop = visibleCustomers.find((stop) => stop.crl_id === selectedStopId) ?? null
-  const routeForMap = route.filter((stop) => listedCustomers.some((visible) => visible.crl_id === stop.crl_id))
+  const routeForMap = useMemo(() => route.filter((stop) => listedCustomers.some((visible) => visible.crl_id === stop.crl_id)), [route, listedCustomers])
+  const mappedCustomers = useMemo(() => listedCustomers.filter(hasValidCoordinates), [listedCustomers])
 
   if (loading) return <main className={styles.page}><div className={styles.loadingCard}>{t('agent.route.loading')}</div></main>
 
@@ -316,7 +317,7 @@ export default function AgentRoutePage() {
           <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
         </div>
         {availableCustomers.length > 0
-          ? <CustomerPinMap customers={listedCustomers.filter(hasValidCoordinates) as MapCustomer[]}
+          ? <CustomerPinMap customers={mappedCustomers as MapCustomer[]}
               routeStops={routeForMap as MapCustomer[]}
               selectedCustomerId={selectedStopId}
               onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
