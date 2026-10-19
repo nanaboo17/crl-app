@@ -42,7 +42,7 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
   }
   type PreVisitAgentSummary = AgentRow & { total: number; ready: number; followup: number; direct: number; rescheduled: number; stopped: number }
   const summary = activity as unknown as { agents: PreVisitAgentSummary[]; totalPreVisits: number; readyCount: number; followUpCount: number }
-  const allAgents = summary.agents ?? []
+  const allAgents = (summary.agents ?? []).filter((agent) => agent.active === true)
   const matches = (agent: PreVisitAgentSummary) => filter === 'all' ||
     (filter === 'none' && agent.total === 0) ||
     (filter === 'ready' && agent.ready > 0) ||
