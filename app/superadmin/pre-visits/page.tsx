@@ -37,18 +37,29 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
 
   let payload: PreVisitCache
   try {
-    payload = await cacheGetOrSet<PreVisitCache>('crl:superadmin:previsits:v1', CACHE_TTL, async () => {
-      const [agentsResult, preVisitsResult, totalResult] = await Promise.all([
-        supabase.from('agents').select('email, agent_name, active').eq('role', 'agent').order('agent_name'),
-        supabase.from('pre_visits').select('agent_email, previsit_status, created_at'),
-        supabase.from('pre_visits').select('*', { count: 'exact', head: true }),
-      ])
-      const error = agentsResult.error || preVisitsResult.error || totalResult.error
-      if (error) throw error
+    payload = await cacheGetOrSet<PreVisitCache>(`crl:superadmin:previsits:v2-user:${user.id}`, CACHE_TTL, async () => {
+      const agentsResult = await supabase.from('agents')
+        .select('email, agent_name, active').eq('role', 'agent').order('agent_name')
+      if (agentsResult.error) throw agentsResult.error
+
+      // PostgREST silently caps unpaginated reads at 1000 rows.
+      // Read all authorized records so the totals and status tabs remain accurate.
+      const preVisits: PreVisitRow[] = []
+      const batchSize = 500
+      for (let from = 0; ; from += batchSize) {
+        const { data, error } = await supabase.from('pre_visits')
+          .select('agent_email, previsit_status, created_at')
+          .order('previsit_id')
+          .range(from, from + batchSize - 1)
+        if (error) throw error
+        const batch = (data ?? []) as PreVisitRow[]
+        preVisits.push(...batch)
+        if (batch.length < batchSize) break
+      }
       return {
         agents: (agentsResult.data ?? []) as AgentRow[],
-        preVisits: (preVisitsResult.data ?? []) as PreVisitRow[],
-        totalPreVisits: totalResult.count ?? 0,
+        preVisits,
+        totalPreVisits: preVisits.length,
       }
     })
   } catch (error) {

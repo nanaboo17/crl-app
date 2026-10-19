@@ -33,20 +33,37 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', email).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const [agentsResult, visitsResult, totalVisitsResult, mismatchResult] = await Promise.all([
-    supabase.from('agents').select('email, agent_name, active').eq('organization', 'Agent').order('agent_name'),
-    supabase.from('visits').select('agent_email, visit_status_kunjungan, location_match, visit_date'),
-    supabase.from('visits').select('*', { count: 'exact', head: true }),
-    supabase.from('visits').select('*', { count: 'exact', head: true }).eq('location_match', false),
-  ])
+  // Load RLS-visible visits in bounded batches. A single unpaginated
+  // PostgREST read silently stops at the default API row limit.
+  const agentsResult = await supabase.from('agents')
+    .select('email, agent_name, active').eq('organization', 'Agent').order('agent_name')
+  const allVisitRows: VisitRow[] = []
+  let visitsError: string | null = null
+  const batchSize = 500
+  if (!agentsResult.error) {
+    for (let from = 0; ; from += batchSize) {
+      const { data, error } = await supabase.from('visits')
+        .select('agent_email, visit_status_kunjungan, location_match, visit_date')
+        .order('visit_id')
+        .range(from, from + batchSize - 1)
+      if (error) {
+        visitsError = error.message
+        break
+      }
+      const batch = (data ?? []) as VisitRow[]
+      allVisitRows.push(...batch)
+      if (batch.length < batchSize) break
+    }
+  }
 
-  const loadError = agentsResult.error || visitsResult.error || totalVisitsResult.error || mismatchResult.error
+  const loadError = agentsResult.error?.message ?? visitsError
   if (loadError) {
-    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={loadError.message} /></div>
+    console.error('superadmin/visits fetch:', loadError)
+    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={loadError} /></div>
   }
 
   const allAgents = (agentsResult.data ?? []) as AgentRow[]
-  const visits = (visitsResult.data ?? []) as VisitRow[]
+  const visits = allVisitRows
   const visitMap = new Map<string, VisitRow[]>()
   for (const visit of visits) {
     const key = (visit.agent_email || '').toLowerCase()
@@ -70,24 +87,11 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   if (totalAgents > 0 && requestedPage !== page) redirect(`/superadmin/visits?mode=agent&filter=${filter}&page=${page}`)
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  // Count each visible agent directly in Supabase instead of counting the
-  // truncated visits payload returned by the Data API.
-  const visitCountResults = await Promise.all(
-    agents.map((agent) =>
-      supabase
-        .from('visits')
-        .select('*', { count: 'exact', head: true })
-        .eq('agent_email', agent.email)
-    )
-  )
-  const visitCountError = visitCountResults.find((result) => result.error)?.error
-  if (visitCountError) {
-    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={visitCountError.message} /></div>
-  }
-
-  const agentData = agents.map((agent, index) => ({
+  // Counts for the visible agents use the same complete RLS-scoped dataset.
+  // Avoid N additional exact COUNT queries on each page.
+  const agentData = agents.map((agent) => ({
     ...agent,
-    visit_count: visitCountResults[index]?.count ?? 0,
+    visit_count: (visitMap.get(agent.email.toLowerCase()) ?? []).length,
   }))
 
   const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -102,9 +106,9 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   ]
   const summaries = [
     { label: t('superadmin.visits.totalAgents'), value: allAgents.length, icon: Users, tone: 'purple' },
-    { label: t('superadmin.visits.totalVisits'), value: totalVisitsResult.count ?? 0, icon: MapPin, tone: 'blue' },
+    { label: t('superadmin.visits.totalVisits'), value: visits.length, icon: MapPin, tone: 'blue' },
     { label: tx('Visits Today', 'Kunjungan Hari Ini'), value: todayVisits, icon: CalendarDays, tone: 'green' },
-    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: mismatchResult.count ?? 0, icon: Route, tone: 'yellow' },
+    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: visits.filter((visit) => visit.location_match === false).length, icon: Route, tone: 'yellow' },
   ]
 
   return <div className={styles.page}>
