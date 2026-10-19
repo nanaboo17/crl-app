@@ -37,18 +37,17 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
 
   let payload: PreVisitCache
   try {
-    payload = await cacheGetOrSet<PreVisitCache>('crl:superadmin:previsits:v1', CACHE_TTL, async () => {
-      const [agentsResult, preVisitsResult, totalResult] = await Promise.all([
+    payload = await cacheGetOrSet<PreVisitCache>(`crl:superadmin:previsits:v2-user:${user.id}`, CACHE_TTL, async () => {
+      const [agentsResult, preVisitsResult] = await Promise.all([
         supabase.from('agents').select('email, agent_name, active').eq('role', 'agent').order('agent_name'),
         supabase.from('pre_visits').select('agent_email, previsit_status, created_at'),
-        supabase.from('pre_visits').select('*', { count: 'exact', head: true }),
       ])
-      const error = agentsResult.error || preVisitsResult.error || totalResult.error
+      const error = agentsResult.error || preVisitsResult.error
       if (error) throw error
       return {
         agents: (agentsResult.data ?? []) as AgentRow[],
         preVisits: (preVisitsResult.data ?? []) as PreVisitRow[],
-        totalPreVisits: totalResult.count ?? 0,
+        totalPreVisits: (preVisitsResult.data ?? []).length,
       }
     })
   } catch (error) {
