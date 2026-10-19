@@ -378,7 +378,7 @@ export default function AgentRoutePage() {
               setShowFat((previous) => !previous)
             }} disabled={!selectedStopId && listedCustomers.length === 0}
               className="rounded-xl border border-teal-600 bg-white px-3 py-2 text-xs font-bold text-teal-700 shadow-sm disabled:opacity-50">
-              {showFat ? tx('Sembunyikan FAT', 'Sembunyikan FAT') : tx('Show FAT', 'Tampilkan FAT')}
+              <span className={styles.fatButtonFull}>{showFat ? tx('Hide FAT', 'Sembunyikan FAT') : tx('Show FAT', 'Tampilkan FAT')}</span><span className={styles.fatButtonMobile}>{showFat ? 'FAT ✓' : 'FAT'}</span>
             </button>
             <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
           </div>
@@ -396,7 +396,7 @@ export default function AgentRoutePage() {
               routeStops={routeForMap as MapCustomer[]}
               fatCandidates={showFat && selectedStopId ? fatCandidates : []}
               selectedCustomerId={selectedStopId}
-              onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
+              onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('collapsed') }}
               agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
         </div>
