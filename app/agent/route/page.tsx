@@ -356,13 +356,14 @@ export default function AgentRoutePage() {
             <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
           </div>
         </div>
-        <div role="status" aria-live="polite" className="absolute left-4 top-20 z-[900] max-w-[290px] rounded-xl border border-teal-100 bg-white/95 px-3 py-2 text-xs text-teal-800 shadow-sm">
+        <div role="status" aria-live="polite" className={styles.fatStatus}>
           {!showFat ? tx('FAT layer hidden. Select a customer and click Show FAT.', 'Layer FAT tersembunyi. Pilih pelanggan lalu klik Tampilkan FAT.')
             : fatLoading ? tx('Loading FAT candidates…', 'Memuat kandidat FAT…')
             : fatError ? tx('FAT unavailable: ', 'FAT gagal dimuat: ') + fatError
             : !selectedStopId ? tx('Select a customer to load FAT.', 'Pilih pelanggan untuk memuat FAT.')
             : `${fatCandidates.length} ${tx('FAT candidates · 200 m illustrative radius', 'Kandidat FAT · radius ilustratif 200 m')}`}
         </div>
+        <div className={styles.mapCanvas}>
         {availableCustomers.length > 0
           ? <CustomerPinMap customers={mappedCustomers as MapCustomer[]}
               routeStops={routeForMap as MapCustomer[]}
@@ -371,6 +372,7 @@ export default function AgentRoutePage() {
               onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
               agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
+        </div>
         <div className={styles.mapLegend}>{showFat && fatCandidates.length > 0 && <span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT · 200 m radius (illustrative)</span>} <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
         <div className={styles.routeHint}>{tx('Dashed line: suggested stop order, not a driving route.', 'Garis putus-putus: urutan kunjungan, bukan rute berkendara.')}</div>
         <div className={`${styles.bottomSheet} ${styles[sheetPosition]}`}>
