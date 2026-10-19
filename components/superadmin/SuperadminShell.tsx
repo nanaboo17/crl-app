@@ -30,6 +30,7 @@ export default function SuperadminShell({
   mode?: 'agent' | 'admin' | 'superadmin'
 }) {
   const pathname = usePathname()
+  const routeFullscreen = mode === 'agent' && pathname === '/agent/route'
   const [navOpen, setNavOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -71,7 +72,7 @@ export default function SuperadminShell({
   }, [navOpen])
 
   return (
-    <div className={`min-h-screen ${playful ? shellTheme.shell : 'bg-base-200'}`}>
+    <div className={`${routeFullscreen ? "h-[100dvh] overflow-hidden" : "min-h-screen"} ${playful ? shellTheme.shell : 'bg-base-200'}`}>
       <GlobalBackButtonFix />
 
       <aside
@@ -122,7 +123,7 @@ export default function SuperadminShell({
         </div>
       </div>
 
-      <div className="flex min-h-screen flex-col lg:pl-64">
+      <div className={`flex flex-col lg:pl-64 ${routeFullscreen ? "h-full min-h-0 overflow-hidden" : "min-h-screen"}`}>
         <SuperadminNavbar
           agentName={agentName}
           email={email}
@@ -133,7 +134,7 @@ export default function SuperadminShell({
           config={config}
         />
         {scopePending && <div role="status" className="border-b border-warning/30 bg-warning/10 px-4 py-2 text-center text-xs font-semibold text-base-content sm:px-6">Circle mapping configured · Access restrictions are not active yet / Mapping Circle tersedia · Pembatasan akses belum aktif</div>}
-        <main className={`flex-1 ${playful ? shellTheme.content : ''} ${mode === 'agent' ? shellTheme.agentContent : ''}`}>
+        <main className={`flex-1 ${playful ? shellTheme.content : ''} ${mode === 'agent' ? shellTheme.agentContent : ''} ${routeFullscreen ? 'min-h-0 overflow-hidden' : ''}`}>
           {children}
         </main>
       </div>
