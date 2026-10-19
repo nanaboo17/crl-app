@@ -48,7 +48,7 @@ function jakartaToday() {
 }
 
 function validDate(value: string) {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(value + 'T00:00:00Z')
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
@@ -56,7 +56,7 @@ function validDate(value: string) {
 function normalizeDate(value: string) {
   const trimmed = value.trim()
   if (validDate(trimmed)) return trimmed
-  const match = /^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2}|\\d{4})$/.exec(trimmed)
+  const match = /^(\d{1,2})\\/(\d{1,2})\\/(\d{2}|\d{4})$/.exec(trimmed)
   if (!match) return ''
   const year = match[3].length === 2 ? '20' + match[3] : match[3]
   const normalized = `${year}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`
