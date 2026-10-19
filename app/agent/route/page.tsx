@@ -79,6 +79,7 @@ export default function AgentRoutePage() {
   const [fatCandidates, setFatCandidates] = useState<FatCandidate[]>([])
   const [fatLoading, setFatLoading] = useState(false)
   const [fatError, setFatError] = useState('')
+  const [showFat, setShowFat] = useState(false)
   const [sheetPosition, setSheetPosition] = useState<'collapsed' | 'half' | 'expanded'>('collapsed')
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export default function AgentRoutePage() {
   }, [supabase, locale])
 
   useEffect(() => {
-    if (!selectedStopId) {
+    if (!selectedStopId || !showFat) {
       setFatCandidates([])
       setFatError('')
       setFatLoading(false)
@@ -157,7 +158,7 @@ export default function AgentRoutePage() {
       setFatLoading(false)
     })()
     return () => { cancelled = true }
-  }, [supabase, selectedStopId])
+  }, [supabase, selectedStopId, showFat])
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -341,17 +342,36 @@ export default function AgentRoutePage() {
       <section className={`${styles.mapPane} ${mobileMap ? styles.mobileMapVisible : ''}`} aria-label={tx('Customer location map', 'Peta lokasi pelanggan')}>
         <div className={styles.mapToolbar}>
           <div><strong>{tx('Customer map', 'Peta pelanggan')}</strong><span>{availableCustomers.length} {tx('mapped stops', 'tujuan pada peta')}</span></div>
-          <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
+          <div className="flex items-center gap-2">
+            <button type="button" aria-pressed={showFat} onClick={() => {
+              if (!selectedStopId && !showFat && listedCustomers.length) {
+                setSelectedStopId(listedCustomers[0].crl_id)
+                setSheetPosition('half')
+              }
+              setShowFat((previous) => !previous)
+            }} disabled={!selectedStopId && listedCustomers.length === 0}
+              className="rounded-xl border border-teal-600 bg-white px-3 py-2 text-xs font-bold text-teal-700 shadow-sm disabled:opacity-50">
+              {showFat ? tx('Sembunyikan FAT', 'Sembunyikan FAT') : tx('Show FAT', 'Tampilkan FAT')}
+            </button>
+            <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
+          </div>
+        </div>
+        <div role="status" aria-live="polite" className="absolute left-4 top-20 z-[900] max-w-[290px] rounded-xl border border-teal-100 bg-white/95 px-3 py-2 text-xs text-teal-800 shadow-sm">
+          {!showFat ? tx('FAT layer hidden. Select a customer and click Show FAT.', 'Layer FAT tersembunyi. Pilih pelanggan lalu klik Tampilkan FAT.')
+            : fatLoading ? tx('Loading FAT candidates…', 'Memuat kandidat FAT…')
+            : fatError ? tx('FAT unavailable: ', 'FAT gagal dimuat: ') + fatError
+            : !selectedStopId ? tx('Select a customer to load FAT.', 'Pilih pelanggan untuk memuat FAT.')
+            : `${fatCandidates.length} ${tx('FAT candidates · 200 m illustrative radius', 'Kandidat FAT · radius ilustratif 200 m')}`}
         </div>
         {availableCustomers.length > 0
           ? <CustomerPinMap customers={mappedCustomers as MapCustomer[]}
               routeStops={routeForMap as MapCustomer[]}
-              fatCandidates={selectedStopId ? fatCandidates : []}
+              fatCandidates={showFat && selectedStopId ? fatCandidates : []}
               selectedCustomerId={selectedStopId}
               onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('half') }}
               agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
           : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
-        <div className={styles.mapLegend}><span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT · 200 m radius (illustrative)</span> <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
+        <div className={styles.mapLegend}>{showFat && fatCandidates.length > 0 && <span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT · 200 m radius (illustrative)</span>} <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
         <div className={styles.routeHint}>{tx('Dashed line: suggested stop order, not a driving route.', 'Garis putus-putus: urutan kunjungan, bukan rute berkendara.')}</div>
         <div className={`${styles.bottomSheet} ${styles[sheetPosition]}`}>
           <div className={styles.sheetHandle} role="group" aria-label={tx('Customer sheet size', 'Ukuran panel pelanggan')}>
@@ -366,12 +386,12 @@ export default function AgentRoutePage() {
             <p>{selectedStop.service_address || selectedStop.district || selectedStop.city || '—'}</p>
             <div className="mt-2 rounded-xl border border-[#cce9e4] bg-[#f2faf7] p-3 text-xs text-[#155e58]">
               <strong>{tx('Same-site FAT candidates · connection unverified', 'Kandidat FAT satu site · koneksi belum terverifikasi')}</strong>
-              <p className="mt-1">{fatLoading
+              <p className="mt-1">{!showFat ? tx('Click Show FAT on map.', 'Klik Tampilkan FAT di peta.') : fatLoading
                 ? tx('Loading FAT locations…', 'Memuat lokasi FAT…')
                 : fatError
                   ? tx('Unable to load FAT candidates.', 'Tidak dapat memuat kandidat FAT.')
                   : `${fatCandidates.length} ${tx('candidates on map (up to 30)', 'kandidat di peta (maks. 30)')}`}</p>
-              {!fatLoading && !fatError && fatCandidates.slice(0, 3).map((fat, index) =>
+              {showFat && !fatLoading && !fatError && fatCandidates.slice(0, 3).map((fat, index) =>
                 <p key={`${fat.fat_id}-${index}`} className="mt-1">{fat.fat_id} · {tx('Available', 'Tersedia')}: {fat.available ?? '—'}/{fat.capacity ?? '—'} · {fat.distance_meters == null ? '—' : formatDistance(fat.distance_meters)}</p>
               )}
             </div>
