@@ -14,7 +14,20 @@ export type MapCustomer = {
   visit_status: string | null
 }
 
+export type FatCandidate = {
+  fat_id: string
+  siteid: string | null
+  siteid_brand: string | null
+  fat_lat: number | null
+  fat_lon: number | null
+  capacity: number | null
+  available: number | null
+  address: string | null
+  distance_meters: number | null
+}
+
 type Props = {
+  fatCandidates?: FatCandidate[]
   customers: MapCustomer[]
   agentPosition?: { lat: number; lng: number } | null
   locale: string
@@ -95,7 +108,7 @@ function popup(customer: MapCustomer, locale: string): HTMLElement {
   return root
 }
 
-export default function CustomerPinMap({ customers, agentPosition, locale, routeStops = [], selectedCustomerId, onSelectCustomer }: Props) {
+export default function CustomerPinMap({ customers, agentPosition, locale, routeStops = [], selectedCustomerId, onSelectCustomer, fatCandidates = [] }: Props) {
   const elementRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState('')
   const selectionRef = useRef(onSelectCustomer)
@@ -142,6 +155,35 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
         marker.on('click', () => selectionRef.current?.(customer.crl_id))
         if (chosen) { map.panTo(pos); marker.openPopup() }
       }
+      for (const fat of fatCandidates) {
+        const lat = Number(fat.fat_lat)
+        const lng = Number(fat.fat_lon)
+        if (fat.fat_lat == null || fat.fat_lon == null || !Number.isFinite(lat) || !Number.isFinite(lng) ||
+            lat < -90 || lat > 90 || lng < -180 || lng > 180) continue
+        const icon = L.divIcon({
+          className: '',
+          html: '<span style="display:grid;place-items:center;width:19px;height:19px;background:#0d9488;border:2px solid white;transform:rotate(45deg);box-shadow:0 2px 8px #1c454755;color:#fff"></span>',
+          iconSize: [19, 19],
+          iconAnchor: [10, 10],
+        })
+        const root = document.createElement('div')
+        root.style.cssText = 'min-width:190px;display:grid;gap:5px'
+        const name = document.createElement('strong')
+        name.textContent = `FAT ${fat.fat_id}`
+        root.appendChild(name)
+        for (const item of [
+          locale === 'id' ? 'Kandidat satu site · koneksi belum terverifikasi' : 'Same-site candidate · connection unverified',
+          `${locale === 'id' ? 'Port tersedia' : 'Available ports'}: ${fat.available ?? '—'} / ${fat.capacity ?? '—'}`,
+          fat.distance_meters == null ? '' : `${locale === 'id' ? 'Jarak perkiraan' : 'Approx. distance'}: ${fat.distance_meters} m`,
+          fat.address || '',
+        ]) {
+          if (!item) continue
+          const line = document.createElement('span')
+          line.textContent = item
+          root.appendChild(line)
+        }
+        L.marker([lat, lng], { icon }).addTo(map).bindPopup(root)
+      }
       if (agentPosition) {
         const pos: [number, number] = [agentPosition.lat, agentPosition.lng]
         bounds.push(pos)
@@ -155,7 +197,7 @@ export default function CustomerPinMap({ customers, agentPosition, locale, route
       if (!stopped) setStatus(error instanceof Error ? error.message : 'Map unavailable')
     })
     return () => { stopped = true; map?.remove() }
-  }, [customers, routeStops, selectedCustomerId, agentPosition?.lat, agentPosition?.lng, locale])
+  }, [customers, routeStops, selectedCustomerId, agentPosition?.lat, agentPosition?.lng, locale, fatCandidates])
   return (
     <div className="relative h-full w-full">
       <div ref={elementRef} className="h-full w-full" aria-label={locale === 'id' ? 'Peta pin pelanggan' : 'Customer pin map'} />
