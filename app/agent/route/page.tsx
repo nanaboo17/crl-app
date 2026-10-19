@@ -173,9 +173,14 @@ export default function AgentRoutePage() {
       }
       // Measure the real space beneath the corporate navbar on iOS Safari,
       // rather than assuming the navbar always has the same pixel height.
-      const availableHeight = window.visualViewport?.height ?? window.innerHeight
+      // iOS Safari's visualViewport.height can exclude the bottom browser
+      // chrome while the layout viewport still extends below it. Subtracting
+      // the element's layout position from that smaller viewport created a
+      // blank strip below the map. Measure in one (layout) coordinate space.
+      const availableHeight = window.innerHeight
       const top = shell.getBoundingClientRect().top
-      shell.style.setProperty('--route-mobile-height', `${Math.max(320, Math.floor(availableHeight - top))}px`)
+      const remaining = Math.max(320, Math.floor(availableHeight - top))
+      shell.style.setProperty('--route-mobile-height', `${remaining}px`)
     }
 
     resize()
