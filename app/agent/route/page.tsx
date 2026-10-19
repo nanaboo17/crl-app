@@ -178,7 +178,7 @@ export default function AgentRoutePage() {
       // the element's layout position from that smaller viewport created a
       // blank strip below the map. Measure in one (layout) coordinate space.
       const availableHeight = window.innerHeight
-      const top = shell.getBoundingClientRect().top + window.scrollY
+      const top = shell.getBoundingClientRect().top
       const remaining = Math.max(320, Math.floor(availableHeight - top))
       shell.style.setProperty('--route-mobile-height', `${remaining}px`)
     }
