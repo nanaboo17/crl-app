@@ -38,7 +38,18 @@ export default async function AgentPreVisitDaysPage({ params, searchParams }: { 
   const { data: agent } = await supabase.from('agents').select('email, agent_name').eq('email', decodedEmail).maybeSingle()
   if (!agent) return <main className={styles.page}><div className={styles.errorCard}>{t('superadmin.preVisits.agentDays.notFound')}</div></main>
 
-  const { data: allPreVisits, error } = await supabase.from('pre_visits').select('previsit_id,customer_id,contact_attempt_date,previsit_status,contact_result').eq('agent_email', decodedEmail).order('contact_attempt_date', { ascending: false })
+  const allPreVisits: { previsit_id: string; customer_id: string; contact_attempt_date: string; previsit_status: string | null; contact_result: string | null }[] = []
+  let error: { message: string } | null = null
+  for (let offset = 0; ; offset += 500) {
+    const result = await supabase.from('pre_visits')
+      .select('previsit_id,customer_id,contact_attempt_date,previsit_status,contact_result')
+      .eq('agent_email', decodedEmail).order('contact_attempt_date', { ascending: false })
+      .order('previsit_id', { ascending: false }).range(offset, offset + 499)
+    if (result.error) { error = result.error; break }
+    const batch = result.data ?? []
+    allPreVisits.push(...batch)
+    if (batch.length < 500) break
+  }
   if (error) return <main className={styles.page}><div className={styles.errorCard}>{error.message}</div></main>
 
   const preVisits = filter === 'all'
