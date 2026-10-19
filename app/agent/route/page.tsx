@@ -184,7 +184,7 @@ export default function AgentRoutePage() {
       window.removeEventListener('resize', resize)
       window.visualViewport?.removeEventListener('resize', resize)
     }
-  }, [])
+  }, [loading])
 
   function captureLocation() {
     if (!navigator.geolocation) {
