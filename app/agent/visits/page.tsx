@@ -16,32 +16,41 @@ export default function VisitsPage() {
   const { locale } = useI18n()
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
   const [rows, setRows] = useState<Visit[]>([])
+  const [total, setTotal] = useState(0)
+  const [filteredTotal, setFilteredTotal] = useState(0)
+  const [completed, setCompleted] = useState(0)
+  const [recentDays, setRecentDays] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    ;(async () => {
+    let active = true
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      setError('')
       const s = createClient()
-      const { data, error } = await s.from('visits').select('*').order('visit_date', { ascending: false })
+      const { data, error } = await s.rpc('crl_agent_history_page_v1', { p_kind: 'visits', p_page: page, p_search: search })
+      if (!active) return
       if (error) setError(error.message)
-      else setRows((data || []) as Visit[])
+      else {
+        const result = data as { rows: Visit[]; total: number; filteredTotal: number; completed: number; recentDays: number }
+        setRows(result.rows ?? [])
+        setTotal(result.total ?? 0)
+        setFilteredTotal(result.filteredTotal ?? 0)
+        setCompleted(result.completed ?? 0)
+        setRecentDays(result.recentDays ?? 0)
+      }
       setLoading(false)
-    })()
-  }, [])
+    }, search ? 250 : 0)
+    return () => { active = false; clearTimeout(timer) }
+  }, [page, search])
 
-  const filteredRows = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return rows
-    return rows.filter((row) => [row.customer_id, row.crl_id, row.visit_id, row.visit_address, row.visit_summary, row.visit_result]
-      .some((value) => String(value ?? '').toLowerCase().includes(query)))
-  }, [rows, search])
-
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const start = (safePage - 1) * PAGE_SIZE
-  const pageRows = filteredRows.slice(start, start + PAGE_SIZE)
+  const pageRows = rows
 
   const grouped = useMemo(() => {
     const map = new Map<string, Visit[]>()
@@ -53,9 +62,6 @@ export default function VisitsPage() {
     })
     return [...map.entries()]
   }, [pageRows, locale])
-
-  const completed = rows.filter((row) => Boolean(row.visit_result)).length
-  const recentDays = new Set(rows.filter((row) => row.visit_date).map((row) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(row.visit_date)))).size
 
   return (
     <main className={styles.page}>
@@ -71,24 +77,24 @@ export default function VisitsPage() {
       </section>
 
       <section className={styles.summaryGrid}>
-        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{rows.length}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{total}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
         <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{completed}</strong><span>{tx('Completed records', 'Data selesai')}</span></article>
         <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
       </section>
 
-      {!loading && !error && rows.length > 0 && (
+      {!loading && !error && total > 0 && (
         <div className="mb-5">
           <div className="relative">
           <span className="pointer-events-none absolute inset-y-0 left-4 z-10 flex items-center text-base-content/60"><Search aria-hidden="true" className="size-5" /></span>
           <input type="search" aria-label={tx('Search visits', 'Cari kunjungan')} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder={tx('Search Customer ID, CRL ID, Visit ID, address…', 'Cari ID Pelanggan, ID CRL, ID Kunjungan, alamat…')} className="dui-input dui-input-bordered w-full rounded-xl !pl-12" style={{ paddingLeft: "3rem" }} />
           </div>
-          <p className="mt-2 text-sm text-base-content/60">{filteredRows.length} {tx('matching visits', 'kunjungan ditemukan')}</p>
+          <p className="mt-2 text-sm text-base-content/60">{filteredTotal} {tx('matching visits', 'kunjungan ditemukan')}</p>
         </div>
       )}
-      {!loading && !error && rows.length > 0 && filteredRows.length === 0 && <div className={styles.state}>{tx('No visits match your search.', 'Tidak ada kunjungan yang cocok dengan pencarian.')}</div>}
+      {!loading && !error && total > 0 && filteredTotal === 0 && <div className={styles.state}>{tx('No visits match your search.', 'Tidak ada kunjungan yang cocok dengan pencarian.')}</div>}
       {loading && <div className={styles.state}>{tx('Loading visit history…', 'Memuat riwayat kunjungan…')}</div>}
       {error && <div className={styles.error}>{error}</div>}
-      {!loading && !error && rows.length === 0 && <div className={styles.state}><CrlRouteIllustration className="visit-empty-illustration" /><strong>{tx('No visit history yet', 'Belum ada riwayat kunjungan')}</strong><span>{tx('Completed visits will appear here.', 'Kunjungan yang selesai akan tampil di sini.')}</span></div>}
+      {!loading && !error && total === 0 && <div className={styles.state}><CrlRouteIllustration className="visit-empty-illustration" /><strong>{tx('No visit history yet', 'Belum ada riwayat kunjungan')}</strong><span>{tx('Completed visits will appear here.', 'Kunjungan yang selesai akan tampil di sini.')}</span></div>}
 
       {!loading && !error && grouped.map(([day, visits]) => (
         <section key={day} className={styles.dayGroup}>
@@ -106,12 +112,12 @@ export default function VisitsPage() {
         </section>
       ))}
 
-      {!loading && !error && filteredRows.length > 0 && (
+      {!loading && !error && filteredTotal > 0 && (
         <nav className={styles.pagination} aria-label="Visit history pagination">
-          <p className={styles.paginationInfo}>{tx('Showing', 'Menampilkan')} {start + 1}–{Math.min(start + PAGE_SIZE, filteredRows.length)} {tx('of', 'dari')} {filteredRows.length}</p>
+          <p className={styles.paginationInfo}>{tx('Showing', 'Menampilkan')} {start + 1}–{Math.min(start + PAGE_SIZE, filteredTotal)} {tx('of', 'dari')} {filteredTotal}</p>
           <div className={styles.paginationControls}>
             <button type="button" className={styles.navButton} onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage === 1}>{tx('Previous', 'Sebelumnya')}</button>
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button key={pageNumber} type="button" className={`${styles.pageButton} ${pageNumber === safePage ? styles.activePage : ''}`} onClick={() => setPage(pageNumber)} aria-current={pageNumber === safePage ? 'page' : undefined}>{pageNumber}</button>)}
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, index) => Math.max(1, Math.min(totalPages - 6, safePage - 3)) + index).map((pageNumber) => <button key={pageNumber} type="button" className={`${styles.pageButton} ${pageNumber === safePage ? styles.activePage : ''}`} onClick={() => setPage(pageNumber)} aria-current={pageNumber === safePage ? 'page' : undefined}>{pageNumber}</button>)}
             <button type="button" className={styles.navButton} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={safePage === totalPages}>{tx('Next', 'Berikutnya')}</button>
           </div>
         </nav>
