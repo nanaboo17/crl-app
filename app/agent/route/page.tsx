@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { LocateFixed, MapPin, Navigation, Route, UserRound } from 'lucide-react'
+import { LocateFixed, MapPin, Navigation, Route, UserRound, Search, ArrowLeft, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
@@ -72,6 +72,9 @@ export default function AgentRoutePage() {
   const [loading, setLoading] = useState(true)
   const [gettingGps, setGettingGps] = useState(false)
   const [error, setError] = useState('')
+  const [searchText, setSearchText] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [mobileMap, setMobileMap] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -236,122 +239,84 @@ export default function AgentRoutePage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const listedCustomers = visibleCustomers.filter((customer) => {
+    if (priorityFilter !== 'all' && customer.priority_rank !== priorityFilter) return false
+    const term = searchText.trim().toLowerCase()
+    if (!term) return true
+    return [customer.customer_name, customer.customer_id, customer.service_address, customer.city, customer.district]
+      .some((value) => String(value ?? '').toLowerCase().includes(term))
+  })
+
   if (loading) return <main className={styles.page}><div className={styles.loadingCard}>{t('agent.route.loading')}</div></main>
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>{t('agent.route.eyebrow')}</p>
-          <h1>{t('agent.route.title')}</h1>
-          <p className={styles.subtitle}><UserRound size={15} /> {agentName}</p>
-        </div>
-        <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Back to agent dashboard', 'Kembali ke dashboard agent')}>
-          <Link href="/agent" className={styles.backButton}>{t('agent.route.back')}</Link>
-        </div>
-      </header>
-
-      <section className={styles.heroGrid}>
-        <div className={styles.locationCard}>
-          <div className="dui-tooltip" data-tip={tx('Uses your phone GPS to calculate nearby route stops', 'Menggunakan GPS ponsel untuk menghitung rute pelanggan terdekat')}>
-            <div className={styles.cardIcon}><LocateFixed size={20} /></div>
-          </div>
-          <div className={styles.locationCopy}>
-            <span>{t('agent.route.currentLocation')}</span>
-            {latitude !== null && longitude !== null ? <>
-              <strong>{t('agent.route.locationCaptured')}</strong>
-              <small>{latitude.toFixed(6)}, {longitude.toFixed(6)}</small>
-              {accuracy !== null && <small>{t('agent.route.accuracy', { value: accuracy.toFixed(1) })}</small>}
-            </> : <strong>{t('agent.route.captureHint')}</strong>}
-          </div>
-          <div className="dui-tooltip dui-tooltip-left" data-tip={tx('Capture your latest high-accuracy GPS position', 'Ambil posisi GPS terbaru dengan akurasi tinggi')}>
-            <button type="button" className={styles.gpsButton} onClick={captureLocation} disabled={gettingGps}>
-              {gettingGps ? t('agent.route.gettingLocation') : t('agent.route.useMyLocation')}
-            </button>
-          </div>
+    <main className={styles.routeShell}>
+      <aside className={`${styles.sidebar} ${mobileMap ? styles.mobileHidden : ''}`}>
+        <div className={styles.sidebarTop}>
+          <Link href="/agent" className={styles.backLink} aria-label={tx('Back to dashboard', 'Kembali ke dashboard')}><ArrowLeft size={20} /></Link>
+          <span className={styles.brandMark}><Route size={21} /></span>
+          <div className={styles.brandText}><strong>CRL Route</strong><small>{agentName}</small></div>
         </div>
 
-        <div className={styles.summaryGrid}>
-          <div className={styles.summaryCard}><span>{tx('Assigned / need visit', 'Ditugaskan / perlu dikunjungi')}</span><strong>{actionableCustomers.length}</strong></div>
-          <div className={styles.summaryCard}><span>{t('agent.route.routeStops')}</span><strong>{route.length}</strong></div>
-        </div>
-      </section>
-
-      {error && <div className={styles.errorCard}>{error}</div>}
-      {missingCoordinateCount > 0 && (
-        <div className={styles.warningCard}>
-          <h2>{tx('Some customers have no coordinates', 'Sebagian pelanggan belum memiliki koordinat')}</h2>
-          <p>{tx(`${missingCoordinateCount} assigned customers are excluded from route calculation until coordinates are available.`, `${missingCoordinateCount} pelanggan yang ditugaskan belum masuk perhitungan rute karena koordinat belum tersedia.`)}</p>
-        </div>
-      )}
-
-      {availableCustomers.length > 0 && (
-        <section className={styles.mapSection}>
-          <div className={styles.sectionHeader}>
-            <div><p className={styles.eyebrow}>{t('agent.route.mapTitle')}</p><h2>{t('agent.route.recommended')}</h2></div>
-            <span className={styles.countBadge}>{availableCustomers.length}</span>
+        <div className={styles.sidebarTools}>
+          <h1>{tx('Your field stops', 'Rute kunjungan')}</h1>
+          <p>{tx('Find customers and plan your next visit.', 'Cari pelanggan dan rencanakan kunjungan berikutnya.')}</p>
+          <label className={styles.searchBox}>
+            <Search size={17} aria-hidden="true" />
+            <input value={searchText} onChange={(e) => setSearchText(e.target.value)}
+              placeholder={tx('Search customers…', 'Cari pelanggan…')}
+              aria-label={tx('Search customers', 'Cari pelanggan')} />
+          </label>
+          <div className={styles.filterRow}>
+            <label><span><SlidersHorizontal size={14} /> {tx('Priority', 'Prioritas')}</span>
+              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+                <option value="all">{tx('All priorities', 'Semua prioritas')}</option>
+                {['P1', 'P2', 'P3', 'P4', 'P5'].map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+            <span className={styles.stopTotal}>{listedCustomers.length} {tx('stops', 'tujuan')}</span>
           </div>
-          <div className={styles.pinLegend} aria-label={tx('Map pin color legend', 'Keterangan warna pin peta')}>
-            <span className={styles.pinLegendTitle}>{tx('Pin colors:', 'Warna pin:')}</span>
-            <span className={styles.pinLegendItem}><i className={styles.pinRed} aria-hidden="true" />{tx('P1 · Critical', 'P1 · Kritis')}</span>
-            <span className={styles.pinLegendItem}><i className={styles.pinOrange} aria-hidden="true" />{tx('P2 · High', 'P2 · Tinggi')}</span>
-            <span className={styles.pinLegendItem}><i className={styles.pinPurple} aria-hidden="true" />{tx('P3–P5 / Unranked', 'P3–P5 / Tanpa prioritas')}</span>
-            <span className={styles.pinLegendItem}><i className={styles.pinBlue} aria-hidden="true" />{tx('My location (GPS)', 'Lokasi saya (GPS)')}</span>
-          </div>
-          <div className={styles.mapCard}>
-            <CustomerPinMap customers={availableCustomers as MapCustomer[]} agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
-          </div>
-          {route.length > 0 && <button type="button" className={styles.routeButton} onClick={openFullRoute}><Navigation size={17} /> {t('agent.route.openFullRoute')}</button>}
-        </section>
-      )}
-
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <div><p className={styles.eyebrow}><Route size={13} /> {t('agent.route.nearestFirst')}</p><h2>{t('agent.route.recommended')}</h2></div>
-          <span className={styles.countBadge}>{actionableCustomers.length}</span>
+          <button className={styles.locateButton} onClick={captureLocation} disabled={gettingGps}>
+            <LocateFixed size={17} />
+            {gettingGps ? t('agent.route.gettingLocation') : latitude !== null ? tx('Update my location', 'Perbarui lokasi saya') : t('agent.route.useMyLocation')}
+          </button>
+          {latitude !== null && <p className={styles.gpsStatus}>{tx('GPS ready', 'GPS siap')}{accuracy != null ? ` · ±${Math.round(accuracy)} m` : ''}</p>}
+          {error && <div className={styles.inlineError} role="alert">{error}</div>}
+          {missingCoordinateCount > 0 && <p className={styles.gpsNotice}>{missingCoordinateCount} {tx('customers have no map coordinates.', 'pelanggan belum memiliki koordinat peta.')}</p>}
         </div>
 
-        {visibleCustomers.length === 0 ? (
-          <div className={styles.emptyCard}>{tx('No customers currently need a visit.', 'Tidak ada pelanggan yang saat ini perlu dikunjungi.')}</div>
-        ) : (
-          <>
-            {latitude === null || longitude === null ? (
-              <div className={styles.emptyCard}>{tx('All customers needing a visit are shown below. Capture your location to sort them by nearest first.', 'Semua pelanggan yang perlu dikunjungi ditampilkan di bawah. Ambil lokasi Anda untuk mengurutkan dari yang terdekat.')}</div>
-            ) : null}
-            <div className={styles.routeList}>
-            {visibleCustomers.map((customer) => (
-              <article key={customer.crl_id} className={styles.stopCard}>
-                <div className={styles.sequence}>{customer.sequence}</div>
-                <div className={styles.stopContent}>
-                  <div className={styles.stopHeader}>
-                    <div><h3>{customer.customer_name}</h3><p>{customer.customer_id}</p></div>
-                    <strong className={styles.distance}>
-                      {Number.isFinite(customer.distance_from_previous)
-                        ? formatDistance(customer.distance_from_previous)
-                        : hasValidCoordinates(customer)
-                          ? tx('Waiting for GPS', 'Menunggu GPS')
-                          : tx('No coordinates', 'Tanpa koordinat')}
-                    </strong>
-                  </div>
-                  <div className={styles.stopInfo}>
-                    <span>{t('agent.route.priorityLabel', { value: customer.priority_rank ?? '-' })}</span>
-                    <span>{customer.payment_status?.toUpperCase() || t('agent.route.notSet')}</span>
-                    <span>{t('agent.route.churnLabel', { days: customer.days_left_to_churn ?? '-' })}</span>
-                  </div>
-                  <p className={styles.address}><MapPin size={14} /> {customer.service_address || customer.sub_district || customer.district || customer.city || '-'}</p>
-                  <div className={styles.actions}>
-                    <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`} className={styles.detailButton}>{t('agent.route.customerDetail')}</Link>
-                    {hasValidCoordinates(customer) && (
-                      <a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noreferrer" className={styles.navigateButton}><Navigation size={15} /> {t('agent.route.navigate')}</a>
-                    )}
-                  </div>
+        <div className={styles.stopList}>
+          {listedCustomers.length === 0 && <div className={styles.emptyStops}>{tx('No customers match your filters.', 'Tidak ada pelanggan yang sesuai filter.')}</div>}
+          {listedCustomers.map((customer) => (
+            <article key={customer.crl_id} className={styles.stopItem}>
+              <div className={styles.stopNumber}>{customer.sequence}</div>
+              <div className={styles.stopDetails}>
+                <div className={styles.stopHeading}><strong>{customer.customer_name || customer.customer_id}</strong><span className={styles.priority}>{customer.priority_rank || '—'}</span></div>
+                <p className={styles.customerId}>{customer.customer_id}</p>
+                <p className={styles.stopAddress}><MapPin size={13} />{customer.service_address || customer.sub_district || customer.district || customer.city || '—'}</p>
+                <div className={styles.stopMeta}><span>{Number.isFinite(customer.distance_from_previous) ? formatDistance(customer.distance_from_previous) : hasValidCoordinates(customer) ? tx('Capture GPS for distance', 'Aktifkan GPS untuk jarak') : tx('No coordinates', 'Tanpa koordinat')}</span><span>{customer.days_left_to_churn ?? '—'} {tx('days left', 'hari lagi')}</span></div>
+                <div className={styles.stopActions}>
+                  <Link href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`}>{t('agent.route.customerDetail')}</Link>
+                  {hasValidCoordinates(customer) && <a href={`https://www.google.com/maps/dir/?api=1&destination=${customer.given_latitude},${customer.given_longitude}&travelmode=driving`} target="_blank" rel="noopener noreferrer"><Navigation size={13}/>{t('agent.route.navigate')}</a>}
                 </div>
-              </article>
-            ))}
-            </div>
-          </>
-        )}
+              </div>
+            </article>
+          ))}
+        </div>
+        {route.length > 0 && <div className={styles.sidebarFooter}><button onClick={openFullRoute} className={styles.routeButton}><Navigation size={17} />{t('agent.route.openFullRoute')}</button></div>}
+      </aside>
+
+      <section className={`${styles.mapPane} ${mobileMap ? styles.mobileMapVisible : ''}`} aria-label={tx('Customer location map', 'Peta lokasi pelanggan')}>
+        <div className={styles.mapToolbar}>
+          <div><strong>{tx('Customer map', 'Peta pelanggan')}</strong><span>{availableCustomers.length} {tx('mapped stops', 'tujuan pada peta')}</span></div>
+          <button type="button" onClick={captureLocation} disabled={gettingGps} title={tx('Locate me', 'Lokasi saya')}><LocateFixed size={20} /></button>
+        </div>
+        {availableCustomers.length > 0
+          ? <CustomerPinMap customers={availableCustomers as MapCustomer[]} agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
+          : <div className={styles.emptyMap}><MapPin size={30}/>{tx('No mapped customers yet.', 'Belum ada pelanggan dengan lokasi peta.')}</div>}
+        <div className={styles.mapLegend}><i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
       </section>
+      <button type="button" className={styles.mobileToggle} onClick={() => setMobileMap(!mobileMap)}>{mobileMap ? tx('View stops', 'Lihat daftar') : tx('View map', 'Lihat peta')}</button>
     </main>
   )
 }
