@@ -63,14 +63,18 @@ export default async function SuperadminVisitsByDatePage({ searchParams }: { sea
   const start = new Date(`${startDate}T00:00:00+07:00`)
   const endInclusive = new Date(`${endDate}T00:00:00+07:00`)
   const endExclusive = new Date(endInclusive.getTime() + 24 * 60 * 60 * 1000)
-  const { data, error } = await supabase
-    .from('visits')
-    .select('*')
-    .gte('visit_date', start.toISOString())
-    .lt('visit_date', endExclusive.toISOString())
-    .order('visit_date', { ascending: true })
-
-  const rows = (data ?? []) as Record<string, unknown>[]
+  const rows: Record<string, unknown>[] = []
+  let error: { message: string } | null = null
+  for (let offset = 0; ; offset += 500) {
+    const result = await supabase.from('visits').select('*')
+      .gte('visit_date', start.toISOString()).lt('visit_date', endExclusive.toISOString())
+      .order('visit_date', { ascending: true }).order('visit_id', { ascending: true })
+      .range(offset, offset + 499)
+    if (result.error) { error = result.error; break }
+    const batch = (result.data ?? []) as Record<string, unknown>[]
+    rows.push(...batch)
+    if (batch.length < 500) break
+  }
   const rangeLabel = startDate === endDate ? startDate : `${startDate} → ${endDate}`
 
   return (
