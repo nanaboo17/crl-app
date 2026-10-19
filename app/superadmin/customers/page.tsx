@@ -109,93 +109,21 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     return `/superadmin/customers?${query.toString()}`
   }
 
+  // One RLS-aware RPC returns only the requested 10 grouped customers,
+  // with Circle-scoped totals and filter lists. No full-table HTTP paging.
   const loadPage = async (page: number): Promise<CustomerCache> => {
-    // Avoid a costly exact-count query before loading any customers.
-    // Small RLS-scoped batches minimize individual statement timeouts.
-    const chunkSize = 250
-    const fields = 'crl_id, customer_id, case_month, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date'
-    const rows: CustomerRow[] = []
-    const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-    for (let from = 0; ; from += chunkSize) {
-      let chunk: CustomerRow[] | null = null
-      for (let attempt = 0; attempt < 4; attempt++) {
-        const { data, error } = await supabase
-          .from('customers')
-          .select(fields)
-          .order('customer_id')
-          .order('crl_id')
-          .range(from, from + chunkSize - 1)
-        if (!error) {
-          chunk = (data ?? []) as CustomerRow[]
-          break
-        }
-        // Never retry authorization failures or invalid requests.
-        const transient = /timeout|timed out|canceling statement|temporarily unavailable|fetch failed/i.test(error.message)
-        if (!transient || attempt === 3) throw error
-        await pause(Math.min(4000, 500 * 2 ** attempt))
-      }
-      if (!chunk) throw new Error('Could not load customer batch')
-      rows.push(...chunk)
-      if (chunk.length < chunkSize) break
+    const { data, error } = await supabase.rpc('crl_superadmin_customers_page_v1', {
+      p_page: page,
+      p_status: status,
+      p_region: region,
+      p_lead_email: leadEmail,
+      p_search: safeSearch,
+    })
+    if (error) throw error
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Customer pagination RPC returned no result')
     }
-
-    const allGroups = groupCustomers(rows)
-
-    const groupHas = (group: CustomerGroup, predicate: (row: CustomerRow) => boolean) => group.cycles.some(predicate)
-    const isAssigned = (row: CustomerRow) => Boolean(row.agent_email)
-    const isVisited = (row: CustomerRow) => String(row.customer_status || '').toLowerCase().includes('visited') || String(row.visit_status || '').toLowerCase() === 'visited'
-    const isPaid = (row: CustomerRow) => String(row.payment_status || '').toLowerCase() === 'paid' || String(row.customer_status || '').toLowerCase().includes('paid')
-    const isUnassigned = (row: CustomerRow) => !row.agent_email
-
-    const matchesCycle = (row: CustomerRow) => {
-      if (status === 'unassigned' && !isUnassigned(row)) return false
-      if (status === 'assigned' && !isAssigned(row)) return false
-      if (status === 'visited' && !isVisited(row)) return false
-      if (status === 'paid' && !isPaid(row)) return false
-      if (region !== 'all' && row.region !== region) return false
-      if (leadEmail !== 'all' && row.lead_email !== leadEmail) return false
-      if (safeSearch) {
-        const haystack = [
-          row.crl_id,
-          row.customer_id,
-          row.customer_name,
-          row.phone_number,
-          row.agent_email,
-          row.lead_email,
-          row.region,
-          row.city,
-          row.district,
-        ].map((value) => String(value || '').toLowerCase()).join(' ')
-        if (!haystack.includes(safeSearch)) return false
-      }
-      return true
-    }
-
-    const filteredGroups = allGroups
-      .filter((group) => group.cycles.some(matchesCycle))
-      .sort((a, b) => {
-        const nameA = String(a.latest.customer_name || a.customer_id)
-        const nameB = String(b.latest.customer_name || b.customer_id)
-        return nameA.localeCompare(nameB)
-      })
-
-    const start = (page - 1) * PAGE_SIZE
-    const paged = filteredGroups.slice(start, start + PAGE_SIZE)
-
-    const regions = Array.from(new Set(rows.map((row) => row.region?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b))
-    const leadEmails = Array.from(new Set(rows.map((row) => row.lead_email?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b))
-
-    return {
-      totalAll: allGroups.length,
-      assigned: allGroups.filter((group) => groupHas(group, isAssigned)).length,
-      visited: allGroups.filter((group) => groupHas(group, isVisited)).length,
-      paid: allGroups.filter((group) => groupHas(group, isPaid)).length,
-      unassigned: allGroups.filter((group) => groupHas(group, isUnassigned)).length,
-      filteredTotal: filteredGroups.length,
-      customers: paged,
-      regions,
-      leadEmails,
-    }
+    return data as unknown as CustomerCache
   }
 
   let payload: CustomerCache
