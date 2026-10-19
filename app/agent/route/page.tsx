@@ -82,6 +82,7 @@ export default function AgentRoutePage() {
   const [fatError, setFatError] = useState('')
   const [showFat, setShowFat] = useState(false)
   const [sheetPosition, setSheetPosition] = useState<'collapsed' | 'half' | 'expanded'>('collapsed')
+  const [fatDetailsOpen, setFatDetailsOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -372,7 +373,7 @@ export default function AgentRoutePage() {
             <button type="button" aria-pressed={showFat} onClick={() => {
               if (!selectedStopId && !showFat && listedCustomers.length) {
                 setSelectedStopId(listedCustomers[0].crl_id)
-                setSheetPosition('half')
+                setSheetPosition('collapsed')
               }
               setShowFat((previous) => !previous)
             }} disabled={!selectedStopId && listedCustomers.length === 0}
@@ -412,8 +413,8 @@ export default function AgentRoutePage() {
           {selectedStop && <div className={styles.selectedPreview}>
             <span>{selectedStop.priority_rank || '—'} · {selectedStop.days_left_to_churn ?? '—'} {tx('days to churn', 'hari menuju churn')}</span>
             <p>{selectedStop.service_address || selectedStop.district || selectedStop.city || '—'}</p>
-            <div className={styles.fatDetails}>
-              <strong>{tx('Same-site FAT candidates · connection unverified', 'Kandidat FAT satu site · koneksi belum terverifikasi')}</strong>
+            <details className={styles.fatDetails} open={fatDetailsOpen} onToggle={(e) => setFatDetailsOpen(e.currentTarget.open)}>
+              <summary>{tx('Same-site FAT candidates · connection unverified', 'Kandidat FAT satu site · koneksi belum terverifikasi')} · {fatCandidates.length}</summary>
               <p className={styles.fatSummary}>{!showFat ? tx('Click Show FAT on map.', 'Klik Tampilkan FAT di peta.') : fatLoading
                 ? tx('Loading FAT locations…', 'Memuat lokasi FAT…')
                 : fatError
@@ -422,7 +423,7 @@ export default function AgentRoutePage() {
               {showFat && !fatLoading && !fatError && fatCandidates.slice(0, 3).map((fat, index) =>
                 <p key={`${fat.fat_id}-${index}`} className={styles.fatEntry}>{fat.fat_id} · {tx('Available', 'Tersedia')}: {fat.available ?? '—'}/{fat.capacity ?? '—'} · {fat.distance_meters == null ? '—' : formatDistance(fat.distance_meters)}</p>
               )}
-            </div>
+            </details>
             <div><Link href={`/agent/customers/${encodeURIComponent(selectedStop.crl_id)}`}>{t('agent.route.customerDetail')}</Link>
               {hasValidCoordinates(selectedStop) && <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedStop.given_latitude},${selectedStop.given_longitude}&travelmode=driving`} target="_blank" rel="noopener noreferrer">{t('agent.route.navigate')}</a>}</div>
           </div>}
