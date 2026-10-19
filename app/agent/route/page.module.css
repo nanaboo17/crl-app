@@ -86,3 +86,11 @@
 /* Consistent responsive map height on desktop, tablet and mobile. */
 .routeShell{height:var(--route-available-height,calc(100dvh - 96px));min-height:0;max-height:none;margin-bottom:0}
 .mapPane,.mapCanvas{min-height:0}
+
+/* Full-screen route workspace: fill parent flex area, no document scrolling. */
+.routeShell{height:100%;width:100%;min-height:0;max-height:100%;margin:0;border-radius:0;overflow:hidden}
+.mapPane,.mapCanvas{height:100%;min-height:0;overflow:hidden}
+@media(max-width:750px){
+ .routeShell{height:100%;max-height:100%;min-height:0;border-radius:0}
+ .mapPane,.sidebar{height:100%;min-height:0}
+}
