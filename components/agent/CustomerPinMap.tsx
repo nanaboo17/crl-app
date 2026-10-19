@@ -18,16 +18,23 @@ type Props = {
   customers: MapCustomer[]
   agentPosition?: { lat: number; lng: number } | null
   locale: string
+  routeStops?: MapCustomer[]
+  selectedCustomerId?: string | null
+  onSelectCustomer?: (crlId: string) => void
 }
 
 type LeafletMap = {
   setView: (point: [number, number], zoom: number) => LeafletMap
   fitBounds: (bounds: [number, number][], options?: { padding?: [number, number]; maxZoom?: number }) => void
   remove: () => void
+  panTo: (point: [number,number]) => void
 }
 type LeafletInstance = {
   map: (element: HTMLElement, options?: Record<string, unknown>) => LeafletMap
   tileLayer: (url: string, options: Record<string, unknown>) => { addTo: (map: LeafletMap) => void }
+  polyline: (points: [number,number][], options: Record<string,unknown>) => { addTo: (map: LeafletMap) => void }
+  divIcon: (options: Record<string,unknown>) => unknown
+  marker: (point: [number,number], options: Record<string,unknown>) => { addTo: (map: LeafletMap) => { on: (name:string,fn:()=>void)=>void; bindPopup:(content:HTMLElement)=>void; openPopup:()=>void } }
   circleMarker: (point: [number, number], options: Record<string, unknown>) => {
     addTo: (map: LeafletMap) => { bindPopup: (content: HTMLElement) => void }
   }
@@ -88,9 +95,11 @@ function popup(customer: MapCustomer, locale: string): HTMLElement {
   return root
 }
 
-export default function CustomerPinMap({ customers, agentPosition, locale }: Props) {
+export default function CustomerPinMap({ customers, agentPosition, locale, routeStops = [], selectedCustomerId, onSelectCustomer }: Props) {
   const elementRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState('')
+  const selectionRef = useRef(onSelectCustomer)
+  selectionRef.current = onSelectCustomer
   useEffect(() => {
     let stopped = false
     let map: LeafletMap | null = null
@@ -106,12 +115,32 @@ export default function CustomerPinMap({ customers, agentPosition, locale }: Pro
         maxZoom: 19,
       }).addTo(map)
       const bounds: [number, number][] = []
+      const numbered = new Map(routeStops.map((stop, i) => [stop.crl_id, i + 1]))
+      const orderedCoordinates = routeStops
+        .filter((stop) => stop.given_latitude != null && stop.given_longitude != null)
+        .map((stop): [number,number] => [Number(stop.given_latitude),Number(stop.given_longitude)])
+      if (orderedCoordinates.length > 1) {
+        L.polyline(agentPosition ? [[agentPosition.lat,agentPosition.lng], ...orderedCoordinates] : orderedCoordinates, {
+          color:'#7651c5',weight:3,opacity:.8,dashArray:'7 8',
+        }).addTo(map)
+      }
       for (const customer of valid) {
         const pos: [number, number] = [Number(customer.given_latitude), Number(customer.given_longitude)]
         bounds.push(pos)
         const fill = customer.priority_rank === 'P1' ? '#c93636' : customer.priority_rank === 'P2' ? '#e58b27' : '#7751c5'
-        L.circleMarker(pos, { radius: 9, color: '#fff', weight: 2, fillColor: fill, fillOpacity: 0.95 })
-          .addTo(map).bindPopup(popup(customer, locale))
+        const chosen = selectedCustomerId === customer.crl_id
+        const number = numbered.get(customer.crl_id)
+        const label = number == null ? '•' : String(number)
+        const icon = L.divIcon({
+          className: '',
+          html: `<span style="display:grid;place-items:center;width:${chosen?38:30}px;height:${chosen?38:30}px;background:${fill};border:3px solid white;border-radius:50%;box-shadow:0 3px 12px #4d3c6b66;color:white;font:800 12px sans-serif">${label}</span>`,
+          iconSize:[chosen?38:30,chosen?38:30],
+          iconAnchor:[chosen?19:15,chosen?19:15],
+        })
+        const marker = L.marker(pos,{icon}).addTo(map)
+        marker.bindPopup(popup(customer, locale))
+        marker.on('click', () => selectionRef.current?.(customer.crl_id))
+        if (chosen) { map.panTo(pos); marker.openPopup() }
       }
       if (agentPosition) {
         const pos: [number, number] = [agentPosition.lat, agentPosition.lng]
@@ -126,7 +155,7 @@ export default function CustomerPinMap({ customers, agentPosition, locale }: Pro
       if (!stopped) setStatus(error instanceof Error ? error.message : 'Map unavailable')
     })
     return () => { stopped = true; map?.remove() }
-  }, [customers, agentPosition?.lat, agentPosition?.lng, locale])
+  }, [customers, routeStops, selectedCustomerId, agentPosition?.lat, agentPosition?.lng, locale])
   return (
     <div className="relative h-full w-full">
       <div ref={elementRef} className="h-full w-full" aria-label={locale === 'id' ? 'Peta pin pelanggan' : 'Customer pin map'} />
