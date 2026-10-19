@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { LocateFixed, MapPin, Navigation, Route, UserRound, Search, ArrowLeft, SlidersHorizontal } from 'lucide-react'
+import { LocateFixed, MapPin, Navigation, Route, UserRound, Search, SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
@@ -253,7 +253,6 @@ export default function AgentRoutePage() {
     <main className={styles.routeShell}>
       <aside className={`${styles.sidebar} ${mobileMap ? styles.mobileHidden : ''}`}>
         <div className={styles.sidebarTop}>
-          <Link href="/agent" className={styles.backLink} aria-label={tx('Back to dashboard', 'Kembali ke dashboard')}><ArrowLeft size={20} /></Link>
           <span className={styles.brandMark}><Route size={21} /></span>
           <div className={styles.brandText}><strong>CRL Route</strong><small>{agentName}</small></div>
         </div>
