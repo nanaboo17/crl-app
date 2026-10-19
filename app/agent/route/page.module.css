@@ -79,3 +79,6 @@
  .fatStatus{top:73px;white-space:normal}
  .mapLegend,.routeHint{display:none}
 }
+
+.fatButtonMobile{display:none}
+@media(max-width:750px){.fatButtonFull{display:none}.fatButtonMobile{display:inline}.mapToolbar .mapActions button:first-child{min-width:58px;width:58px;max-width:58px}}
