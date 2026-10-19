@@ -35,88 +35,37 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', email).maybeSingle()
   if (!currentUser || !currentUser.active || !['admin', 'superadmin'].includes(currentUser.role)) redirect('/auth/route')
 
-  let payload: PreVisitCache
-  try {
-    payload = await cacheGetOrSet<PreVisitCache>(`crl:superadmin:previsits:v2-user:${user.id}`, CACHE_TTL, async () => {
-      const agentsResult = await supabase.from('agents')
-        .select('email, agent_name, active').eq('role', 'agent').order('agent_name')
-      if (agentsResult.error) throw agentsResult.error
-
-      // PostgREST silently caps unpaginated reads at 1000 rows.
-      // Read all authorized records so the totals and status tabs remain accurate.
-      const preVisits: PreVisitRow[] = []
-      const batchSize = 500
-      for (let from = 0; ; from += batchSize) {
-        const { data, error } = await supabase.from('pre_visits')
-          .select('agent_email, previsit_status, created_at')
-          .order('previsit_id')
-          .range(from, from + batchSize - 1)
-        if (error) throw error
-        const batch = (data ?? []) as PreVisitRow[]
-        preVisits.push(...batch)
-        if (batch.length < batchSize) break
-      }
-      return {
-        agents: (agentsResult.data ?? []) as AgentRow[],
-        preVisits,
-        totalPreVisits: preVisits.length,
-      }
-    })
-  } catch (error) {
-    console.error('superadmin/pre-visits:', error)
+  const { data: activity, error: activityError } = await supabase.rpc('crl_superadmin_activity_summary_v1', { p_kind: 'pre_visits' })
+  if (activityError || !activity || typeof activity !== 'object' || Array.isArray(activity)) {
+    console.error('superadmin/pre-visits:', activityError?.message)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.preVisits') }]} title={t('superadmin.preVisits.title')} description={t('superadmin.preVisits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.preVisits.errorTitle')} description={t('superadmin.preVisits.errorDesc')} /></div>
   }
-
-  const allAgents = payload.agents
-  const preVisits = payload.preVisits
-  const preVisitMap = new Map<string, PreVisitRow[]>()
-  for (const row of preVisits) {
-    const key = (row.agent_email || '').toLowerCase()
-    if (!key) continue
-    preVisitMap.set(key, [...(preVisitMap.get(key) ?? []), row])
-  }
-
-  const statusFor = (key: Exclude<PreVisitFilter, 'all' | 'none'>) => ({
-    ready: 'Ready for Visit',
-    followup: 'Need Follow-up',
-    direct: 'Direct Visit',
-    rescheduled: 'Rescheduled',
-    stopped: 'Stopped',
-  }[key])
-
-  const rowsForFilter = (agentEmail: string) => {
-    const rows = preVisitMap.get(agentEmail.toLowerCase()) ?? []
-    if (filter === 'all') return rows
-    if (filter === 'none') return []
-    return rows.filter((row) => row.previsit_status === statusFor(filter))
-  }
-
-  const matches = (agentEmail: string) => {
-    const rows = preVisitMap.get(agentEmail.toLowerCase()) ?? []
-    if (filter === 'all') return true
-    if (filter === 'none') return rows.length === 0
-    return rowsForFilter(agentEmail).length > 0
-  }
-
-  const filteredAgents = allAgents.filter((agent) => matches(agent.email))
+  type PreVisitAgentSummary = AgentRow & { total: number; ready: number; followup: number; direct: number; rescheduled: number; stopped: number }
+  const summary = activity as unknown as { agents: PreVisitAgentSummary[]; totalPreVisits: number; readyCount: number; followUpCount: number }
+  const allAgents = summary.agents ?? []
+  const matches = (agent: PreVisitAgentSummary) => filter === 'all' ||
+    (filter === 'none' && agent.total === 0) ||
+    (filter === 'ready' && agent.ready > 0) ||
+    (filter === 'followup' && agent.followup > 0) ||
+    (filter === 'direct' && agent.direct > 0) ||
+    (filter === 'rescheduled' && agent.rescheduled > 0) ||
+    (filter === 'stopped' && agent.stopped > 0)
+  const filteredAgents = allAgents.filter(matches)
   const totalAgents = filteredAgents.length
-  const totalPages = Math.max(1, Math.ceil(totalAgents / PAGE_SIZE))
-  const page = Math.min(requestedPage, totalPages)
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(totalAgents / PAGE_SIZE)))
   if (totalAgents > 0 && requestedPage !== page) redirect(`/superadmin/pre-visits?mode=agent&filter=${filter}&page=${page}`)
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const agentData = agents.map((agent) => ({ ...agent, previsit_count: filter === 'none' ? 0 : rowsForFilter(agent.email).length }))
-
-  const countStatus = (status: string) => preVisits.filter((row) => row.previsit_status === status).length
-  const readyCount = countStatus('Ready for Visit')
-  const followUpCount = countStatus('Need Follow-up')
+  const agentData = agents.map(agent => ({ ...agent, previsit_count: filter === 'none' ? 0 : filter === 'all' ? agent.total : agent[filter] }))
+  const readyCount = summary.readyCount
+  const followUpCount = summary.followUpCount
   const filters: { key: PreVisitFilter; label: string; count: number }[] = [
     { key: 'all', label: tx('All agents', 'Semua agen'), count: allAgents.length },
-    { key: 'ready', label: tx('Ready', 'Siap dikunjungi'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).some((r) => r.previsit_status === 'Ready for Visit')).length },
-    { key: 'followup', label: tx('Follow-up', 'Tindak lanjut'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).some((r) => r.previsit_status === 'Need Follow-up')).length },
-    { key: 'direct', label: tx('Direct Visit', 'Kunjungan langsung'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).some((r) => r.previsit_status === 'Direct Visit')).length },
-    { key: 'rescheduled', label: tx('Rescheduled', 'Dijadwalkan ulang'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).some((r) => r.previsit_status === 'Rescheduled')).length },
-    { key: 'stopped', label: tx('Stopped', 'Dihentikan'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).some((r) => r.previsit_status === 'Stopped')).length },
-    { key: 'none', label: tx('No pre-visit', 'Belum ada pra-kunjungan'), count: allAgents.filter((a) => (preVisitMap.get(a.email.toLowerCase()) ?? []).length === 0).length },
+    { key: 'ready', label: tx('Ready', 'Siap dikunjungi'), count: allAgents.filter(a => a.ready > 0).length },
+    { key: 'followup', label: tx('Follow-up', 'Tindak lanjut'), count: allAgents.filter(a => a.followup > 0).length },
+    { key: 'direct', label: tx('Direct Visit', 'Kunjungan langsung'), count: allAgents.filter(a => a.direct > 0).length },
+    { key: 'rescheduled', label: tx('Rescheduled', 'Dijadwalkan ulang'), count: allAgents.filter(a => a.rescheduled > 0).length },
+    { key: 'stopped', label: tx('Stopped', 'Dihentikan'), count: allAgents.filter(a => a.stopped > 0).length },
+    { key: 'none', label: tx('No pre-visit', 'Belum ada pra-kunjungan'), count: allAgents.filter(a => a.total === 0).length },
   ]
 
   const agentHref = (agentEmail: string) => `/superadmin/pre-visits/${encodeURIComponent(agentEmail)}?filter=${filter}`
@@ -125,7 +74,7 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
     <div className={styles.page}>
       <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.preVisits') }]} title={t('superadmin.preVisits.title')} description={t('superadmin.preVisits.description')} />
       <section className={styles.hero}><div><p className={styles.heroEyebrow}>{tx('PRE-VISIT CONTROL', 'KONTROL PRA-KUNJUNGAN')}</p><h2>{tx('Keep every field visit prepared and on track.', 'Pastikan setiap kunjungan lapangan siap dan terarah.')}</h2><p>{tx('Review agent preparation, follow-up demand, and readiness before the team reaches the customer.', 'Pantau persiapan agen, kebutuhan tindak lanjut, dan kesiapan sebelum tim menemui pelanggan.')}</p></div><div className={styles.heroScene} aria-hidden="true"><div className={styles.heroChecklist}>✓</div><div className={styles.heroPath} /><div className={styles.heroPin}>📍</div></div></section>
-      <section className={styles.summaryGrid} aria-label={tx('Pre-visit summary', 'Ringkasan pra-kunjungan')}><div className={`${styles.summaryCard} ${styles.purple}`}><div><span>{t('superadmin.preVisits.totalAgents')}</span><strong>{allAgents.length}</strong></div><div className={styles.summaryIcon}><Users /></div></div><div className={`${styles.summaryCard} ${styles.yellow}`}><div><span>{t('superadmin.preVisits.totalPreVisits')}</span><strong>{payload.totalPreVisits}</strong></div><div className={styles.summaryIcon}><ClipboardList /></div></div><div className={`${styles.summaryCard} ${styles.green}`}><div><span>{tx('Ready for Visit', 'Siap Dikunjungi')}</span><strong>{readyCount}</strong></div><div className={styles.summaryIcon}><ClipboardCheck /></div></div><div className={`${styles.summaryCard} ${styles.orange}`}><div><span>{tx('Need Follow-up', 'Perlu Tindak Lanjut')}</span><strong>{followUpCount}</strong></div><div className={styles.summaryIcon}><RefreshCcw /></div></div></section>
+      <section className={styles.summaryGrid} aria-label={tx('Pre-visit summary', 'Ringkasan pra-kunjungan')}><div className={`${styles.summaryCard} ${styles.purple}`}><div><span>{t('superadmin.preVisits.totalAgents')}</span><strong>{allAgents.length}</strong></div><div className={styles.summaryIcon}><Users /></div></div><div className={`${styles.summaryCard} ${styles.yellow}`}><div><span>{t('superadmin.preVisits.totalPreVisits')}</span><strong>{summary.totalPreVisits}</strong></div><div className={styles.summaryIcon}><ClipboardList /></div></div><div className={`${styles.summaryCard} ${styles.green}`}><div><span>{tx('Ready for Visit', 'Siap Dikunjungi')}</span><strong>{readyCount}</strong></div><div className={styles.summaryIcon}><ClipboardCheck /></div></div><div className={`${styles.summaryCard} ${styles.orange}`}><div><span>{tx('Need Follow-up', 'Perlu Tindak Lanjut')}</span><strong>{followUpCount}</strong></div><div className={styles.summaryIcon}><RefreshCcw /></div></div></section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className={styles.filterBar} aria-label={tx('Pre-visit filters', 'Filter pra-kunjungan')}>{filters.map((item) => <Link key={item.key} href={`/superadmin/pre-visits?mode=agent&filter=${item.key}&page=1`} className={`${styles.filterChip} ${filter === item.key ? styles.filterActive : ''}`}>{item.label}<span>{item.count}</span></Link>)}</nav>
         <Link href="/superadmin/pre-visits" className="dui-btn dui-btn-ghost dui-btn-sm">{tx('Change View', 'Ganti Tampilan')}</Link>
