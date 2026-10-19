@@ -53,3 +53,9 @@
  .mapLegend{max-width:calc(100% - 24px);flex-wrap:wrap;gap:5px;padding:7px 9px}
  .routeHint{max-width:calc(100% - 24px)}
 }
+
+/* Route fills the visible mobile viewport below the actual Indosat header. */
+@media (max-width:750px){
+ .routeShell{height:var(--route-mobile-height,calc(100dvh - 86px));min-height:0;max-height:none;overflow:hidden;border-bottom:0}
+ .mapPane,.sidebar{height:100%;min-height:0}
+}
