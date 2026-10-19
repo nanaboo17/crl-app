@@ -342,7 +342,7 @@ export default function AgentRoutePage() {
       <section className={`${styles.mapPane} ${mobileMap ? styles.mobileMapVisible : ''}`} aria-label={tx('Customer location map', 'Peta lokasi pelanggan')}>
         <div className={styles.mapToolbar}>
           <div><strong>{tx('Customer map', 'Peta pelanggan')}</strong><span>{availableCustomers.length} {tx('mapped stops', 'tujuan pada peta')}</span></div>
-          <div className="flex items-center gap-2">
+          <div className={styles.mapActions}>
             <button type="button" aria-pressed={showFat} onClick={() => {
               if (!selectedStopId && !showFat && listedCustomers.length) {
                 setSelectedStopId(listedCustomers[0].crl_id)
@@ -386,15 +386,15 @@ export default function AgentRoutePage() {
           {selectedStop && <div className={styles.selectedPreview}>
             <span>{selectedStop.priority_rank || '—'} · {selectedStop.days_left_to_churn ?? '—'} {tx('days to churn', 'hari menuju churn')}</span>
             <p>{selectedStop.service_address || selectedStop.district || selectedStop.city || '—'}</p>
-            <div className="mt-2 rounded-xl border border-[#cce9e4] bg-[#f2faf7] p-3 text-xs text-[#155e58]">
+            <div className={styles.fatDetails}>
               <strong>{tx('Same-site FAT candidates · connection unverified', 'Kandidat FAT satu site · koneksi belum terverifikasi')}</strong>
-              <p className="mt-1">{!showFat ? tx('Click Show FAT on map.', 'Klik Tampilkan FAT di peta.') : fatLoading
+              <p className={styles.fatSummary}>{!showFat ? tx('Click Show FAT on map.', 'Klik Tampilkan FAT di peta.') : fatLoading
                 ? tx('Loading FAT locations…', 'Memuat lokasi FAT…')
                 : fatError
                   ? tx('Unable to load FAT candidates.', 'Tidak dapat memuat kandidat FAT.')
                   : `${fatCandidates.length} ${tx('candidates on map (up to 30)', 'kandidat di peta (maks. 30)')}`}</p>
               {showFat && !fatLoading && !fatError && fatCandidates.slice(0, 3).map((fat, index) =>
-                <p key={`${fat.fat_id}-${index}`} className="mt-1">{fat.fat_id} · {tx('Available', 'Tersedia')}: {fat.available ?? '—'}/{fat.capacity ?? '—'} · {fat.distance_meters == null ? '—' : formatDistance(fat.distance_meters)}</p>
+                <p key={`${fat.fat_id}-${index}`} className={styles.fatEntry}>{fat.fat_id} · {tx('Available', 'Tersedia')}: {fat.available ?? '—'}/{fat.capacity ?? '—'} · {fat.distance_meters == null ? '—' : formatDistance(fat.distance_meters)}</p>
               )}
             </div>
             <div><Link href={`/agent/customers/${encodeURIComponent(selectedStop.crl_id)}`}>{t('agent.route.customerDetail')}</Link>
