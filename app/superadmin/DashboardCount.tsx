@@ -16,14 +16,35 @@ export default function DashboardCount({ table }: { table: CountTable }) {
 
     async function load() {
       try {
-        // Supabase RLS applies to each count; never substitute global totals.
-        const query = supabase.from(table).select('*', { count: 'exact', head: true })
-        const result = table === 'agents' ? await query.eq('active', true) : await query
-        if (stopped) return
-        if (result.error || result.count == null) {
-          throw new Error(result.error?.message || 'Count unavailable')
+        // Exact PostgREST counts for customers/visits repeatedly evaluate
+        // Circle RLS across thousands of rows and can time out indefinitely.
+        // Reuse the already-tested Circle-scoped aggregate RPCs.
+        let nextCount: number | null = null
+        if (table === 'agents') {
+          const { count, error } = await supabase.from('agents')
+            .select('email', { count: 'exact', head: true }).eq('active', true)
+          if (error) throw error
+          nextCount = count
+        } else if (table === 'customers') {
+          const { data, error } = await supabase.rpc('crl_superadmin_customers_page_v1', {
+            p_page: 1, p_status: 'all', p_region: 'all', p_lead_email: 'all', p_search: '',
+          })
+          if (error) throw error
+          const payload = data as { totalAll?: number } | null
+          nextCount = payload?.totalAll ?? null
+        } else {
+          const { data, error } = await supabase.rpc('crl_superadmin_activity_summary_v1', {
+            p_kind: table,
+          })
+          if (error) throw error
+          const payload = data as { totalPreVisits?: number; totalVisits?: number } | null
+          nextCount = table === 'visits' ? payload?.totalVisits ?? null : payload?.totalPreVisits ?? null
         }
-        setCount(result.count)
+        if (stopped) return
+        if (nextCount === null || !Number.isFinite(nextCount)) {
+          throw new Error('Dashboard aggregate count unavailable')
+        }
+        setCount(nextCount)
       } catch (error) {
         if (stopped) return
         attempt += 1
