@@ -166,23 +166,24 @@ export default function AgentRoutePage() {
     const shell = routeShellRef.current
     if (!shell) return
 
+    // Keep the map flush with the visible viewport on desktop, tablet,
+    // Android and iOS, regardless of the corporate navbar height.
     const resize = () => {
-      if (window.innerWidth > 750) {
-        shell.style.removeProperty('--route-mobile-height')
-        return
-      }
-      // Measure the real space beneath the corporate navbar on iOS Safari,
-      // rather than assuming the navbar always has the same pixel height.
-      const availableHeight = window.visualViewport?.height ?? window.innerHeight
       const top = shell.getBoundingClientRect().top
-      shell.style.setProperty('--route-mobile-height', `${Math.max(320, Math.floor(availableHeight - top))}px`)
+      const height = Math.max(0, Math.floor(window.innerHeight - top))
+      shell.style.setProperty('--route-available-height', `${height}px`)
     }
 
     resize()
+    const observer = new ResizeObserver(resize)
+    if (shell.parentElement) observer.observe(shell.parentElement)
     window.addEventListener('resize', resize)
+    window.addEventListener('orientationchange', resize)
     window.visualViewport?.addEventListener('resize', resize)
     return () => {
+      observer.disconnect()
       window.removeEventListener('resize', resize)
+      window.removeEventListener('orientationchange', resize)
       window.visualViewport?.removeEventListener('resize', resize)
     }
   }, [loading])
