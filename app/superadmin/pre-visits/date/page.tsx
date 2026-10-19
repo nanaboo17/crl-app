@@ -132,7 +132,7 @@ export default async function SuperadminPreVisitsByDatePage({ searchParams }: { 
           </label>
           <label className="form-control w-full sm:w-auto">
             <span className="mb-1 text-xs font-bold uppercase tracking-wide text-base-content/60">End date (WIB)</span>
-            <input className="dui-input dui-input-bordered" type="date" name="end" defaultValue={endDate} min={startDate} />
+            <input className="dui-input dui-input-bordered" type="date" name="end" defaultValue={endDate} />
           </label>
           <button className="dui-btn dui-btn-secondary" type="submit"><CalendarDays className="size-4" />View Range</button>
         </form>
