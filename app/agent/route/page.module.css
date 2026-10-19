@@ -1,5 +1,5 @@
 .page{min-height:100vh;padding:24px}.loadingCard{padding:32px;text-align:center;border-radius:20px;background:#252525;color:#fff}
-.routeShell{display:grid;grid-template-columns:minmax(315px,355px) minmax(0,1fr);height:calc(100dvh - 96px);min-height:570px;background:var(--color-base-100);color:var(--color-base-content);overflow:hidden;border:1px solid #e3d7ef;border-radius:18px}
+.routeShell{display:grid;grid-template-columns:minmax(315px,355px) minmax(0,1fr);height:var(--route-available-height,calc(100dvh - 96px));min-height:0;background:var(--color-base-100);color:var(--color-base-content);overflow:hidden;border:1px solid #e3d7ef;border-radius:18px}
 .sidebar{display:flex;flex-direction:column;min-height:0;background:linear-gradient(180deg,#f7f0ff,#fff9e8);border-right:1px solid #e5d7ee}
 .sidebarTop{display:flex;align-items:center;gap:11px;padding:19px 18px 13px}.backLink{color:#6845b4;display:grid;place-items:center;width:32px;height:32px;border-radius:9px}.backLink:hover{background:#eee5ff}.brandMark{height:38px;width:38px;border-radius:11px;display:grid;place-items:center;background:#eee5ff;color:#7651c5}.brandText{display:grid;gap:2px;min-width:0}.brandText strong{font-size:16px;letter-spacing:-.02em}.brandText small{font-size:11px;color:#756b80;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sidebarTools{padding:10px 20px 16px;border-bottom:1px solid #e5d7ee}.sidebarTools h1{font-size:20px;font-weight:850;margin:0 0 4px}.sidebarTools>p{font-size:11px;color:#7b7083;margin:0 0 15px}.searchBox{height:44px;display:flex;align-items:center;gap:10px;border:1px solid #ded5ef;background:#fff;padding:0 13px;border-radius:11px;color:#7651c5}.searchBox input{width:100%;background:transparent;border:0;color:#4c4055;outline:none;font-size:12px}.searchBox input::placeholder{color:#93849c}.filterRow{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-top:14px}.filterRow label{display:grid;gap:6px;flex:1}.filterRow label span{display:flex;align-items:center;gap:6px;color:#7651c5;font-size:11px}.filterRow select{height:37px;width:100%;border:1px solid #dfd0f3;border-radius:9px;background:#fff;color:#4c4055;padding:0 10px;font-size:11px}.stopTotal{border-radius:99px;background:#eee5ff;color:#6845b4;padding:9px 11px;white-space:nowrap;font-size:11px;font-weight:750}.locateButton{width:100%;min-height:40px;margin-top:14px;border:0;background:linear-gradient(135deg,#7651c5,#946ce2);color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:12px;font-weight:750}.locateButton:disabled{opacity:.6}.gpsStatus,.gpsNotice{font-size:11px!important;margin:8px 0 0!important}.gpsStatus{color:#3f8b59!important}.gpsNotice{color:#8a744e!important}.inlineError{padding:10px;margin-top:10px;background:#fff0ed;border-radius:9px;color:#a83838;font-size:11px}
@@ -56,7 +56,7 @@
 
 /* Route fills the visible mobile viewport below the actual Indosat header. */
 @media (max-width:750px){
- .routeShell{height:var(--route-mobile-height,calc(100dvh - 86px));min-height:0;max-height:none;overflow:hidden;border-bottom:0}
+ .routeShell{height:var(--route-available-height,calc(100dvh - 86px));min-height:0;max-height:none;overflow:hidden;border-bottom:0}
  .mapPane,.sidebar{height:100%;min-height:0}
 }
 
@@ -82,3 +82,7 @@
 
 .fatButtonMobile{display:none}
 @media(max-width:750px){.fatButtonFull{display:none}.fatButtonMobile{display:inline}.mapToolbar .mapActions button:first-child{min-width:58px;width:58px;max-width:58px}}
+
+/* Route viewport fit applies to all device sizes. Do not leave outer shell gaps. */
+.routeShell{height:var(--route-available-height,calc(100dvh - 96px));min-height:0;max-height:none;margin-bottom:0}
+.mapPane,.mapCanvas{min-height:0}
