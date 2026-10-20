@@ -211,12 +211,6 @@ export default function VisitPage() {
           const savedAt = Number(draft.savedAt || 0)
           if (savedAt && Date.now() - savedAt <= VISIT_DRAFT_MAX_AGE_MS) {
             if (typeof draft.visitAddress === 'string') setVisitAddress(draft.visitAddress)
-            if (typeof draft.latitude === 'number') setLatitude(draft.latitude)
-            if (typeof draft.longitude === 'number') setLongitude(draft.longitude)
-            if (typeof draft.gpsAccuracy === 'number') setGpsAccuracy(draft.gpsAccuracy)
-            if (typeof draft.gpsCapturedAt === 'string') setGpsCapturedAt(draft.gpsCapturedAt)
-            if (typeof draft.distanceMeters === 'number') setDistanceMeters(draft.distanceMeters)
-            if (typeof draft.locationMatch === 'boolean') setLocationMatch(draft.locationMatch)
             if (typeof draft.phoneCorrect === 'boolean') setPhoneCorrect(draft.phoneCorrect)
             if (typeof draft.updatedPhone === 'string') setUpdatedPhone(draft.updatedPhone)
             if (typeof draft.consentGiven === 'boolean') setConsentGiven(draft.consentGiven)
@@ -249,12 +243,6 @@ export default function VisitPage() {
       sessionStorage.setItem(draftKey, JSON.stringify({
         savedAt: Date.now(),
         visitAddress,
-        latitude,
-        longitude,
-        gpsAccuracy,
-        gpsCapturedAt,
-        distanceMeters,
-        locationMatch,
         phoneCorrect,
         updatedPhone,
         consentGiven,
@@ -269,8 +257,7 @@ export default function VisitPage() {
       // A visit must still work if browser storage is unavailable.
     }
   }, [
-    draftReady, draftKey, visitAddress, latitude, longitude, gpsAccuracy, gpsCapturedAt,
-    distanceMeters, locationMatch, phoneCorrect, updatedPhone, consentGiven,
+    draftReady, draftKey, visitAddress, phoneCorrect, updatedPhone, consentGiven,
     visitStatusKunjungan, conversationResult, approvedOffer, plannedPaymentDate,
     unpaidReason, additionalNotes,
   ])
