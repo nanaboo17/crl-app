@@ -90,9 +90,9 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v6:${selectedDate}`, CACHE_TTL, async () => {
+  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v7:${selectedDate}`, CACHE_TTL, async () => {
     const [agentsResult, visitsResult, preVisitsResult, attendanceResult] = await Promise.all([
-      supabase.from('agents').select('email, agent_name, active, organization').eq('role', 'agent').order('agent_name'),
+      supabase.from('agents').select('email, agent_name, active, organization').eq('role', 'agent').eq('active', true).order('agent_name'),
       supabase
         .from('visits')
         .select('agent_email, visit_date')
