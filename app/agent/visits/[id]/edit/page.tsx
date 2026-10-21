@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
-  Gauge,
   MapPin,
   Phone,
   Save,
@@ -262,7 +261,7 @@ export default function EditVisitPage() {
 
       {row && (
         <form onSubmit={submit} className="space-y-4">
-          <StepCard step="1" title={tx('Location & Address', 'Lokasi & Alamat')}>
+          <StepCard step="1" title={t('agent.visit.step1')}>
             <div className="dui-alert dui-alert-info">
               <MapPin className="h-5 w-5 shrink-0" />
               <span className="text-sm">
@@ -283,7 +282,7 @@ export default function EditVisitPage() {
             </Field>
           </StepCard>
 
-          <StepCard step="2" title={tx('Customer Contact', 'Kontak Pelanggan')}>
+          <StepCard step="2" title={t('agent.visit.step2')}>
             <Field label={tx('Updated phone number', 'Nomor telepon terbaru')}>
               <div className="relative">
                 <Phone className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-base-content/40" />
@@ -299,7 +298,7 @@ export default function EditVisitPage() {
             </Field>
           </StepCard>
 
-          <StepCard step="3" title={tx('Evidence & Speed Test', 'Bukti & Speed Test')}>
+          <StepCard step="3" title={t('agent.visit.step3')}>
             <div className="dui-alert dui-alert-info">
               <CheckCircle2 className="h-5 w-5 shrink-0" />
               <span className="text-sm">
@@ -328,7 +327,7 @@ export default function EditVisitPage() {
             </div>
           </StepCard>
 
-          <StepCard step="4" title={tx('Visit Result', 'Hasil Kunjungan')}>
+          <StepCard step="4" title={t('agent.visit.step4')}>
             <Field label={tx('Visit status', 'Status kunjungan')}>
               <select
                 className="dui-select w-full"
@@ -362,7 +361,7 @@ export default function EditVisitPage() {
           </StepCard>
 
           {form.conversation_result !== 'Tidak bertemu pelanggan' && (
-            <StepCard step="5" title={tx('Offer Approved by Customer', 'Offer yang Disetujui Pelanggan')}>
+            <StepCard step="5" title={t('agent.visit.step5')}>
               <p className="text-sm text-base-content/60">
                 {tx(
                   'Keep the approved retention offer aligned with the original visit flow.',
@@ -392,7 +391,7 @@ export default function EditVisitPage() {
             </StepCard>
           )}
 
-          <StepCard step="6" title={tx('Payment Follow-up', 'Tindak Lanjut Pembayaran')}>
+          <StepCard step="6" title={t('agent.visit.step6')}>
             {form.conversation_result === 'Bersedia bayar / Promise to Pay' && (
               <Field label={tx('Planned payment date', 'Rencana tanggal pembayaran')}>
                 <div className="relative">
@@ -439,7 +438,7 @@ export default function EditVisitPage() {
             )}
           </StepCard>
 
-          <StepCard step="7" title={tx('Additional Notes', 'Catatan Tambahan')}>
+          <StepCard step="7" title={t('agent.visit.step7')}>
             <p className="text-sm text-base-content/60">
               {tx(
                 'Update important information collected from the customer.',
