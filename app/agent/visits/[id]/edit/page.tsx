@@ -3,20 +3,21 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
-  Gauge,
+  CheckCircle2,
   MapPin,
-  MessageSquareText,
-  NotebookText,
   Phone,
   Save,
-  Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 export default function EditVisitPage() {
+  const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => locale === 'id' ? id : en
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const id = decodeURIComponent(params.id)
@@ -38,6 +39,23 @@ export default function EditVisitPage() {
     speed_test_download_mbps: '',
     speed_test_upload_mbps: '',
   })
+
+  useEffect(() => {
+    if (form.conversation_result === 'Sudah melakukan pembayaran') {
+      setForm((current) => ({
+        ...current,
+        unpaid_reason: 'Sudah bayar',
+        planned_payment_date: '',
+      }))
+    } else if (form.conversation_result === 'Tidak bertemu pelanggan') {
+      setForm((current) => ({
+        ...current,
+        approved_offer: NO_APPROVED_OFFER,
+        planned_payment_date: '',
+        unpaid_reason: '',
+      }))
+    }
+  }, [form.conversation_result])
 
   useEffect(() => {
     const supabase = createClient()
@@ -91,8 +109,27 @@ export default function EditVisitPage() {
       return
     }
 
+    if (form.conversation_result !== 'Tidak bertemu pelanggan' && !form.approved_offer) {
+      setError(tx('Please select an approved offer.', 'Mohon pilih offer yang disetujui.'))
+      return
+    }
+
     if (form.approved_offer && form.approved_offer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === form.approved_offer)) {
-      setError('Selected offer is not available for this Customer ID.')
+      setError(tx('Selected offer is not available for this Customer ID.', 'Offer yang dipilih tidak tersedia untuk Customer ID ini.'))
+      return
+    }
+
+    if (form.conversation_result === 'Bersedia bayar / Promise to Pay' && !form.planned_payment_date) {
+      setError(tx('Please select the planned payment date.', 'Mohon pilih rencana tanggal pembayaran.'))
+      return
+    }
+
+    if (
+      form.conversation_result !== 'Sudah melakukan pembayaran' &&
+      form.conversation_result !== 'Tidak bertemu pelanggan' &&
+      !form.unpaid_reason
+    ) {
+      setError(tx('Please select the unpaid reason.', 'Mohon pilih alasan belum bayar.'))
       return
     }
 
@@ -173,309 +210,335 @@ export default function EditVisitPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-5 p-4 pb-28 sm:p-6 lg:p-8">
-      <button
-        type="button"
-        onClick={() => router.back()}
-        className="dui-btn dui-btn-ghost dui-btn-sm gap-2 px-0"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to visit detail
-      </button>
+    <div className="mx-auto w-full max-w-3xl space-y-4 p-4 pb-28 sm:p-6 lg:p-8">
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="dui-btn dui-btn-ghost dui-btn-sm gap-2 px-0"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {tx('Back to visit detail', 'Kembali ke detail kunjungan')}
+        </button>
+        <span className="dui-badge dui-badge-primary dui-badge-outline">
+          {tx('Edit Visit', 'Edit Kunjungan')}
+        </span>
+      </div>
 
-      <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-        <div className="bg-gradient-to-r from-primary/12 via-primary/5 to-transparent px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="dui-badge dui-badge-primary dui-badge-sm">EDIT VISIT</span>
-                <span className="dui-badge dui-badge-ghost dui-badge-sm">{id}</span>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                {row?.customer_name || row?.customer_id || 'Visit data'}
-              </h1>
-              <p className="mt-1 text-sm text-base-content/60">
-                Customer ID: <span className="font-semibold text-base-content/75">{row?.customer_id}</span>
-                {row?.crl_id ? <> · CRL ID: <span className="font-semibold text-base-content/75">{row.crl_id}</span></> : null}
-              </p>
-            </div>
-            <div className="rounded-xl border border-base-300 bg-base-100/80 px-4 py-3 text-sm backdrop-blur sm:text-right">
-              <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">Original record</div>
-              <div className="mt-1 font-semibold">GPS & evidence stay attached</div>
-            </div>
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="dui-badge dui-badge-primary dui-badge-sm">{tx('EDIT MODE', 'MODE EDIT')}</span>
+            <span className="dui-badge dui-badge-ghost dui-badge-sm">{id}</span>
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-tight sm:text-2xl">
+              {row?.customer_name || row?.customer_id || tx('Visit data', 'Data kunjungan')}
+            </h1>
+            <p className="mt-1 text-sm text-base-content/60">
+              {tx('Customer ID', 'Customer ID')}: <span className="font-semibold text-base-content">{row?.customer_id}</span>
+              {row?.crl_id ? <> · CRL ID: <span className="font-semibold text-base-content">{row.crl_id}</span></> : null}
+            </p>
+          </div>
+          <div className="dui-alert dui-alert-info py-3">
+            <MapPin className="h-5 w-5 shrink-0" />
+            <span className="text-sm">
+              {tx(
+                'You are editing the submitted visit. GPS and uploaded evidence stay attached to the original visit.',
+                'Anda sedang mengedit kunjungan yang sudah dikirim. GPS dan bukti foto tetap terhubung ke kunjungan awal.'
+              )}
+            </span>
           </div>
         </div>
       </section>
 
       {error && (
-        <div className="dui-alert dui-alert-error shadow-sm" role="alert">
+        <div className="dui-alert dui-alert-error" role="alert">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {row && (
-        <form onSubmit={submit} className="space-y-5">
-          <SectionCard
-            icon={<MessageSquareText className="h-5 w-5" />}
-            eyebrow="VISIT OUTCOME"
-            title="Visit & conversation result"
-            description="Update the visit status and what happened during the customer interaction."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Visit status" required>
-                <select
-                  className="dui-select dui-select-bordered w-full"
-                  value={form.visit_status_kunjungan}
-                  onChange={(e) => setForm({ ...form, visit_status_kunjungan: e.target.value })}
-                >
-                  <option value="">Select visit status</option>
-                  <option value="Bertemu dengan pelanggan">Bertemu dengan pelanggan</option>
-                  <option value="Pelanggan tidak ada di tempat">Pelanggan tidak ada di tempat</option>
-                  <option value="Alamat tidak ditemukan">Alamat tidak ditemukan</option>
-                  <option value="Pelanggan sudah pindah">Pelanggan sudah pindah</option>
-                  <option value="Tidak berhasil dikunjungi">Tidak berhasil dikunjungi</option>
-                  <option value="Lainnya">Lainnya</option>
-                </select>
-              </FormField>
-
-              <FormField label="Conversation result" required>
-                <select
-                  className="dui-select dui-select-bordered w-full"
-                  value={form.conversation_result}
-                  onChange={(e) => setForm({ ...form, conversation_result: e.target.value })}
-                >
-                  <option value="">Select result</option>
-                  <option value="Sudah melakukan pembayaran">Sudah melakukan pembayaran</option>
-                  <option value="Bersedia bayar / Promise to Pay">Bersedia bayar / Promise to Pay</option>
-                  <option value="Masih mempertimbangkan">Masih mempertimbangkan</option>
-                  <option value="Tidak bersedia melanjutkan layanan">Tidak bersedia melanjutkan layanan</option>
-                  <option value="Tidak bertemu pelanggan">Tidak bertemu pelanggan</option>
-                </select>
-              </FormField>
+        <form onSubmit={submit} className="space-y-4">
+          <StepCard step="1" title={t('agent.visit.step1')}>
+            <div className="dui-alert dui-alert-info">
+              <MapPin className="h-5 w-5 shrink-0" />
+              <span className="text-sm">
+                {tx(
+                  'The original GPS point is kept. You can update only the visit address below.',
+                  'Titik GPS awal tetap digunakan. Anda hanya dapat memperbarui alamat kunjungan di bawah.'
+                )}
+              </span>
             </div>
-          </SectionCard>
-
-          <SectionCard
-            icon={<MapPin className="h-5 w-5" />}
-            eyebrow="CUSTOMER CONTACT"
-            title="Address & contact"
-            description="Adjust only if the field information collected during the visit is different."
-          >
-            <FormField label="Visit address">
+            <Field label={tx('Visit address', 'Alamat kunjungan')}>
               <textarea
-                className="dui-textarea dui-textarea-bordered min-h-28 w-full resize-y"
+                className="dui-textarea w-full"
+                rows={3}
                 value={form.visit_address}
                 onChange={(e) => setForm({ ...form, visit_address: e.target.value })}
-                placeholder="Customer visit address"
+                placeholder={tx('Customer visit address', 'Alamat kunjungan pelanggan')}
               />
-            </FormField>
+            </Field>
+          </StepCard>
 
-            <FormField label="Updated phone" icon={<Phone className="h-4 w-4" />}>
-              <input
-                type="tel"
-                inputMode="tel"
-                className="dui-input dui-input-bordered w-full"
-                value={form.updated_phone}
-                onChange={(e) => setForm({ ...form, updated_phone: e.target.value })}
-                placeholder="08xxxxxxxxxx or 62xxxxxxxxxxx"
-              />
-            </FormField>
-          </SectionCard>
+          <StepCard step="2" title={t('agent.visit.step2')}>
+            <Field label={tx('Updated phone number', 'Nomor telepon terbaru')}>
+              <div className="relative">
+                <Phone className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-base-content/40" />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  className="dui-input w-full pl-10"
+                  value={form.updated_phone}
+                  onChange={(e) => setForm({ ...form, updated_phone: e.target.value })}
+                  placeholder="08xxxxxxxxxx / 62xxxxxxxxxxx"
+                />
+              </div>
+            </Field>
+          </StepCard>
 
-          <SectionCard
-            icon={<Gauge className="h-5 w-5" />}
-            eyebrow="NETWORK QUALITY"
-            title="Speed test result"
-            description="Compare the customer's subscribed speed with the measured download and upload result."
-          >
+          <StepCard step="3" title={t('agent.visit.step3')}>
+            <div className="dui-alert dui-alert-info">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <span className="text-sm">
+                {tx(
+                  'Existing visit photos remain unchanged. You can update the measured speed result here.',
+                  'Foto kunjungan yang sudah ada tidak berubah. Anda dapat memperbarui hasil speed test di sini.'
+                )}
+              </span>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricField
-                label="Speed Current"
+              <ReadOnly
+                label={tx('Subscribed speed', 'Speed pelanggan')}
                 value={currentSpeed == null ? '—' : `${currentSpeed} Mbps`}
-                muted
               />
-
               <SpeedInput
-                label="Download"
+                label={tx('Download', 'Download')}
                 value={form.speed_test_download_mbps}
                 onChange={(value) => setForm({ ...form, speed_test_download_mbps: value })}
               />
-
               <SpeedInput
-                label="Upload"
+                label={tx('Upload', 'Upload')}
                 value={form.speed_test_upload_mbps}
                 onChange={(value) => setForm({ ...form, speed_test_upload_mbps: value })}
               />
             </div>
-          </SectionCard>
+          </StepCard>
 
-          <SectionCard
-            icon={<Sparkles className="h-5 w-5" />}
-            eyebrow="RETENTION"
-            title="Offer & payment"
-            description="Keep the agreed offer and payment follow-up aligned with the visit outcome."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Approved offer">
+          <StepCard step="4" title={t('agent.visit.step4')}>
+            <Field label={tx('Visit status', 'Status kunjungan')}>
+              <select
+                className="dui-select w-full"
+                value={form.visit_status_kunjungan}
+                onChange={(e) => setForm({ ...form, visit_status_kunjungan: e.target.value })}
+              >
+                <option value="">{tx('Select visit status', 'Pilih status kunjungan')}</option>
+                <option value="Bertemu dengan pelanggan">Bertemu dengan pelanggan</option>
+                <option value="Pelanggan tidak ada di tempat">Pelanggan tidak ada di tempat</option>
+                <option value="Alamat tidak ditemukan">Alamat tidak ditemukan</option>
+                <option value="Pelanggan sudah pindah">Pelanggan sudah pindah</option>
+                <option value="Tidak berhasil dikunjungi">Tidak berhasil dikunjungi</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </Field>
+
+            <Field label={tx('Conversation result', 'Hasil percakapan')}>
+              <select
+                className="dui-select w-full"
+                value={form.conversation_result}
+                onChange={(e) => setForm({ ...form, conversation_result: e.target.value })}
+              >
+                <option value="">{tx('Select conversation result', 'Pilih hasil percakapan')}</option>
+                <option value="Sudah melakukan pembayaran">Sudah melakukan pembayaran</option>
+                <option value="Bersedia bayar / Promise to Pay">Bersedia bayar / Promise to Pay</option>
+                <option value="Masih mempertimbangkan">Masih mempertimbangkan</option>
+                <option value="Tidak bersedia melanjutkan layanan">Tidak bersedia melanjutkan layanan</option>
+                <option value="Tidak bertemu pelanggan">Tidak bertemu pelanggan</option>
+              </select>
+            </Field>
+          </StepCard>
+
+          {form.conversation_result !== 'Tidak bertemu pelanggan' && (
+            <StepCard step="5" title={t('agent.visit.step5')}>
+              <p className="text-sm text-base-content/60">
+                {tx(
+                  'Keep the approved retention offer aligned with the original visit flow.',
+                  'Pastikan offer retention yang disetujui sesuai dengan alur kunjungan awal.'
+                )}
+              </p>
+              <Field label={tx('Approved offer', 'Offer yang disetujui')}>
                 <select
-                  className="dui-select dui-select-bordered w-full"
+                  className="dui-select w-full"
                   value={form.approved_offer}
                   onChange={(event) => setForm({ ...form, approved_offer: event.target.value })}
                 >
-                  <option value="">Select offer</option>
-                  {eligibleOffers.map((offer) => <option key={offer.value} value={offer.value}>{offer.label}</option>)}
-                  <option value={NO_APPROVED_OFFER}>No approved offer yet</option>
-                  {form.approved_offer && form.approved_offer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === form.approved_offer) && (
-                    <option value={form.approved_offer} disabled>{form.approved_offer} (previous offer — unavailable)</option>
-                  )}
+                  <option value="">{tx('Select offer', 'Pilih offer')}</option>
+                  {eligibleOffers.map((offer) => (
+                    <option key={offer.value} value={offer.value}>{offer.label}</option>
+                  ))}
+                  <option value={NO_APPROVED_OFFER}>{tx('No approved offer yet', 'Belum ada offer yang disetujui')}</option>
+                  {form.approved_offer &&
+                    form.approved_offer !== NO_APPROVED_OFFER &&
+                    !eligibleOffers.some((offer) => offer.value === form.approved_offer) && (
+                      <option value={form.approved_offer} disabled>
+                        {form.approved_offer} ({tx('previous offer — unavailable', 'offer sebelumnya — tidak tersedia')})
+                      </option>
+                    )}
                 </select>
-              </FormField>
+              </Field>
+            </StepCard>
+          )}
 
-              <FormField label="Planned payment date" icon={<CalendarDays className="h-4 w-4" />}>
-                <input
-                  type="date"
-                  className="dui-input dui-input-bordered w-full"
-                  value={form.planned_payment_date}
-                  onChange={(e) => setForm({ ...form, planned_payment_date: e.target.value })}
-                />
-              </FormField>
-            </div>
+          <StepCard step="6" title={t('agent.visit.step6')}>
+            {form.conversation_result === 'Bersedia bayar / Promise to Pay' && (
+              <Field label={tx('Planned payment date', 'Rencana tanggal pembayaran')}>
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-base-content/40" />
+                  <input
+                    type="date"
+                    className="dui-input w-full pl-10"
+                    value={form.planned_payment_date}
+                    onChange={(e) => setForm({ ...form, planned_payment_date: e.target.value })}
+                  />
+                </div>
+              </Field>
+            )}
 
-            <FormField label="Unpaid reason">
-              <input
-                className="dui-input dui-input-bordered w-full"
-                value={form.unpaid_reason}
-                onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })}
-                placeholder="Reason customer has not paid"
-              />
-            </FormField>
-          </SectionCard>
+            {form.conversation_result === 'Sudah melakukan pembayaran' ? (
+              <div className="dui-alert dui-alert-success">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <span>{tx('Customer has completed payment.', 'Pelanggan sudah melakukan pembayaran.')}</span>
+              </div>
+            ) : form.conversation_result === 'Tidak bertemu pelanggan' ? (
+              <div className="dui-alert dui-alert-info">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <span>{tx('Customer was not met during the visit.', 'Pelanggan tidak bertemu saat kunjungan.')}</span>
+              </div>
+            ) : (
+              <Field label={tx('Unpaid reason', 'Alasan belum bayar')}>
+                <select
+                  className="dui-select w-full"
+                  value={form.unpaid_reason}
+                  onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })}
+                >
+                  <option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>
+                  <option value="Masalah keuangan">Masalah keuangan</option>
+                  <option value="Harga / tagihan">Harga / tagihan</option>
+                  <option value="Pindah ke provider lain">Pindah ke provider lain</option>
+                  <option value="Masalah jaringan / layanan">Masalah jaringan / layanan</option>
+                  <option value="Jarang digunakan">Jarang digunakan</option>
+                  <option value="Pindah alamat">Pindah alamat</option>
+                  <option value="Masalah sales">Masalah sales</option>
+                  <option value="Alasan pribadi">Alasan pribadi</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+              </Field>
+            )}
+          </StepCard>
 
-          <SectionCard
-            icon={<NotebookText className="h-5 w-5" />}
-            eyebrow="NOTES"
-            title="Additional notes"
-            description="Add any context that will help the next follow-up."
-          >
-            <FormField label="Notes">
+          <StepCard step="7" title={t('agent.visit.step7')}>
+            <p className="text-sm text-base-content/60">
+              {tx(
+                'Update important information collected from the customer.',
+                'Perbarui informasi penting yang didapat dari pelanggan.'
+              )}
+            </p>
+            <Field label={tx('Additional notes', 'Catatan tambahan')}>
               <textarea
-                className="dui-textarea dui-textarea-bordered min-h-32 w-full resize-y"
+                className="dui-textarea w-full"
+                rows={4}
                 value={form.additional_notes}
                 onChange={(e) => setForm({ ...form, additional_notes: e.target.value })}
-                placeholder="Add visit notes..."
+                placeholder={tx('Add visit notes...', 'Tambahkan catatan kunjungan...')}
               />
-            </FormField>
-          </SectionCard>
+            </Field>
+          </StepCard>
 
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 backdrop-blur">
             <div className="mx-auto flex max-w-3xl gap-2">
               <button
                 type="button"
+                className="dui-btn flex-1"
                 onClick={() => router.back()}
                 disabled={saving}
-                className="dui-btn flex-1 sm:flex-none sm:min-w-32"
               >
-                Cancel
+                {tx('Cancel', 'Batal')}
               </button>
               <button
                 type="submit"
+                className="dui-btn dui-btn-primary flex-1"
                 disabled={saving}
-                className="dui-btn dui-btn-primary flex-1 gap-2 sm:min-w-48 sm:flex-none sm:ml-auto"
               >
                 {saving ? (
-                  <span className="dui-loading dui-loading-spinner dui-loading-sm" />
+                  <>
+                    <span className="dui-loading dui-loading-spinner dui-loading-sm" />
+                    {tx('Saving...', 'Menyimpan...')}
+                  </>
                 ) : (
-                  <Save className="h-4 w-4" />
+                  <>
+                    <Save className="h-5 w-5" />
+                    {tx('Save Changes', 'Simpan Perubahan')}
+                  </>
                 )}
-                {saving ? 'Saving changes…' : 'Save changes'}
               </button>
             </div>
           </div>
         </form>
       )}
-    </main>
+    </div>
   )
 }
 
-function SectionCard({
-  icon,
-  eyebrow,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ReactNode
-  eyebrow: string
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
+function StepCard({ step, title, children }: { step: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-      <div className="border-b border-base-200 px-5 py-4 sm:px-6">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/80">{eyebrow}</div>
-            <h2 className="mt-0.5 text-base font-bold sm:text-lg">{title}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-base-content/55 sm:text-sm">{description}</p>
-          </div>
-        </div>
+    <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+      <div className="dui-card-body gap-4">
+        <h2 className="flex items-center gap-2 text-base font-bold tracking-tight">
+          <span className="dui-badge dui-badge-primary dui-badge-sm">{step}</span>
+          {title}
+        </h2>
+        {children}
       </div>
-      <div className="space-y-4 p-5 sm:p-6">{children}</div>
     </section>
   )
 }
 
-function FormField({
-  label,
-  required = false,
-  icon,
-  children,
-}: {
-  label: string
-  required?: boolean
-  icon?: React.ReactNode
-  children: React.ReactNode
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="flex items-center gap-1.5 text-sm font-semibold text-base-content/80">
-        {icon}
-        {label}
-        {required && <span className="text-error">*</span>}
-      </span>
+    <div className="dui-fieldset">
+      <div className="dui-fieldset-label"><span>{label}</span></div>
       {children}
-    </label>
+    </div>
   )
 }
 
-function MetricField({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
+function ReadOnly({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-xl border p-4 ${muted ? 'border-base-300 bg-base-200/45' : 'border-base-300 bg-base-100'}`}>
-      <div className="text-[11px] font-bold uppercase tracking-wide text-base-content/45">{label}</div>
-      <div className="mt-2 text-xl font-bold tracking-tight">{value}</div>
+    <div className="rounded-box bg-base-200/60 px-3 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-base-content/50">{label}</div>
+      <div className="mt-1 text-lg font-bold">{value}</div>
     </div>
   )
 }
 
 function SpeedInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className="rounded-xl border border-base-300 bg-base-100 p-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-base-content/45">{label}</span>
-      <div className="mt-2 flex items-end gap-2">
+    <label className="rounded-box border border-base-300 bg-base-100 p-3">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-base-content/50">{label}</span>
+      <div className="mt-1 flex items-end gap-2">
         <input
           type="number"
           min="0"
           step="0.01"
           inputMode="decimal"
-          className="min-w-0 flex-1 bg-transparent text-xl font-bold outline-none"
+          className="min-w-0 flex-1 bg-transparent text-lg font-bold outline-none"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
         />
-        <span className="pb-0.5 text-xs font-semibold text-base-content/45">Mbps</span>
+        <span className="pb-0.5 text-xs text-base-content/50">Mbps</span>
       </div>
     </label>
   )
