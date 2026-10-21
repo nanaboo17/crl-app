@@ -6,14 +6,27 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  Camera,
   CheckCircle2,
   MapPin,
+  Navigation,
   Phone,
   Save,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
 import { useI18n } from '@/components/providers/i18n-provider'
+
+const LOCATION_LIMIT_METERS = 200
+const MAX_EDIT_PHOTOS = 5
+const MAX_PHOTO_DIMENSION = 1600
+
+type NewVisitPhoto = {
+  file: File
+  stamped: Blob
+  preview: string
+  capturedAt: string
+}
 
 export default function EditVisitPage() {
   const { t, locale } = useI18n()
@@ -27,6 +40,16 @@ export default function EditVisitPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [gettingGps, setGettingGps] = useState(false)
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null)
+  const [distanceMeters, setDistanceMeters] = useState<number | null>(null)
+  const [locationMatch, setLocationMatch] = useState<boolean | null>(null)
+  const [givenLatitude, setGivenLatitude] = useState<number | null>(null)
+  const [givenLongitude, setGivenLongitude] = useState<number | null>(null)
+  const [newPhotos, setNewPhotos] = useState<NewVisitPhoto[]>([])
   const [form, setForm] = useState({
     visit_status_kunjungan: '',
     conversation_result: '',
@@ -78,12 +101,20 @@ export default function EditVisitPage() {
 
       const { data: customerData } = await supabase
         .from('customers')
-        .select('speed,customer_name')
+        .select('speed,customer_name,given_latitude,given_longitude')
         .eq('crl_id', data.crl_id)
         .ilike('agent_email', user.email.trim())
         .maybeSingle()
 
       setCurrentSpeed(customerData?.speed == null ? null : Number(customerData.speed))
+      setGivenLatitude(customerData?.given_latitude == null ? null : Number(customerData.given_latitude))
+      setGivenLongitude(customerData?.given_longitude == null ? null : Number(customerData.given_longitude))
+      setLatitude(data.latitude == null ? null : Number(data.latitude))
+      setLongitude(data.longitude == null ? null : Number(data.longitude))
+      setGpsAccuracy(data.gps_accuracy == null ? null : Number(data.gps_accuracy))
+      setGpsCapturedAt(data.gps_captured_at || null)
+      setDistanceMeters(data.distance_to_customer_meters == null ? null : Number(data.distance_to_customer_meters))
+      setLocationMatch(data.location_match == null ? null : Boolean(data.location_match))
       setRow({ ...data, customer_name: customerData?.customer_name || null })
       setForm({
         visit_status_kunjungan: data.visit_status_kunjungan || '',
@@ -100,6 +131,148 @@ export default function EditVisitPage() {
       setLoading(false)
     })()
   }, [id, router])
+
+  function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const radius = 6371000
+    const toRad = (value: number) => (value * Math.PI) / 180
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+    return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  function captureGps() {
+    if (!navigator.geolocation) {
+      setError(tx('Geolocation is not supported by this browser.', 'Geolokasi tidak didukung oleh browser ini.'))
+      return
+    }
+
+    setGettingGps(true)
+    setError('')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLat = position.coords.latitude
+        const nextLong = position.coords.longitude
+        setLatitude(nextLat)
+        setLongitude(nextLong)
+        setGpsAccuracy(position.coords.accuracy)
+        setGpsCapturedAt(new Date().toISOString())
+
+        if (givenLatitude !== null && givenLongitude !== null) {
+          const distance = haversineDistance(givenLatitude, givenLongitude, nextLat, nextLong)
+          setDistanceMeters(distance)
+          setLocationMatch(distance <= LOCATION_LIMIT_METERS)
+        } else {
+          setDistanceMeters(null)
+          setLocationMatch(null)
+        }
+        setGettingGps(false)
+      },
+      (gpsError) => {
+        setError(tx(`Unable to capture location: ${gpsError.message}`, `Gagal mengambil lokasi: ${gpsError.message}`))
+        setGettingGps(false)
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    )
+  }
+
+  async function stampImage(file: File, capturedAt: string) {
+    if (latitude === null || longitude === null) {
+      throw new Error(tx('Capture location before adding new photos.', 'Ambil lokasi terlebih dahulu sebelum menambah foto baru.'))
+    }
+
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    try {
+      const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(bitmap.width, bitmap.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error(tx('Unable to process photo.', 'Foto tidak dapat diproses.'))
+
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+
+      const shortSide = Math.min(canvas.width, canvas.height)
+      const fontSize = Math.max(20, Math.min(40, Math.round(shortSide * 0.025)))
+      const padding = Math.max(18, Math.round(shortSide * 0.018))
+      const lineHeight = Math.round(fontSize * 1.4)
+      const timestamp = new Date(capturedAt).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour12: false,
+      })
+      const lines = [
+        `Lat: ${latitude.toFixed(7)}`,
+        `Lng: ${longitude.toFixed(7)}`,
+        `${tx('Edited', 'Edit')}: ${timestamp} WIB`,
+        `Visit: ${id}`,
+      ]
+      const overlayHeight = lineHeight * lines.length + padding * 2
+      const y = Math.max(0, canvas.height - overlayHeight)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.72)'
+      ctx.fillRect(0, y, canvas.width, overlayHeight)
+      ctx.fillStyle = '#fff'
+      ctx.font = `600 ${fontSize}px Arial, sans-serif`
+      ctx.textBaseline = 'top'
+      lines.forEach((line, index) => {
+        ctx.fillText(line, padding, y + padding + lineHeight * index, canvas.width - padding * 2)
+      })
+
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error(tx('Unable to save photo.', 'Foto tidak dapat disimpan.'))),
+          'image/jpeg',
+          0.84
+        )
+      })
+    } finally {
+      bitmap.close()
+    }
+  }
+
+  async function addPhoto(file: File | null) {
+    if (!file) return
+    if (latitude === null || longitude === null || !gpsCapturedAt) {
+      setError(tx('Capture location before adding new photos.', 'Ambil lokasi terlebih dahulu sebelum menambah foto baru.'))
+      return
+    }
+    if (newPhotos.length >= MAX_EDIT_PHOTOS) {
+      setError(tx('Maximum 5 new photos per edit.', 'Maksimal 5 foto baru per edit.'))
+      return
+    }
+
+    try {
+      const capturedAt = new Date().toISOString()
+      const stamped = await stampImage(file, capturedAt)
+      const preview = URL.createObjectURL(stamped)
+      setNewPhotos((current) => [...current, { file, stamped, preview, capturedAt }].slice(0, MAX_EDIT_PHOTOS))
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : tx('Unable to process photo.', 'Foto tidak dapat diproses.'))
+    }
+  }
+
+  async function addPhotoFiles(files: FileList | null) {
+    if (!files?.length) return
+    const remaining = MAX_EDIT_PHOTOS - newPhotos.length
+    for (const file of Array.from(files).slice(0, remaining)) {
+      await addPhoto(file)
+    }
+    if (files.length > remaining) {
+      setError(tx(
+        `Maximum 5 new photos. Only ${remaining} more photo(s) were accepted.`,
+        `Maksimal 5 foto baru. Hanya ${remaining} foto tambahan yang diterima.`
+      ))
+    }
+  }
+
+  function removeNewPhoto(index: number) {
+    setNewPhotos((current) => {
+      const removed = current[index]
+      if (removed) URL.revokeObjectURL(removed.preview)
+      return current.filter((_, itemIndex) => itemIndex !== index)
+    })
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -146,6 +319,44 @@ export default function EditVisitPage() {
     setSaving(true)
     setError('')
     const supabase = createClient()
+    const uploadedPaths: string[] = []
+
+    if (newPhotos.length > 0) {
+      if (latitude === null || longitude === null || !gpsCapturedAt) {
+        setError(tx('Capture location before uploading new photos.', 'Ambil lokasi terlebih dahulu sebelum mengunggah foto baru.'))
+        setSaving(false)
+        return
+      }
+
+      const safeVisitId = id.replace(/[^a-zA-Z0-9_-]/g, '_')
+      const batchId = Date.now()
+      for (let index = 0; index < newPhotos.length; index++) {
+        const filePath = `${row.agent_email}/${safeVisitId}/edit-${batchId}-${index + 1}-stamped.jpg`
+        const { error: uploadError } = await supabase.storage
+          .from('visit-evidence')
+          .upload(filePath, newPhotos[index].stamped, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+            upsert: false,
+          })
+
+        if (uploadError) {
+          if (uploadedPaths.length > 0) {
+            await supabase.storage.from('visit-evidence').remove(uploadedPaths)
+          }
+          setError(tx(`Photo upload failed: ${uploadError.message}`, `Upload foto gagal: ${uploadError.message}`))
+          setSaving(false)
+          return
+        }
+        uploadedPaths.push(filePath)
+      }
+    }
+
+    const previousPhotoUrls = Array.isArray(row.visit_photo_urls)
+      ? row.visit_photo_urls.filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+      : (row.visit_photo_url ? [row.visit_photo_url] : [])
+    const combinedPhotoUrls = [...previousPhotoUrls, ...uploadedPaths]
+
     const payload = {
       visit_status_kunjungan: form.visit_status_kunjungan,
       conversation_result: form.conversation_result,
@@ -158,6 +369,14 @@ export default function EditVisitPage() {
       updated_phone: form.updated_phone.trim() || null,
       speed_test_download_mbps: downloadValue,
       speed_test_upload_mbps: uploadValue,
+      latitude,
+      longitude,
+      gps_accuracy: gpsAccuracy,
+      gps_captured_at: gpsCapturedAt,
+      distance_to_customer_meters: distanceMeters,
+      location_match: locationMatch,
+      visit_photo_url: combinedPhotoUrls[0] || null,
+      visit_photo_urls: combinedPhotoUrls,
     }
 
     const { data: updatedVisit, error: visitError } = await supabase
@@ -168,6 +387,9 @@ export default function EditVisitPage() {
       .maybeSingle()
 
     if (visitError || !updatedVisit) {
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from('visit-evidence').remove(uploadedPaths)
+      }
       setError(visitError?.message || 'Visit could not be updated.')
       setSaving(false)
       return
@@ -244,8 +466,8 @@ export default function EditVisitPage() {
             <MapPin className="h-5 w-5 shrink-0" />
             <span className="text-sm">
               {tx(
-                'You are editing the submitted visit. GPS and uploaded evidence stay attached to the original visit.',
-                'Anda sedang mengedit kunjungan yang sudah dikirim. GPS dan bukti foto tetap terhubung ke kunjungan awal.'
+                'You can recapture GPS and add new evidence photos. Existing evidence will stay attached.',
+                'Anda dapat mengambil ulang GPS dan menambahkan foto bukti baru. Bukti lama tetap tersimpan.'
               )}
             </span>
           </div>
@@ -262,15 +484,6 @@ export default function EditVisitPage() {
       {row && (
         <form onSubmit={submit} className="space-y-4">
           <StepCard step="1" title={t('agent.visit.step1')}>
-            <div className="dui-alert dui-alert-info">
-              <MapPin className="h-5 w-5 shrink-0" />
-              <span className="text-sm">
-                {tx(
-                  'The original GPS point is kept. You can update only the visit address below.',
-                  'Titik GPS awal tetap digunakan. Anda hanya dapat memperbarui alamat kunjungan di bawah.'
-                )}
-              </span>
-            </div>
             <Field label={tx('Visit address', 'Alamat kunjungan')}>
               <textarea
                 className="dui-textarea w-full"
@@ -280,6 +493,58 @@ export default function EditVisitPage() {
                 placeholder={tx('Customer visit address', 'Alamat kunjungan pelanggan')}
               />
             </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <ReadOnly label={tx('Given latitude', 'Latitude pelanggan')} value={givenLatitude == null ? '—' : givenLatitude.toFixed(7)} />
+              <ReadOnly label={tx('Given longitude', 'Longitude pelanggan')} value={givenLongitude == null ? '—' : givenLongitude.toFixed(7)} />
+            </div>
+
+            <button
+              type="button"
+              className="dui-btn dui-btn-primary w-full"
+              onClick={captureGps}
+              disabled={gettingGps || saving}
+            >
+              <Navigation className="h-5 w-5" />
+              {gettingGps
+                ? tx('Capturing location...', 'Mengambil lokasi...')
+                : tx('Capture New Location', 'Ambil Lokasi Baru')}
+            </button>
+
+            {latitude !== null && longitude !== null && (
+              <>
+                <div className="dui-alert dui-alert-success">
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
+                  <span>{tx('Location ready for this edit.', 'Lokasi siap digunakan untuk edit ini.')}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <ReadOnly label={tx('Latitude', 'Latitude')} value={latitude.toFixed(7)} />
+                  <ReadOnly label={tx('Longitude', 'Longitude')} value={longitude.toFixed(7)} />
+                  <ReadOnly label={tx('Accuracy', 'Akurasi')} value={gpsAccuracy == null ? '—' : `${gpsAccuracy.toFixed(1)} m`} />
+                  <ReadOnly
+                    label={tx('Captured at', 'Diambil pada')}
+                    value={gpsCapturedAt ? new Date(gpsCapturedAt).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta', hour12: false }) + ' WIB' : '—'}
+                  />
+                </div>
+                {distanceMeters !== null && (
+                  <div className={locationMatch ? 'dui-alert dui-alert-success' : 'dui-alert dui-alert-warning'}>
+                    {locationMatch ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertTriangle className="h-5 w-5 shrink-0" />}
+                    <span>
+                      {tx('Distance from customer location', 'Jarak dari lokasi pelanggan')}: <strong>{distanceMeters.toFixed(1)} m</strong>
+                    </span>
+                  </div>
+                )}
+                <a
+                  href={`https://www.google.com/maps?q=${latitude},${longitude}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="dui-btn dui-btn-outline w-full"
+                >
+                  <MapPin className="h-5 w-5" />
+                  {tx('Open in Maps', 'Buka di Maps')}
+                </a>
+              </>
+            )}
           </StepCard>
 
           <StepCard step="2" title={t('agent.visit.step2')}>
@@ -303,11 +568,83 @@ export default function EditVisitPage() {
               <CheckCircle2 className="h-5 w-5 shrink-0" />
               <span className="text-sm">
                 {tx(
-                  'Existing visit photos remain unchanged. You can update the measured speed result here.',
-                  'Foto kunjungan yang sudah ada tidak berubah. Anda dapat memperbarui hasil speed test di sini.'
+                  'Existing visit photos are kept. New photos will be added to the same visit and stamped with the captured location.',
+                  'Foto kunjungan lama tetap disimpan. Foto baru akan ditambahkan ke kunjungan yang sama dan diberi stamp lokasi yang diambil.'
                 )}
               </span>
             </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className={`dui-btn dui-btn-primary w-full cursor-pointer ${latitude === null || longitude === null ? 'dui-btn-disabled' : ''}`}>
+                <Camera className="h-5 w-5" />
+                {tx('Take New Photo', 'Ambil Foto Baru')}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  disabled={latitude === null || longitude === null || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
+                  onChange={(event) => {
+                    void addPhoto(event.target.files?.[0] || null)
+                    event.currentTarget.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <label className={`dui-btn dui-btn-outline w-full cursor-pointer ${latitude === null || longitude === null ? 'dui-btn-disabled' : ''}`}>
+                <Camera className="h-5 w-5" />
+                {tx('Choose Photos', 'Pilih Foto')}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={latitude === null || longitude === null || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
+                  onChange={(event) => {
+                    void addPhotoFiles(event.target.files)
+                    event.currentTarget.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {(latitude === null || longitude === null) && (
+              <div className="dui-alert dui-alert-warning">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <span>{tx('Capture location before adding new photos.', 'Ambil lokasi terlebih dahulu sebelum menambah foto baru.')}</span>
+              </div>
+            )}
+
+            {newPhotos.length > 0 && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {newPhotos.map((photo, index) => (
+                  <div key={photo.preview} className="rounded-box border border-base-300 bg-base-100 p-3">
+                    <img src={photo.preview} alt={tx(`New visit photo ${index + 1}`, `Foto kunjungan baru ${index + 1}`)} className="aspect-[4/3] w-full rounded-box object-cover" />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-xs text-base-content/60">
+                        {tx('New photo', 'Foto baru')} {index + 1}/{MAX_EDIT_PHOTOS}
+                      </span>
+                      <button
+                        type="button"
+                        className="dui-btn dui-btn-error dui-btn-xs"
+                        onClick={() => removeNewPhoto(index)}
+                        disabled={saving}
+                      >
+                        {tx('Remove', 'Hapus')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-base-content/60">
+              {tx(
+                `${newPhotos.length}/${MAX_EDIT_PHOTOS} new photos selected. They will be appended when you save changes.`,
+                `${newPhotos.length}/${MAX_EDIT_PHOTOS} foto baru dipilih. Foto akan ditambahkan saat Simpan Perubahan.`
+              )}
+            </p>
+
+            <div className="divider my-1" />
 
             <div className="grid gap-3 sm:grid-cols-3">
               <ReadOnly
