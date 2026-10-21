@@ -47,6 +47,7 @@ export default function EditVisitPage() {
   const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null)
   const [distanceMeters, setDistanceMeters] = useState<number | null>(null)
   const [locationMatch, setLocationMatch] = useState<boolean | null>(null)
+  const [locationCapturedThisEdit, setLocationCapturedThisEdit] = useState(false)
   const [givenLatitude, setGivenLatitude] = useState<number | null>(null)
   const [givenLongitude, setGivenLongitude] = useState<number | null>(null)
   const [newPhotos, setNewPhotos] = useState<NewVisitPhoto[]>([])
@@ -159,6 +160,7 @@ export default function EditVisitPage() {
         setLongitude(nextLong)
         setGpsAccuracy(position.coords.accuracy)
         setGpsCapturedAt(new Date().toISOString())
+        setLocationCapturedThisEdit(true)
 
         if (givenLatitude !== null && givenLongitude !== null) {
           const distance = haversineDistance(givenLatitude, givenLongitude, nextLat, nextLong)
@@ -233,8 +235,8 @@ export default function EditVisitPage() {
 
   async function addPhoto(file: File | null) {
     if (!file) return
-    if (latitude === null || longitude === null || !gpsCapturedAt) {
-      setError(tx('Capture location before adding new photos.', 'Ambil lokasi terlebih dahulu sebelum menambah foto baru.'))
+    if (!locationCapturedThisEdit || latitude === null || longitude === null || !gpsCapturedAt) {
+      setError(tx('Capture a new location before adding new photos.', 'Ambil lokasi baru terlebih dahulu sebelum menambah foto baru.'))
       return
     }
     if (newPhotos.length >= MAX_EDIT_PHOTOS) {
@@ -322,8 +324,8 @@ export default function EditVisitPage() {
     const uploadedPaths: string[] = []
 
     if (newPhotos.length > 0) {
-      if (latitude === null || longitude === null || !gpsCapturedAt) {
-        setError(tx('Capture location before uploading new photos.', 'Ambil lokasi terlebih dahulu sebelum mengunggah foto baru.'))
+      if (!locationCapturedThisEdit || latitude === null || longitude === null || !gpsCapturedAt) {
+        setError(tx('Capture a new location before uploading new photos.', 'Ambil lokasi baru terlebih dahulu sebelum mengunggah foto baru.'))
         setSaving(false)
         return
       }
@@ -515,7 +517,9 @@ export default function EditVisitPage() {
               <>
                 <div className="dui-alert dui-alert-success">
                   <CheckCircle2 className="h-5 w-5 shrink-0" />
-                  <span>{tx('Location ready for this edit.', 'Lokasi siap digunakan untuk edit ini.')}</span>
+                  <span>{locationCapturedThisEdit
+                    ? tx('New location captured for this edit.', 'Lokasi baru berhasil diambil untuk edit ini.')
+                    : tx('Saved location from the original visit.', 'Lokasi tersimpan dari kunjungan awal.')}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <ReadOnly label={tx('Latitude', 'Latitude')} value={latitude.toFixed(7)} />
@@ -568,21 +572,26 @@ export default function EditVisitPage() {
               <CheckCircle2 className="h-5 w-5 shrink-0" />
               <span className="text-sm">
                 {tx(
-                  'Existing visit photos are kept. New photos will be added to the same visit and stamped with the captured location.',
-                  'Foto kunjungan lama tetap disimpan. Foto baru akan ditambahkan ke kunjungan yang sama dan diberi stamp lokasi yang diambil.'
+                  'Existing visit photos are kept. Capture a new location first, then add up to 5 new photos to the same visit.',
+                  'Foto kunjungan lama tetap disimpan. Ambil lokasi baru terlebih dahulu, lalu tambahkan maksimal 5 foto baru ke kunjungan yang sama.'
                 )}
               </span>
             </div>
 
+            <ReadOnly
+              label={tx('Existing evidence photos', 'Foto bukti yang sudah ada')}
+              value={String(Array.isArray(row.visit_photo_urls) ? row.visit_photo_urls.length : (row.visit_photo_url ? 1 : 0))}
+            />
+
             <div className="grid gap-2 sm:grid-cols-2">
-              <label className={`dui-btn dui-btn-primary w-full cursor-pointer ${latitude === null || longitude === null ? 'dui-btn-disabled' : ''}`}>
+              <label className={`dui-btn dui-btn-primary w-full cursor-pointer ${!locationCapturedThisEdit ? 'dui-btn-disabled' : ''}`}>
                 <Camera className="h-5 w-5" />
                 {tx('Take New Photo', 'Ambil Foto Baru')}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   capture="environment"
-                  disabled={latitude === null || longitude === null || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
+                  disabled={!locationCapturedThisEdit || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
                   onChange={(event) => {
                     void addPhoto(event.target.files?.[0] || null)
                     event.currentTarget.value = ''
@@ -590,14 +599,14 @@ export default function EditVisitPage() {
                   className="hidden"
                 />
               </label>
-              <label className={`dui-btn dui-btn-outline w-full cursor-pointer ${latitude === null || longitude === null ? 'dui-btn-disabled' : ''}`}>
+              <label className={`dui-btn dui-btn-outline w-full cursor-pointer ${!locationCapturedThisEdit ? 'dui-btn-disabled' : ''}`}>
                 <Camera className="h-5 w-5" />
                 {tx('Choose Photos', 'Pilih Foto')}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   multiple
-                  disabled={latitude === null || longitude === null || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
+                  disabled={!locationCapturedThisEdit || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
                   onChange={(event) => {
                     void addPhotoFiles(event.target.files)
                     event.currentTarget.value = ''
@@ -607,10 +616,10 @@ export default function EditVisitPage() {
               </label>
             </div>
 
-            {(latitude === null || longitude === null) && (
+            {!locationCapturedThisEdit && (
               <div className="dui-alert dui-alert-warning">
                 <AlertTriangle className="h-5 w-5 shrink-0" />
-                <span>{tx('Capture location before adding new photos.', 'Ambil lokasi terlebih dahulu sebelum menambah foto baru.')}</span>
+                <span>{tx('Capture a new location before adding new photos.', 'Ambil lokasi baru terlebih dahulu sebelum menambah foto baru.')}</span>
               </div>
             )}
 
