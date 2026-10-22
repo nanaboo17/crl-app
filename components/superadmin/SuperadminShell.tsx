@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import SuperadminSidebar from './SuperadminSidebar'
 import SuperadminNavbar from './SuperadminNavbar'
 import GlobalBackButtonFix from '@/components/navigation/GlobalBackButtonFix'
+import NavigationProgress from '@/components/navigation/NavigationProgress'
 import {
   adminConfig,
   agentConfig,
@@ -74,6 +75,7 @@ export default function SuperadminShell({
   return (
     <div className={`${routeFullscreen ? "h-[100dvh] overflow-hidden" : "min-h-screen"} ${playful ? shellTheme.shell : 'bg-base-200'}`}>
       <GlobalBackButtonFix />
+      <NavigationProgress />
 
       <aside
         aria-label={`${config.role} sidebar`}
