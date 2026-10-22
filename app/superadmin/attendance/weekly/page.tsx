@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import WeeklyAttendanceNavigation from '@/components/superadmin/WeeklyAttendanceNavigation'
 
 const TIMEZONE = 'Asia/Jakarta'
 type Status = 'on_time' | 'late' | 'sick' | 'permission' | 'pending' | 'not_checked_in' | 'unscheduled'
@@ -79,11 +79,11 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
     <SuperadminPageHeader breadcrumbs={[{label:'Superadmin',href:'/superadmin'},{label:'Attendance',href:'/superadmin/attendance'},{label:'Weekly'}]} title="Weekly Attendance Monitoring" description="Ringkasan kehadiran mingguan agent, termasuk Sakit dan Izin yang disetujui."/>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Link href="/superadmin/attendance" className="text-sm font-semibold text-primary hover:underline">← Daily Attendance</Link>
-      <div className="flex flex-wrap gap-2">
-        <Link href={qs(addDays(start,-7))} className="dui-btn dui-btn-outline dui-btn-sm"><ChevronLeft size={16}/> Previous</Link>
-        <span className="dui-btn dui-btn-ghost dui-btn-sm pointer-events-none"><CalendarDays size={16}/>{formatDate(start)} – {formatDate(end)}</span>
-        <Link href={qs(addDays(start,7))} className="dui-btn dui-btn-outline dui-btn-sm">Next <ChevronRight size={16}/></Link>
-      </div>
+      <WeeklyAttendanceNavigation
+        previousHref={qs(addDays(start,-7))}
+        nextHref={qs(addDays(start,7))}
+        dateLabel={`${formatDate(start)} – ${formatDate(end)}`}
+      />
     </div>
     <form className="flex flex-wrap items-end gap-3 rounded-xl border border-base-300 bg-base-100 p-4">
       <label className="grid gap-1 text-sm font-medium">Week containing<input type="date" name="week" defaultValue={raw} className="dui-input dui-input-bordered"/></label>
