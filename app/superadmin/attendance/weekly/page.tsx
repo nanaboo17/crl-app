@@ -100,13 +100,20 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
         <table className="w-full min-w-[1050px] border-separate border-spacing-0 text-xs sm:text-sm">
           <thead><tr className="bg-base-200 text-base-content/70"><th scope="col" className="sticky left-0 z-20 min-w-48 border-b border-r border-base-300 bg-base-200 p-3 text-left">Agent</th>
             {days.map(day=><th scope="col" key={day} className="min-w-28 border-b border-base-300 p-2 text-center">{formatDate(day)}<div className="text-[10px] font-normal">{new Intl.DateTimeFormat('en-GB',{weekday:'short',timeZone:'UTC'}).format(new Date(day+'T00:00:00Z'))}</div></th>)}
-            <th colSpan={5} className="border-b border-l border-base-300 px-2 text-center">Weekly totals</th></tr></thead>
+            <th colSpan={5} className="border-b border-l border-base-300 px-2 py-3 text-center">Weekly totals</th></tr>
+          <tr className="bg-base-200/70 text-xs">
+            <th className="sticky left-0 z-20 border-b border-r border-base-300 bg-base-200/90" />
+            {days.map(day=><th key={day} className="border-b border-base-300" />)}
+            {(['on_time','late','sick','permission','not_checked_in'] as const).map(k=>
+              <th scope="col" key={k} className={`min-w-24 border-b border-l border-base-300 px-2 py-3 text-center font-semibold ${colors[k]}`}>{labels[k]}</th>
+            )}
+          </tr></thead>
           <tbody>{summaries.map(({agent,cells,totals})=><tr key={agent.email} className="hover:bg-base-200/30">
             <th scope="row" className="sticky left-0 z-10 max-w-52 border-b border-r border-base-300 bg-base-100 p-3 text-left font-medium"><span className="block truncate">{agent.agent_name||agent.email}</span><span className="block truncate text-[11px] font-normal text-base-content/50" title={agent.email}>{agent.email}</span></th>
             {cells.map((c,i)=><td key={days[i]} className="border-b border-base-300 p-1 text-center"><span title={c.hint} className={`flex min-h-12 items-center justify-center rounded-lg px-1.5 py-2 font-semibold ring-1 ${colors[c.status]}`}>{c.value}</span></td>)}
-            {(['on_time','late','sick','permission','not_checked_in'] as const).map(k=><td key={k} title={labels[k]} className="border-b border-l border-base-300 px-3 text-center font-semibold tabular-nums">{totals[k]}</td>)}
+            {(['on_time','late','sick','permission','not_checked_in'] as const).map(k=><td key={k} title={labels[k]} className={`border-b border-l border-base-300 px-3 text-center font-semibold tabular-nums ${colors[k]}`}>{totals[k]}</td>)}
           </tr>)}</tbody>
-          <tfoot><tr className="bg-base-200 text-xs">{Array.from({length:8},(_,i)=><td key={i} className="px-2 py-2">{i===0?'Totals: On Time · Late · Sick · Izin · Missing':''}</td>)}{(['on_time','late','sick','permission','not_checked_in'] as const).map(k=><td key={k} title={labels[k]} className="border-l border-base-300 p-2 text-center font-bold">{summaries.reduce((sum,s)=>sum+s.totals[k],0)}</td>)}</tr></tfoot>
+          <tfoot><tr className="bg-base-200 text-xs">{Array.from({length:8},(_,i)=><td key={i} className="px-2 py-2">{i===0?'Totals: On Time · Late · Sick · Izin · Missing':''}</td>)}{(['on_time','late','sick','permission','not_checked_in'] as const).map(k=><td key={k} title={labels[k]} className={`border-l border-base-300 p-2 text-center font-bold ${colors[k]}`}>{summaries.reduce((sum,s)=>sum+s.totals[k],0)}</td>)}</tr></tfoot>
         </table>
       </div>
     </section>
