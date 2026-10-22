@@ -111,7 +111,7 @@ export default function VisitDetailPage() {
       <section className={styles.doneCard}>
         <Pencil />
         <div><strong>{tx('You can edit this visit record.', 'Catatan kunjungan ini dapat diedit.')}</strong><span>{tx('GPS and evidence photo will remain attached unless the visit is redone separately.', 'GPS dan foto bukti tetap tersimpan kecuali kunjungan dilakukan ulang secara terpisah.')}</span></div>
-        <Link className={styles.mapButton} href={`/agent/visits/${encodeURIComponent(row.visit_id)}/edit`}>{tx('Edit Visit', 'Edit Kunjungan')}</Link>
+        <Link className={styles.mapButton} href={`/agent/customers/${encodeURIComponent(row.crl_id)}/visit`}>{tx('New Visit', 'Kunjungan Baru')}</Link>
       </section>
 
       <section className={styles.summaryGrid}>
