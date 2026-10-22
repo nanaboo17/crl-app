@@ -637,7 +637,8 @@ export default function VisitPage() {
     const customerUpdate: Record<string, string> = {
       visit_status: 'Visited',
       customer_status: '5. Visited',
-      payment_status: conversationResult === 'Sudah melakukan pembayaran' ? 'paid' : 'unpaid',
+      // Never downgrade a confirmed payment because of a follow-up visit.
+      ...(conversationResult === 'Sudah melakukan pembayaran' ? { payment_status: 'paid' } : {}),
     }
     if (correctedPhone) customerUpdate.phone_number = correctedPhone
 
