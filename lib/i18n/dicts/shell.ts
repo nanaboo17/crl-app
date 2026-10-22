@@ -27,6 +27,7 @@ export const shellMessages = defineMessages({
   'nav.preVisits': { en: 'Pre-Visits', id: 'Pra-Kunjungan' },
   'nav.visits': { en: 'Visits', id: 'Kunjungan' },
   'nav.attendance': { en: 'Attendance', id: 'Kehadiran' },
+  'nav.leave': { en: 'Sick / Permission', id: 'Sakit / Izin' },
   'nav.reports': { en: 'Reports', id: 'Laporan' },
   'nav.cms': { en: 'CMS', id: 'CMS' },
   'nav.route': { en: 'Route', id: 'Rute' },
