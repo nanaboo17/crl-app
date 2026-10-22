@@ -4,6 +4,7 @@ import { AlertCircle, ClipboardCheck, ClipboardList, Eye, Inbox, RefreshCcw, Use
 import { createClient } from '@/lib/supabase-server'
 import { cacheGetOrSet } from '@/lib/redis-cache'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import ActivityViewPicker from '@/components/superadmin/ActivityViewPicker'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import SuperadminPagination from '@/components/superadmin/SuperadminPagination'
 import { getLocale } from '@/lib/i18n/server'
@@ -21,6 +22,7 @@ type PreVisitCache = { agents: AgentRow[]; preVisits: PreVisitRow[]; totalPreVis
 
 export default async function AdminPreVisitsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
+  const mode = typeof params.mode === 'string' ? params.mode : ''
   const requestedPage = Math.max(1, Math.floor(Number(params.page) || 1))
   const rawFilter = typeof params.filter === 'string' ? params.filter : 'all'
   const filter: PreVisitFilter = ['all', 'ready', 'followup', 'direct', 'rescheduled', 'stopped', 'none'].includes(rawFilter) ? rawFilter as PreVisitFilter : 'all'
@@ -70,8 +72,11 @@ export default async function AdminPreVisitsPage({ searchParams }: { searchParam
 
   const agentHref = (agentEmail: string) => `/superadmin/pre-visits/${encodeURIComponent(agentEmail)}?filter=${filter}`
 
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+
   return (
     <div className={styles.page}>
+      {mode !== 'agent' && <ActivityViewPicker kind="pre-visits" today={today} locale={locale} />}
       <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.preVisits') }]} title={t('superadmin.preVisits.title')} description={t('superadmin.preVisits.description')} />
       <section className={styles.hero}><div><p className={styles.heroEyebrow}>{tx('PRE-VISIT CONTROL', 'KONTROL PRA-KUNJUNGAN')}</p><h2>{tx('Keep every field visit prepared and on track.', 'Pastikan setiap kunjungan lapangan siap dan terarah.')}</h2><p>{tx('Review agent preparation, follow-up demand, and readiness before the team reaches the customer.', 'Pantau persiapan agen, kebutuhan tindak lanjut, dan kesiapan sebelum tim menemui pelanggan.')}</p></div><div className={styles.heroScene} aria-hidden="true"><div className={styles.heroChecklist}>✓</div><div className={styles.heroPath} /><div className={styles.heroPin}>📍</div></div></section>
       <section className={styles.summaryGrid} aria-label={tx('Pre-visit summary', 'Ringkasan pra-kunjungan')}><div className={`${styles.summaryCard} ${styles.purple}`}><div><span>{t('superadmin.preVisits.totalAgents')}</span><strong>{allAgents.length}</strong></div><div className={styles.summaryIcon}><Users /></div></div><div className={`${styles.summaryCard} ${styles.yellow}`}><div><span>{t('superadmin.preVisits.totalPreVisits')}</span><strong>{summary.totalPreVisits}</strong></div><div className={styles.summaryIcon}><ClipboardList /></div></div><div className={`${styles.summaryCard} ${styles.green}`}><div><span>{tx('Ready for Visit', 'Siap Dikunjungi')}</span><strong>{readyCount}</strong></div><div className={styles.summaryIcon}><ClipboardCheck /></div></div><div className={`${styles.summaryCard} ${styles.orange}`}><div><span>{tx('Need Follow-up', 'Perlu Tindak Lanjut')}</span><strong>{followUpCount}</strong></div><div className={styles.summaryIcon}><RefreshCcw /></div></div></section>
