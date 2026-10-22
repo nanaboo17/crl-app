@@ -36,8 +36,6 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
     .select('crl_id,customer_id,customer_name,phone_number,service_address,agent_email,payment_status,visit_status')
     .eq(customerLookupColumn, decodedCustomerId)
     .eq('agent_email', email)
-    .order('visit_date', { ascending: false })
-    .limit(1)
     .maybeSingle()
 
   if (!customer) return <ErrorBlock message={t('agent.visitResult.notFound')} backHref={`/agent/customers/${encodeURIComponent(decodedCustomerId)}`} t={t} />
@@ -47,6 +45,8 @@ export default async function VisitResultPage({ params }: { params: Promise<{ cu
     .select('*')
     .eq('crl_id', customer.crl_id)
     .eq('agent_email', email)
+    .order('visit_date', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (error || !visit) return <ErrorBlock message={t('agent.visitResult.resultNotFound')} backHref={`/agent/customers/${encodeURIComponent(decodedCustomerId)}`} t={t} />
