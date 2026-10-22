@@ -87,14 +87,6 @@
   background: linear-gradient(180deg, #cce9a8, #aad57d);
 }
 
-.heroPeople {
-  position: absolute;
-  right: 1.25rem;
-  bottom: 1rem;
-  font-size: clamp(2.3rem, 6vw, 4.7rem);
-  filter: drop-shadow(0 8px 12px rgba(70, 62, 91, .12));
-}
-
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -302,8 +294,13 @@
 
 @media (max-width: 767px) {
   .page { padding: 1rem; gap: 1rem; }
-  .heroCard { grid-template-columns: 1fr; min-height: 0; padding: 1.25rem; }
-  .heroVisual { min-height: 7.5rem; }
+  .heroCard { grid-template-columns: 1fr; min-height: 0; padding: 1rem 1.1rem; gap: .35rem; border-radius: 1.4rem; }
+  .heroCard h2 { font-size: 1.2rem; line-height: 1.2; max-width: 22rem; margin: .3rem 0; }
+  .heroCard p { font-size: .79rem; line-height: 1.45; max-width: 23rem; }
+  .heroEyebrow { font-size: .61rem; }
+  .heroVisual { min-height: 3.2rem; }
+  .heroSun { width: 2.5rem; height: 2.5rem; top: -.25rem; right: 1rem; }
+  .heroHill { height: 5rem; bottom: -4rem; right: -1.1rem; width: 110%; }
   .statsGrid { grid-template-columns: 1fr 1fr; gap: .75rem; }
   .summaryCard { min-height: 9.5rem; padding: .95rem; border-radius: 1.2rem; }
   .summaryCard strong { font-size: 1.65rem; }
@@ -317,5 +314,4 @@
   .statsGrid { grid-template-columns: 1fr; }
   .mobileTop { display: grid; }
   .mobileMeta { grid-template-columns: 1fr; }
-  .heroPeople { font-size: 3rem; }
 }
