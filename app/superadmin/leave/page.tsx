@@ -56,12 +56,16 @@ export default function LeaveApprovalsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [evidenceBusy, setEvidenceBusy] = useState<string|null>(null)
+  const [success, setSuccess] = useState('')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
   async function reload() {
+    setRefreshing(true)
     const sb = createClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user?.email) {
@@ -74,6 +78,7 @@ export default function LeaveApprovalsPage() {
     if (requestError) setError(requestError.message)
     else { setRows((data || []) as LeaveRequest[]); setError('') }
     setLoading(false)
+    setRefreshing(false)
   }
 
   useEffect(() => { void reload() }, [])
@@ -91,8 +96,10 @@ export default function LeaveApprovalsPage() {
   ), [rows, filter, search])
 
   async function decide(id: string, decision: 'approved' | 'rejected', reason: string | null = null) {
+    if(busy)return
     setBusy(id)
     setError('')
+    setSuccess('')
     try {
       const { error: reviewError } = await createClient().rpc('crl_review_leave_request', {
         p_request_id: id, p_decision: decision, p_reason: reason,
@@ -101,6 +108,7 @@ export default function LeaveApprovalsPage() {
       setRejectId(null)
       setRejectReason('')
       await reload()
+      setSuccess(decision==='approved'?tx('Pengajuan berhasil disetujui.','Request approved successfully.'):tx('Pengajuan berhasil ditolak.','Request rejected successfully.'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memproses pengajuan.')
     } finally {
@@ -109,9 +117,13 @@ export default function LeaveApprovalsPage() {
   }
 
   async function viewEvidence(path: string) {
-    const { data, error: fileError } = await createClient().storage.from('leave-evidence').createSignedUrl(path, 60)
-    if (fileError || !data?.signedUrl) { setError(fileError?.message || 'Bukti tidak tersedia.'); return }
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    if(evidenceBusy)return
+    setEvidenceBusy(path)
+    try {
+      const { data, error: fileError } = await createClient().storage.from('leave-evidence').createSignedUrl(path, 60)
+      if (fileError || !data?.signedUrl) { setError(fileError?.message || 'Bukti tidak tersedia.'); return }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } finally {setEvidenceBusy(null)}
   }
 
   return (
@@ -124,7 +136,7 @@ export default function LeaveApprovalsPage() {
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{tx('Persetujuan Sakit & Izin','Sick & Permission Approvals')}</h1>
             <p className="max-w-2xl text-sm text-base-content/65">{tx('Tinjau pengajuan, lihat dokumen pendukung secara privat, dan kelola persetujuan agent sesuai kewenangan.','Review requests, view private supporting documents, and manage approvals within your permissions.')}</p>
           </div>
-          <button onClick={() => void reload()} className="dui-btn dui-btn-outline dui-btn-sm">{tx('Refresh data','Refresh data')}</button>
+          <button onClick={() => void reload()} disabled={refreshing||!!busy} aria-busy={refreshing} className="dui-btn dui-btn-outline dui-btn-sm">{refreshing?<><span className="dui-loading dui-loading-spinner dui-loading-xs"/>{tx('Memuat…','Refreshing…')}</>:tx('Refresh data','Refresh data')}</button>
         </div>
       </div>
 
@@ -160,6 +172,7 @@ export default function LeaveApprovalsPage() {
           </div>
         </div>
 
+        {success && <p className="m-4 rounded-xl bg-success/10 p-3 text-sm text-success" role="status">{success}</p>}
         {error && <p className="m-4 rounded-xl bg-error/10 p-3 text-sm text-error" role="alert">{error}</p>}
         {loading ? <div className="p-10 text-center text-sm text-base-content/60">Memuat pengajuan…</div> :
           visible.length === 0 ? <div className="p-10 text-center text-sm text-base-content/60">Tidak ada pengajuan yang cocok.</div> :
@@ -187,11 +200,11 @@ export default function LeaveApprovalsPage() {
                     <td className="whitespace-nowrap p-3">{dateRange(r.start_date,r.end_date)}<p className="mt-1 text-xs text-base-content/55">{duration(r.start_date,r.end_date)}</p></td>
                     <td className="max-w-60 whitespace-pre-wrap break-words p-3">{r.reason}{r.rejection_reason&&<p className="mt-2 text-xs text-error">{tx('Ditolak','Rejected')}: {r.rejection_reason}</p>}</td>
                     <td className="p-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyles[r.status]}`}>{tx(statusLabels[r.status],{pending:'Pending',approved:'Approved',rejected:'Rejected',cancelled:'Cancelled'}[r.status])}</span></td>
-                    <td className="p-3">{r.evidence_path?<button className="dui-btn dui-btn-outline dui-btn-xs" onClick={()=>void viewEvidence(r.evidence_path!)}><FileText size={14}/>{tx('Lihat','View')}</button>:'—'}</td>
+                    <td className="p-3">{r.evidence_path?<button className="dui-btn dui-btn-outline dui-btn-xs" disabled={!!evidenceBusy} aria-busy={evidenceBusy===r.evidence_path} onClick={()=>void viewEvidence(r.evidence_path!)}>{evidenceBusy===r.evidence_path?<span className="dui-loading dui-loading-spinner dui-loading-xs"/>:<FileText size={14}/>} {evidenceBusy===r.evidence_path?tx('Memuat…','Opening…'):tx('Lihat','View')}</button>:'—'}</td>
                     <td className="p-3">{r.status==='pending'?
                       <div className="flex flex-col gap-2">
-                        <button disabled={busy===r.id} className="dui-btn dui-btn-success dui-btn-xs" onClick={()=>void decide(r.id,'approved')}>{tx('Setujui','Approve')}</button>
-                        <button disabled={busy===r.id} className="dui-btn dui-btn-outline dui-btn-error dui-btn-xs" onClick={()=>{setRejectId(r.id);setRejectReason('')}}>{tx('Tolak','Reject')}</button>
+                        <button disabled={!!busy||refreshing} aria-busy={busy===r.id} className="dui-btn dui-btn-success dui-btn-xs" onClick={()=>void decide(r.id,'approved')}>{busy===r.id?<><span className="dui-loading dui-loading-spinner dui-loading-xs"/>{tx('Memproses…','Processing…')}</>:tx('Setujui','Approve')}</button>
+                        <button disabled={!!busy||refreshing} className="dui-btn dui-btn-outline dui-btn-error dui-btn-xs" onClick={()=>{setRejectId(r.id);setRejectReason('')}}>{tx('Tolak','Reject')}</button>
                       </div>:<span className="text-base-content/40">—</span>}</td>
                   </tr>
                 ))}
@@ -208,7 +221,7 @@ export default function LeaveApprovalsPage() {
           <textarea className="dui-textarea dui-textarea-bordered mt-4 w-full" rows={3} minLength={5} maxLength={1000} autoFocus value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Alasan penolakan (minimal 5 karakter)"/>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" className="dui-btn dui-btn-ghost" onClick={() => setRejectId(null)}>{tx('Batal','Cancel')}</button>
-            <button type="button" className="dui-btn dui-btn-error" disabled={rejectReason.trim().length < 5 || busy === rejectId} onClick={() => void decide(rejectId, 'rejected', rejectReason)}>{tx('Tolak pengajuan','Reject request')}</button>
+            <button type="button" className="dui-btn dui-btn-error" disabled={rejectReason.trim().length < 5 || !!busy} aria-busy={!!busy} onClick={() => void decide(rejectId, 'rejected', rejectReason)}>{busy?<><span className="dui-loading dui-loading-spinner dui-loading-xs"/>{tx('Memproses…','Processing…')}</>:tx('Tolak pengajuan','Reject request')}</button>
           </div>
         </div>
       </div>}
