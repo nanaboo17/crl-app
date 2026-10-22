@@ -1,3 +1,11 @@
+/* Layer order declared BEFORE the tailwind import so "legacy" (the original
+   handwritten classes below) sits between base and components — daisyUI and
+   Tailwind utilities can then override it, instead of the old unlayered rules
+   hijacking .btn/.card/.avatar/.input. */
+@layer theme, base, legacy, components, utilities;
+
+@import "tailwindcss";
+
 /* Indosat brand typography: files are served from /public/fonts. */
 @font-face {
   font-family: 'Indosat';
@@ -25,13 +33,6 @@
   --font-sans: 'Indosat', ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Layer order declared BEFORE the tailwind import so "legacy" (the original
-   handwritten classes below) sits between base and components — daisyUI and
-   Tailwind utilities can then override it, instead of the old unlayered rules
-   hijacking .btn/.card/.avatar/.input. */
-@layer theme, base, legacy, components, utilities;
-
-@import "tailwindcss";
 
 @plugin "daisyui" {
   prefix: "dui-";
@@ -848,3 +849,10 @@ textarea { min-height: 108px; resize: vertical; }
 }
 
 } /* end @layer legacy */
+
+/* Apply Indosat consistently to DaisyUI widgets and form controls. */
+@layer base {
+  html, body, button, input, select, textarea, option {
+    font-family: 'Indosat', ui-sans-serif, system-ui, sans-serif;
+  }
+}
