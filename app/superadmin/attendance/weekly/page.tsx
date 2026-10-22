@@ -86,9 +86,9 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
       />
     </div>
     <form className="flex flex-wrap items-end gap-3 rounded-xl border border-base-300 bg-base-100 p-4">
-      <label className="grid gap-1 text-sm font-medium">Week containing<input type="date" name="week" defaultValue={raw} className="dui-input dui-input-bordered"/></label>
-      <label className="grid gap-1 text-sm font-medium">Organization<select name="organization" defaultValue={organization} className="dui-select dui-select-bordered"><option value="">All organizations</option>{organizations.map(o=><option key={o}>{o}</option>)}</select></label>
-      <button className="dui-btn dui-btn-primary">View week</button>
+      <label className="grid gap-1 text-sm font-medium">Week containing<input type="date" name="week" defaultValue={raw} className="dui-input dui-input-bordered !h-12 !min-h-12"/></label>
+      <label className="grid gap-1 text-sm font-medium">Organization<select name="organization" defaultValue={organization} className="dui-select dui-select-bordered !h-12 !min-h-12"><option value="">All organizations</option>{organizations.map(o=><option key={o}>{o}</option>)}</select></label>
+      <button className="dui-btn dui-btn-primary !h-12 !min-h-12 px-6">View week</button>
     </form>
     <div className="flex flex-wrap gap-2 text-xs">
       {(Object.keys(labels) as Status[]).filter(k=>k!=='unscheduled').map(k=><span key={k} className={`rounded-lg px-3 py-1.5 font-semibold ring-1 ${colors[k]}`}>{labels[k]}</span>)}
