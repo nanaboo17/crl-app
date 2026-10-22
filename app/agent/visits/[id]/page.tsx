@@ -92,6 +92,7 @@ export default function VisitDetailPage() {
     return <main className={styles.page}><PageTop title={t('agent.visitDetail.title')} back /><div className={styles.errorCard}>{error || t('agent.visitDetail.notFound')}</div></main>
   }
 
+  const newVisitCaseId = row.crl_id || customer?.crl_id || null
   const hasLocation = row.latitude !== null && row.longitude !== null
   const locationLabel = hasLocation ? `${row.latitude?.toFixed(6)}, ${row.longitude?.toFixed(6)}` : '—'
 
@@ -110,8 +111,8 @@ export default function VisitDetailPage() {
 
       <section className={styles.doneCard}>
         <Pencil />
-        <div><strong>{tx('You can edit this visit record.', 'Catatan kunjungan ini dapat diedit.')}</strong><span>{tx('GPS and evidence photo will remain attached unless the visit is redone separately.', 'GPS dan foto bukti tetap tersimpan kecuali kunjungan dilakukan ulang secara terpisah.')}</span></div>
-        <Link className={styles.mapButton} href={`/agent/customers/${encodeURIComponent(row.crl_id)}/visit`}>{tx('New Visit', 'Kunjungan Baru')}</Link>
+        <div><strong>{tx('Record another visit for this customer.', 'Catat kunjungan baru untuk pelanggan ini.')}</strong><span>{tx('Previous visit records, GPS and evidence photos will be preserved.', 'Catatan, GPS, dan foto bukti kunjungan sebelumnya tetap tersimpan.')}</span></div>
+        {newVisitCaseId && <Link className={styles.mapButton} href={`/agent/customers/${encodeURIComponent(newVisitCaseId)}/visit`}>{tx('New Visit', 'Kunjungan Baru')}</Link>}
       </section>
 
       <section className={styles.summaryGrid}>
