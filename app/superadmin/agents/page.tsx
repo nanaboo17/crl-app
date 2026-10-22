@@ -124,7 +124,6 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
         <div className={styles.heroVisual} aria-hidden="true">
           <div className={styles.heroSun} />
           <div className={styles.heroHill} />
-          <div className={styles.heroPeople}>👩‍💼 👨‍💼</div>
         </div>
       </section>
 
