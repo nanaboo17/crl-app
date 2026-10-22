@@ -234,7 +234,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
       <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold">Agent attendance — {selectedDate}{selectedOrganization ? ` · ${selectedOrganization}` : ''}</h2><Link href="/superadmin/leave" className="dui-btn dui-btn-outline dui-btn-sm">Sakit / Izin approvals</Link></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold">Agent attendance — {selectedDate}{selectedOrganization ? ` · ${selectedOrganization}` : ''}</h2><div className="flex flex-wrap gap-2"><Link href="/superadmin/attendance/weekly" className="dui-btn dui-btn-primary dui-btn-sm">Weekly Attendance</Link><Link href="/superadmin/leave" className="dui-btn dui-btn-outline dui-btn-sm">Sakit / Izin approvals</Link></div></div>
         </div>
 
         <div className="grid gap-3 p-3 md:hidden">
