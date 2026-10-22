@@ -1,14 +1,6 @@
-import { Plus_Jakarta_Sans } from 'next/font/google'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminShell from '@/components/superadmin/SuperadminShell'
-
-// Jakarta Sans scoped to the Superadmin area only (agent/admin pages keep Inter).
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-jakarta',
-  display: 'swap',
-})
 
 export default async function SuperadminLayout({
   children,
@@ -42,13 +34,7 @@ export default async function SuperadminLayout({
   }
 
   return (
-    <div
-      className={jakarta.variable}
-      style={{
-        fontFamily:
-          'var(--font-jakarta), Inter, ui-sans-serif, system-ui, sans-serif',
-      }}
-    >
+    <div>
       <SuperadminShell
         agentName={agent.agent_name ?? 'Superadmin'}
         email={agent.email}
