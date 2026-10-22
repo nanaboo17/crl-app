@@ -142,29 +142,27 @@ export default function SuperadminReportsPage() {
       }),
     ])
 
-    if (agentResult.error) {
-      setError(agentResult.error.message)
-      setLoading(false)
-      return
-    }
-    if (reportResult.error) {
-      setError(reportResult.error.message)
-      setLoading(false)
-      return
-    }
-    if (weeklyResult.error) {
-      setError(weeklyResult.error.message)
-      setLoading(false)
-      return
-    }
-
-    if (conversionResult.error) { setError(conversionResult.error.message); setLoading(false); return }
-    setConversionRows((conversionResult.data ?? []) as PaymentConversion[])
-    if (productivityResult.error) { setError(productivityResult.error.message); setLoading(false); return }
-    setProductivityRows((productivityResult.data ?? []) as ProductivityRow[])
+    // Keep successful report sections visible if one expensive RPC times out.
     setAgents((agentResult.data ?? []) as AgentOption[])
-    setRows((reportResult.data ?? []) as ReportRow[])
-    setWeeklyRows((weeklyResult.data ?? []) as WeeklyReportRow[])
+    setRows(reportResult.error ? [] : (reportResult.data ?? []) as ReportRow[])
+    setWeeklyRows(weeklyResult.error ? [] : (weeklyResult.data ?? []) as WeeklyReportRow[])
+    setConversionRows(conversionResult.error ? [] : (conversionResult.data ?? []) as PaymentConversion[])
+    setProductivityRows(productivityResult.error ? [] : (productivityResult.data ?? []) as ProductivityRow[])
+
+    const failed = [
+      agentResult.error && tx('Agent directory', 'Direktori agen'),
+      reportResult.error && tx('Overview', 'Ringkasan'),
+      weeklyResult.error && tx('Weekly activity', 'Aktivitas mingguan'),
+      conversionResult.error && tx('Payment conversions', 'Konversi pembayaran'),
+      productivityResult.error && tx('Productivity', 'Produktivitas'),
+    ].filter(Boolean)
+    if (failed.length) {
+      setError(
+        tx('Some report sections could not load', 'Sebagian laporan gagal dimuat') +
+        ': ' + failed.join(', ') +
+        '. ' + tx('Try a shorter date range or select one agent, then refresh.', 'Coba rentang tanggal lebih pendek atau pilih satu agen, lalu muat ulang.')
+      )
+    }
     setLoading(false)
   }, [agentEmail, endDate, startDate, dailyTarget, supabase])
 
@@ -350,16 +348,16 @@ export default function SuperadminReportsPage() {
           <div className="grid gap-3 md:grid-cols-6">
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Start date', 'Tanggal mulai')}</span>
-              <input type="date" className="dui-input w-full" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
+              <input type="date" className="dui-input w-full !h-12 !min-h-12" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('End date', 'Tanggal akhir')}</span>
-              <input type="date" className="dui-input w-full" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <input type="date" className="dui-input w-full !h-12 !min-h-12" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Organization', 'Organisasi')}</span>
               <select
-                className="dui-select w-full"
+                className="dui-select w-full !h-12 !min-h-12"
                 value={organization}
                 onChange={(e) => {
                   setOrganization(e.target.value)
@@ -372,17 +370,17 @@ export default function SuperadminReportsPage() {
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Agent', 'Agen')}</span>
-              <select className="dui-select w-full" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
+              <select className="dui-select w-full !h-12 !min-h-12" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
                 <option value="">{tx('All agents', 'Semua agen')}</option>
                 {filteredAgents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name || agent.email}</option>)}
               </select>
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Daily visit target (optional)', 'Target kunjungan harian (opsional)')}</span>
-              <input type="number" min="0" step="0.5" className="dui-input w-full" placeholder="—" value={dailyTarget} onChange={e=>setDailyTarget(e.target.value)}/>
+              <input type="number" min="0" step="0.5" className="dui-input w-full !h-12 !min-h-12" placeholder="—" value={dailyTarget} onChange={e=>setDailyTarget(e.target.value)}/>
             </label>
             <div className="flex items-end">
-              <button type="button" className="dui-btn dui-btn-outline w-full" onClick={() => void load()} disabled={loading}>
+              <button type="button" className="dui-btn dui-btn-outline w-full !h-12 !min-h-12" onClick={() => void load()} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 {tx('Refresh', 'Muat ulang')}
               </button>
