@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, CheckCircle2, Clock3, FileText, Search, ShieldCheck, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
+import { useI18n } from '@/components/providers/i18n-provider'
 
 type LeaveRequest = {
   id: string
@@ -49,6 +50,8 @@ function duration(start: string, end: string) {
 }
 
 export default function LeaveApprovalsPage() {
+  const { locale } = useI18n()
+  const tx = (id:string,en:string)=>locale==='id'?id:en
   const [rows, setRows] = useState<LeaveRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -118,10 +121,10 @@ export default function LeaveApprovalsPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60"><ShieldCheck size={16}/> Attendance Management</div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Persetujuan Sakit & Izin</h1>
-            <p className="max-w-2xl text-sm text-base-content/65">Tinjau pengajuan, lihat dokumen pendukung secara privat, dan kelola persetujuan agent sesuai kewenangan.</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{tx('Persetujuan Sakit & Izin','Sick & Permission Approvals')}</h1>
+            <p className="max-w-2xl text-sm text-base-content/65">{tx('Tinjau pengajuan, lihat dokumen pendukung secara privat, dan kelola persetujuan agent sesuai kewenangan.','Review requests, view private supporting documents, and manage approvals within your permissions.')}</p>
           </div>
-          <button onClick={() => void reload()} className="dui-btn dui-btn-outline dui-btn-sm">Refresh data</button>
+          <button onClick={() => void reload()} className="dui-btn dui-btn-outline dui-btn-sm">{tx('Refresh data','Refresh data')}</button>
         </div>
       </div>
 
@@ -148,11 +151,11 @@ export default function LeaveApprovalsPage() {
               <input className="min-w-0 grow" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari agent atau alasan…" aria-label="Cari pengajuan"/>
             </label>
             <select className="dui-select dui-select-bordered" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter status">
-              <option value="all">Semua status</option>
-              <option value="pending">Menunggu</option>
-              <option value="approved">Disetujui</option>
-              <option value="rejected">Ditolak</option>
-              <option value="cancelled">Dibatalkan</option>
+              <option value="all">{tx('Semua status','All statuses')}</option>
+              <option value="pending">{tx('Menunggu','Pending')}</option>
+              <option value="approved">{tx('Disetujui','Approved')}</option>
+              <option value="rejected">{tx('Ditolak','Rejected')}</option>
+              <option value="cancelled">{tx('Dibatalkan','Cancelled')}</option>
             </select>
           </div>
         </div>
@@ -160,48 +163,52 @@ export default function LeaveApprovalsPage() {
         {error && <p className="m-4 rounded-xl bg-error/10 p-3 text-sm text-error" role="alert">{error}</p>}
         {loading ? <div className="p-10 text-center text-sm text-base-content/60">Memuat pengajuan…</div> :
           visible.length === 0 ? <div className="p-10 text-center text-sm text-base-content/60">Tidak ada pengajuan yang cocok.</div> :
-          <div className="divide-y divide-base-300">
-            {visible.map(r => (
-              <article key={r.id} className="space-y-4 p-4 sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="break-all font-semibold">{r.agent_email}</h3>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${r.request_type === 'sick' ? 'bg-blue-50 text-blue-800 ring-blue-200' : 'bg-violet-50 text-violet-800 ring-violet-200'}`}>{r.request_type === 'sick' ? 'Sakit' : 'Izin'}</span>
-                    </div>
-                    <p className="break-all text-xs text-base-content/55">Lead: {r.lead_email}</p>
-                  </div>
-                  <span className={`w-fit shrink-0 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusStyles[r.status]}`}>{statusLabels[r.status]}</span>
-                </div>
-
-                <div className="grid gap-3 rounded-xl bg-base-200/60 p-3 text-sm sm:grid-cols-2">
-                  <div><p className="text-xs text-base-content/55">Tanggal pengajuan</p><p className="mt-1 flex items-center gap-2 font-medium"><CalendarDays size={15}/>{dateRange(r.start_date, r.end_date)}</p><p className="mt-1 text-xs text-base-content/55">{duration(r.start_date, r.end_date)}</p></div>
-                  <div><p className="text-xs text-base-content/55">Diajukan pada</p><p className="mt-1 font-medium">{new Date(r.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })} WIB</p></div>
-                </div>
-
-                <div className="space-y-1"><p className="text-xs font-semibold uppercase tracking-wide text-base-content/55">Alasan</p><p className="whitespace-pre-wrap break-words text-sm">{r.reason}</p></div>
-                {r.rejection_reason && <p className="rounded-lg bg-error/10 p-3 text-sm text-error">Alasan penolakan: {r.rejection_reason}</p>}
-                <div className="flex flex-wrap items-center gap-2 border-t border-base-200 pt-3">
-                  {r.evidence_path && <button type="button" className="dui-btn dui-btn-outline dui-btn-sm gap-2" onClick={() => void viewEvidence(r.evidence_path!)}><FileText size={16}/> Lihat bukti</button>}
-                  {r.status === 'pending' && <>
-                    <button type="button" disabled={busy === r.id} className="dui-btn dui-btn-success dui-btn-sm" onClick={() => void decide(r.id, 'approved')}>Setujui</button>
-                    <button type="button" disabled={busy === r.id} className="dui-btn dui-btn-outline dui-btn-error dui-btn-sm" onClick={() => { setRejectId(r.id); setRejectReason('') }}>Tolak</button>
-                  </>}
-                </div>
-              </article>
-            ))}
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="bg-base-200 text-left text-xs uppercase tracking-wide text-base-content/70">
+                <tr>
+                  <th className="p-3">Agent</th>
+                  <th className="p-3">{tx('Jenis','Type')}</th>
+                  <th className="p-3">{tx('Periode','Period')}</th>
+                  <th className="p-3">{tx('Alasan','Reason')}</th>
+                  <th className="p-3">{tx('Status','Status')}</th>
+                  <th className="p-3">{tx('Bukti','Evidence')}</th>
+                  <th className="p-3">{tx('Tindakan','Actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-base-300">
+                {visible.map(r => (
+                  <tr key={r.id} className="align-top hover:bg-base-200/30">
+                    <td className="max-w-56 break-all p-3">
+                      <p className="font-semibold">{r.agent_email}</p>
+                      <p className="mt-1 text-xs text-base-content/50">Lead: {r.lead_email}</p>
+                    </td>
+                    <td className="p-3"><span className="font-medium">{r.request_type==='sick'?tx('Sakit','Sick'):tx('Izin','Permission')}</span></td>
+                    <td className="whitespace-nowrap p-3">{dateRange(r.start_date,r.end_date)}<p className="mt-1 text-xs text-base-content/55">{duration(r.start_date,r.end_date)}</p></td>
+                    <td className="max-w-60 whitespace-pre-wrap break-words p-3">{r.reason}{r.rejection_reason&&<p className="mt-2 text-xs text-error">{tx('Ditolak','Rejected')}: {r.rejection_reason}</p>}</td>
+                    <td className="p-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyles[r.status]}`}>{tx(statusLabels[r.status],{pending:'Pending',approved:'Approved',rejected:'Rejected',cancelled:'Cancelled'}[r.status])}</span></td>
+                    <td className="p-3">{r.evidence_path?<button className="dui-btn dui-btn-outline dui-btn-xs" onClick={()=>void viewEvidence(r.evidence_path!)}><FileText size={14}/>{tx('Lihat','View')}</button>:'—'}</td>
+                    <td className="p-3">{r.status==='pending'?
+                      <div className="flex flex-col gap-2">
+                        <button disabled={busy===r.id} className="dui-btn dui-btn-success dui-btn-xs" onClick={()=>void decide(r.id,'approved')}>{tx('Setujui','Approve')}</button>
+                        <button disabled={busy===r.id} className="dui-btn dui-btn-outline dui-btn-error dui-btn-xs" onClick={()=>{setRejectId(r.id);setRejectReason('')}}>{tx('Tolak','Reject')}</button>
+                      </div>:<span className="text-base-content/40">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         }
       </section>
 
       {rejectId && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation">
         <div className="w-full max-w-md rounded-2xl bg-base-100 p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="reject-title">
-          <h2 id="reject-title" className="text-lg font-bold">Tolak pengajuan</h2>
-          <p className="mt-1 text-sm text-base-content/65">Berikan alasan penolakan untuk agent.</p>
+          <h2 id="reject-title" className="text-lg font-bold">{tx('Tolak pengajuan','Reject request')}</h2>
+          <p className="mt-1 text-sm text-base-content/65">{tx('Berikan alasan penolakan untuk agent.','Provide a rejection reason for the agent.')}</p>
           <textarea className="dui-textarea dui-textarea-bordered mt-4 w-full" rows={3} minLength={5} maxLength={1000} autoFocus value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Alasan penolakan (minimal 5 karakter)"/>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="dui-btn dui-btn-ghost" onClick={() => setRejectId(null)}>Batal</button>
-            <button type="button" className="dui-btn dui-btn-error" disabled={rejectReason.trim().length < 5 || busy === rejectId} onClick={() => void decide(rejectId, 'rejected', rejectReason)}>Tolak pengajuan</button>
+            <button type="button" className="dui-btn dui-btn-ghost" onClick={() => setRejectId(null)}>{tx('Batal','Cancel')}</button>
+            <button type="button" className="dui-btn dui-btn-error" disabled={rejectReason.trim().length < 5 || busy === rejectId} onClick={() => void decide(rejectId, 'rejected', rejectReason)}>{tx('Tolak pengajuan','Reject request')}</button>
           </div>
         </div>
       </div>}
