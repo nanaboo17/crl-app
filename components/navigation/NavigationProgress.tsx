@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
 /**
  * Shared navigation feedback for Agent, Admin and Superadmin.
@@ -9,14 +9,13 @@ import { usePathname, useSearchParams } from 'next/navigation'
  */
 export default function NavigationProgress() {
   const pathname = usePathname()
-  const search = useSearchParams()
   const [busy, setBusy] = useState(false)
   const [slow, setSlow] = useState(false)
 
   useEffect(() => {
     setBusy(false)
     setSlow(false)
-  }, [pathname, search])
+  }, [pathname])
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -27,7 +26,7 @@ export default function NavigationProgress() {
       if (!(link instanceof HTMLAnchorElement) || link.hasAttribute('download') || link.target === '_blank') return
       const target = new URL(link.href, window.location.href)
       if (target.origin !== window.location.origin || !/^https?:$/.test(target.protocol)) return
-      if (target.pathname === window.location.pathname && target.search === window.location.search) return
+      if (target.pathname === window.location.pathname) return
       setBusy(true)
       setSlow(false)
     }
