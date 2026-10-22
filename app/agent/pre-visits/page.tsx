@@ -6,7 +6,6 @@ import { CheckCircle2, ClipboardList, Clock3, PhoneCall, Search } from 'lucide-r
 import { createClient } from '@/lib/supabase-browser'
 import type { PreVisit } from '@/lib/types'
 import { dateTime } from '@/lib/format'
-import AgentNav from '@/components/AgentNav'
 import Loading from '@/components/Loading'
 import EmptyState from '@/components/EmptyState'
 import StatusPill from '@/components/StatusPill'
@@ -132,7 +131,6 @@ export default function PreVisitsPage() {
           </div>
         </nav>
       )}
-      <AgentNav />
     </main>
   )
 }
