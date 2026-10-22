@@ -188,18 +188,6 @@ export default function VisitPage() {
         return
       }
 
-      const { data: existingVisit } = await supabase
-        .from('visits')
-        .select('visit_id')
-        .eq('crl_id', customerData.crl_id)
-        .maybeSingle()
-      if (existingVisit) {
-        try { sessionStorage.removeItem(draftKey) } catch {}
-        setError(t('agent.visit.alreadySubmitted'))
-        setLoading(false)
-        return
-      }
-
       setAgent(agentData)
       setCustomer(customerData)
 
