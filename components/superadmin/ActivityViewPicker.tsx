@@ -27,9 +27,39 @@ export default function ActivityViewPicker({ kind, today, locale }: {
   if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center overflow-hidden bg-black/50 backdrop-blur-sm sm:items-center sm:p-6" style={{ width: "100vw", maxWidth: "100vw", left: 0, right: 0 }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="activity-view-title"
-        className="w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-t-3xl border border-base-300 bg-base-100 px-4 py-5 shadow-2xl sm:max-w-xl sm:rounded-3xl sm:p-8" style={{ maxHeight: "calc(100dvh - 1rem)", boxSizing: "border-box" }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100%',
+        height: '100dvh',
+        zIndex: 99999,
+        display: 'grid',
+        placeItems: 'center',
+        overflowX: 'hidden',
+        overflowY: 'auto',
+        padding: '12px',
+        boxSizing: 'border-box',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="activity-view-title"
+        className="rounded-2xl border border-base-300 bg-base-100 px-4 py-5 shadow-2xl sm:p-8"
+        style={{
+          width: '100%',
+          maxWidth: '560px',
+          minWidth: 0,
+          maxHeight: 'calc(100dvh - 24px)',
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          boxSizing: 'border-box',
+          margin: 'auto',
+        }}
+      >
         <div className="text-center">
           <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-secondary/15 text-secondary sm:mb-4 sm:size-14">
             <CalendarDays className="size-6 sm:size-7" />
