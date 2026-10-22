@@ -55,6 +55,7 @@ type ReportRow = {
   average_worked_minutes: number
 }
 
+type VisitedCustomerCount = { agent_email: string; visited_customers: number }
 type PaymentConversion = { agent_email: string; paid_after_visit: number; paid_after_previsit: number }
 type AuthDirectoryUser = { id: string; email: string | null }
 
@@ -102,6 +103,7 @@ export default function SuperadminReportsPage() {
   const [productivityRows, setProductivityRows] = useState<ProductivityRow[]>([])
   const [dailyTarget, setDailyTarget] = useState('')
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
+  const [visitedCustomerRows, setVisitedCustomerRows] = useState<VisitedCustomerCount[]>([])
   const [conversionRows, setConversionRows] = useState<PaymentConversion[]>([])
   const [locationAgent, setLocationAgent] = useState<ProductivityRow | null>(null)
   const [locationRows, setLocationRows] = useState<HistoryPoint[]>([])
@@ -115,7 +117,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult, visitedResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -140,6 +142,9 @@ export default function SuperadminReportsPage() {
         p_agent_email: agentEmail || null,
         p_daily_visit_target: Number(dailyTarget)>0 ? Number(dailyTarget) : null,
       }),
+      supabase.rpc('crl_report_visited_customer_counts', {
+        p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
+      }),
     ])
 
     // Keep successful report sections visible if one expensive RPC times out.
@@ -148,6 +153,7 @@ export default function SuperadminReportsPage() {
     setWeeklyRows(weeklyResult.error ? [] : (weeklyResult.data ?? []) as WeeklyReportRow[])
     setConversionRows(conversionResult.error ? [] : (conversionResult.data ?? []) as PaymentConversion[])
     setProductivityRows(productivityResult.error ? [] : (productivityResult.data ?? []) as ProductivityRow[])
+    setVisitedCustomerRows(visitedResult.error ? [] : (visitedResult.data ?? []) as VisitedCustomerCount[])
 
     const failed = [
       agentResult.error && tx('Agent directory', 'Direktori agen'),
@@ -155,6 +161,7 @@ export default function SuperadminReportsPage() {
       weeklyResult.error && tx('Weekly activity', 'Aktivitas mingguan'),
       conversionResult.error && tx('Payment conversions', 'Konversi pembayaran'),
       productivityResult.error && tx('Productivity', 'Produktivitas'),
+      visitedResult.error && tx('Visited customers', 'Pelanggan dikunjungi'),
     ].filter(Boolean)
     if (failed.length) {
       setError(
@@ -231,6 +238,11 @@ export default function SuperadminReportsPage() {
     }),
     { assigned: 0, paid: 0, unpaid: 0, preVisits: 0, visits: 0, attendance: 0 }
   ), [visibleRows])
+
+  const visitedCustomerTotal = useMemo(() => {
+    const allowed = new Set(agents.filter(a => !organization || (a.organization || '').trim() === organization).map(a => a.email.toLowerCase()))
+    return visitedCustomerRows.reduce((sum, r) => sum + (allowed.has(r.agent_email.toLowerCase()) ? Number(r.visited_customers || 0) : 0), 0)
+  }, [agents, organization, visitedCustomerRows])
 
   const conversionsByEmail = useMemo(() => new Map(conversionRows.map(r=>[r.agent_email.toLowerCase(),r])), [conversionRows])
 
@@ -397,12 +409,13 @@ export default function SuperadminReportsPage() {
 
       {error && <div className="dui-alert dui-alert-error"><span>{error}</span></div>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <Metric label={tx('Assigned', 'Ditugaskan')} value={totals.assigned} />
         <Metric label={tx('Paid', 'Lunas')} value={totals.paid} />
         <Metric label={tx('Unpaid', 'Belum Bayar')} value={totals.unpaid} />
         <Metric label={tx('Pre-Visits', 'Pra-Kunjungan')} value={totals.preVisits} />
-        <Metric label={tx('Visits', 'Kunjungan')} value={totals.visits} />
+        <Metric label={tx('Visited Customers', 'Pelanggan Dikunjungi')} value={visitedCustomerTotal} />
+        <Metric label={tx('Total Visits', 'Total Kunjungan')} value={totals.visits} />
         <Metric label={tx('Attendance Days', 'Hari Absensi')} value={totals.attendance} />
       </section>
 
