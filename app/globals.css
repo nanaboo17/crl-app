@@ -6,33 +6,9 @@
 
 @import "tailwindcss";
 
-/* Indosat brand typography: files are served from /public/fonts. */
-@font-face {
-  font-family: 'Indosat';
-  src: url('/fonts/IndosatRegular.woff2') format('woff2');
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Indosat';
-  src: url('/fonts/IndosatMedium.woff2') format('woff2');
-  font-style: normal;
-  font-weight: 500 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Indosat';
-  src: url('/fonts/IndosatBold.woff2') format('woff2');
-  font-style: normal;
-  font-weight: 700 900;
-  font-display: swap;
-}
-
 @theme {
-  --font-sans: 'Indosat', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-indosat), Arial, sans-serif;
 }
-
 
 @plugin "daisyui" {
   prefix: "dui-";
@@ -153,7 +129,7 @@ body {
   min-width: 320px;
   background: var(--bg);
   color: var(--text);
-  font-family: "Indosat", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-indosat), Arial, sans-serif;
 }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
@@ -853,6 +829,6 @@ textarea { min-height: 108px; resize: vertical; }
 /* Apply Indosat consistently to DaisyUI widgets and form controls. */
 @layer base {
   html, body, button, input, select, textarea, option {
-    font-family: 'Indosat', ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-indosat), Arial, sans-serif;
   }
 }
