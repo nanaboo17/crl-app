@@ -22,7 +22,9 @@ type AttendanceRecord = {
   check_in_status: string | null
   worked_minutes: number | null
 }
+type LeaveRow = { agent_email: string; request_type: string; status: string; start_date: string; end_date: string }
 type AttendancePayload = {
+  leaveRequests: LeaveRow[]
   agents: Agent[]
   visits: VisitActivity[]
   preVisits: PreVisitActivity[]
@@ -90,8 +92,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', user.email.trim().toLowerCase()).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v7:${selectedDate}`, CACHE_TTL, async () => {
-    const [agentsResult, visitsResult, preVisitsResult, attendanceResult] = await Promise.all([
+  const payload = await cacheGetOrSet<AttendancePayload>(`crl:superadmin:attendance:v8:${selectedDate}`, CACHE_TTL, async () => {
+    const [agentsResult, visitsResult, preVisitsResult, attendanceResult, leaveResult] = await Promise.all([
       supabase.from('agents').select('email, agent_name, active, organization').eq('role', 'agent').eq('active', true).order('agent_name'),
       supabase
         .from('visits')
@@ -107,9 +109,10 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         .from('agent_attendance')
         .select('agent_email, attendance_date, check_in_at, check_out_at, check_in_photo_path, check_out_photo_path, check_in_status, worked_minutes')
         .eq('attendance_date', selectedDate),
+      supabase.from('agent_leave_requests').select('agent_email,request_type,status,start_date,end_date').lte('start_date',selectedDate).gte('end_date',selectedDate),
     ])
 
-    const error = agentsResult.error || visitsResult.error || preVisitsResult.error || attendanceResult.error
+    const error = agentsResult.error || visitsResult.error || preVisitsResult.error || attendanceResult.error || leaveResult.error
     if (error) throw error
 
     return {
@@ -117,6 +120,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       visits: (visitsResult.data ?? []) as VisitActivity[],
       preVisits: (preVisitsResult.data ?? []) as PreVisitActivity[],
       attendance: (attendanceResult.data ?? []) as AttendanceRecord[],
+      leaveRequests: (leaveResult.data ?? []) as LeaveRow[],
     }
   })
 
@@ -151,6 +155,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     const dayVisits = payload.visits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.visit_date && jakartaDate(row.visit_date) === selectedDate)
     const dayPreVisits = payload.preVisits.filter((row) => (row.agent_email || '').toLowerCase() === email && row.created_at && jakartaDate(row.created_at) === selectedDate)
     const attendance = attendanceMap.get(email) ?? null
+    const leave = payload.leaveRequests.find((row) => row.agent_email.toLowerCase() === email && row.status === 'approved') ?? null
+    const pendingLeave = payload.leaveRequests.some((row) => row.agent_email.toLowerCase() === email && row.status === 'pending')
     const photoPath = attendance?.check_in_photo_path ?? null
 
     return {
@@ -158,6 +164,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       visits: dayVisits.length,
       preVisits: dayPreVisits.length,
       present: Boolean(attendance?.check_in_at),
+      absenceLabel: attendance?.check_in_at ? 'Checked In' : leave ? (leave.request_type === 'sick' ? 'Sakit' : 'Izin') : pendingLeave ? 'Pending Approval' : 'Not Checked In',
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
       checkInStatus: attendance?.check_in_status ?? null,
@@ -172,7 +179,10 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
   const activeAgents = filteredRows.filter((row) => row.active)
   const present = activeAgents.filter((row) => row.present).length
-  const absent = activeAgents.length - present
+  const sick = activeAgents.filter((row) => !row.present && row.absenceLabel === 'Sakit').length
+  const permission = activeAgents.filter((row) => !row.present && row.absenceLabel === 'Izin').length
+  const pending = activeAgents.filter((row) => !row.present && row.absenceLabel === 'Pending Approval').length
+  const absent = activeAgents.length - present - sick - permission - pending
   const visitCount = filteredRows.reduce((sum, row) => sum + row.visits, 0)
   const preVisitCount = filteredRows.reduce((sum, row) => sum + row.preVisits, 0)
   const todayHref = selectedOrganization
@@ -203,11 +213,14 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         {selectedOrganization ? <Link href={`/superadmin/attendance?date=${encodeURIComponent(selectedDate)}`} className="dui-btn dui-btn-ghost w-full sm:w-auto">Clear organization</Link> : null}
       </form>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: 'Active agents', value: activeAgents.length, icon: Users },
           { label: 'Checked in', value: present, icon: CheckCircle2 },
           { label: 'Not checked in', value: absent, icon: XCircle },
+          { label: 'Sakit', value: sick, icon: Clock3 },
+          { label: 'Izin', value: permission, icon: Clock3 },
+          { label: 'Pending approval', value: pending, icon: Clock3 },
           { label: 'Pre-visits', value: preVisitCount, icon: Clock3 },
           { label: 'Visits', value: visitCount, icon: CalendarDays },
         ].map(({ label, value, icon: Icon }) => (
@@ -221,7 +234,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
       <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-4">
-          <h2 className="font-bold">Agent attendance — {selectedDate}{selectedOrganization ? ` · ${selectedOrganization}` : ''}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold">Agent attendance — {selectedDate}{selectedOrganization ? ` · ${selectedOrganization}` : ''}</h2><Link href="/superadmin/leave" className="dui-btn dui-btn-outline dui-btn-sm">Sakit / Izin approvals</Link></div>
         </div>
 
         <div className="grid gap-3 p-3 md:hidden">
@@ -235,7 +248,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                     <div className="break-all text-xs text-base-content/50">{row.email}</div>
                     <div className="mt-1 text-xs text-base-content/60">{row.organization || 'No organization'}</div>
                   </div>
-                  <span className={`dui-badge shrink-0 ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.present ? 'Checked In' : 'Not Checked In'}</span>
+                  <span className={`dui-badge shrink-0 ${row.present ? 'dui-badge-success' : 'dui-badge-ghost'}`}>{row.absenceLabel}</span>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

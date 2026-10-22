@@ -58,6 +58,7 @@ export const superadminConfig: ShellConfig = {
       { href: '/superadmin/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
       { href: '/superadmin/visits', labelKey: 'nav.visits', icon: MapPin },
       { href: '/superadmin/attendance', labelKey: 'nav.attendance', icon: CalendarCheck2 },
+      { href: '/superadmin/leave', labelKey: 'nav.leave', icon: ClipboardList },
       { href: '/superadmin/reports', labelKey: 'nav.reports', icon: FileBarChart2 },
       { href: '/superadmin/cms', labelKey: 'nav.cms', icon: Settings2 },
     ]),
@@ -97,6 +98,7 @@ export const agentConfig: ShellConfig = {
       { href: '/agent/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
       { href: '/agent/visits', labelKey: 'nav.visits', icon: MapPin },
       { href: '/agent/attendance/weekly', labelKey: 'nav.attendance', icon: CalendarCheck2 },
+      { href: '/agent/leave', labelKey: 'nav.leave', icon: ClipboardList },
     ]),
   ],
 }
