@@ -454,6 +454,14 @@ export default function SuperadminReportsPage() {
         endDate={endDate}
         onOpenLocations={openLocations}
       />
+      <section className="hidden print:block">
+        <h2 className="mb-2 text-lg font-black">Agent Performance · Funnel / Attendance / Productivity / Review</h2>
+        <p className="mb-3 text-xs">{startDate} — {endDate} · {organization || 'All organizations'} · {agentEmail || 'All agents'}</p>
+        <table className="w-full border-collapse text-[8px]">
+          <thead><tr>{['Agent','Assigned','Pre-Visit (unique)','Visits','Unique','Met','P2P','Paid after activity','Attendance','On time','Late','Sick','Permission','No activity','Missing checkout','Long gaps'].map(h=><th key={h} className="border p-1 text-left">{h}</th>)}</tr></thead>
+          <tbody>{exportAgentRows.map(({r,fu,att,unique,met,ptp,paid})=><tr key={r.agent_email}>{[r.agent_name||r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days].map((value,i)=><td key={i} className="border p-1">{value}</td>)}</tr>)}</tbody>
+        </table>
+      </section>
       <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} startDate={startDate} endDate={endDate}
         funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
         payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
