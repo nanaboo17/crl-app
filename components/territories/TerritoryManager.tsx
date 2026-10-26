@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Search, UserRound } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Loader2, MapPin, RefreshCw, Search, ShieldCheck, UserRound, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './TerritoryManager.module.css'
 
@@ -40,6 +40,8 @@ export default function TerritoryManager() {
   const [loading, setLoading] = useState(true)
   const [savingCode, setSavingCode] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [pending, setPending] = useState<{ territoryCode: string; email: string; target: string; count: number; month: string } | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -103,7 +105,7 @@ export default function TerritoryManager() {
   }, [filtered])
 
   async function assignAgent(territoryCode: string, email: string) {
-    if (savingCode) return
+    if (savingCode || pending) return
     setSavingCode(territoryCode)
     setError('')
     try {
@@ -112,33 +114,95 @@ export default function TerritoryManager() {
         p_agent_email: email || null,
       })
       if (previewError) throw previewError
-      const month = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }).format(new Date())
-      const count = Number(impacted || 0)
-      const target = agents.find((a) => a.email === email)?.agent_name || (email ? email : 'Unassigned')
-      const confirmed = window.confirm(
-        `Change territory ${territoryCode} owner to ${target}?\n\n` +
-        `${count.toLocaleString('en-US')} eligible unvisited customer case(s) from ${month} will be transferred.\n` +
-        'Older case months and customers with recorded visits will keep their current assignments.\n\nContinue?'
-      )
-      if (!confirmed) return
-      const { error: rpcError } = await supabase.rpc('set_territory_agent_by_code', {
-        p_territory_code: territoryCode,
-        p_agent_email: email || null,
+      setPending({
+        territoryCode,
+        email,
+        target: agents.find((a) => a.email === email)?.agent_name || (email || 'Unassigned'),
+        count: Number(impacted || 0),
+        month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }).format(new Date()),
       })
-      if (rpcError) throw rpcError
-      await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to change territory assignment')
-    } finally {
+      setError(err instanceof Error ? err.message : 'Unable to preview territory assignment')
       setSavingCode(null)
     }
   }
+
+  function cancelTransfer() {
+    if (submitting) return
+    setPending(null)
+    setSavingCode(null)
+  }
+
+  async function confirmTransfer() {
+    if (!pending || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const { error: rpcError } = await supabase.rpc('set_territory_agent_by_code', {
+        p_territory_code: pending.territoryCode,
+        p_agent_email: pending.email || null,
+      })
+      if (rpcError) throw rpcError
+      setPending(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to change territory assignment')
+      setPending(null)
+    } finally {
+      setSubmitting(false)
+      setSavingCode(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!pending) return
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !submitting) cancelTransfer()
+    }
+    document.addEventListener('keydown', handleEscape)
+    const priorOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = priorOverflow
+    }
+  }, [pending, submitting])
 
   if (loading) return <div className={styles.loading} />
 
   return (
     <div className={styles.manager}>
       {error && <div className={styles.alert}>{error}</div>}
+      {pending && (
+        <div className={styles.dialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelTransfer() }}>
+          <section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="territory-transfer-title" aria-describedby="territory-transfer-description">
+            <div className={styles.dialogHeader}>
+              <span className={styles.dialogIcon}><MapPin size={23} /></span>
+              <button type="button" className={styles.dialogClose} onClick={cancelTransfer} disabled={submitting} aria-label="Close confirmation"><X size={19} /></button>
+            </div>
+            <span className={styles.dialogEyebrow}>TERRITORY ASSIGNMENT</span>
+            <h2 id="territory-transfer-title" className={styles.dialogTitle}>Confirm agent transfer</h2>
+            <p id="territory-transfer-description" className={styles.dialogSubtitle}>Review the assignment changes before updating this territory.</p>
+            <div className={styles.transferRoute}>
+              <div><span>Territory</span><strong>{pending.territoryCode}</strong></div>
+              <ArrowRight size={19} aria-hidden="true" />
+              <div><span>New agent</span><strong>{pending.target}</strong></div>
+            </div>
+            <div className={styles.transferImpact}>
+              <span className={styles.impactNumber}>{pending.count.toLocaleString('en-US')}</span>
+              <div><strong>Customer cases will be transferred</strong><span>Eligible, unvisited cases · {pending.month}</span></div>
+            </div>
+            <div className={styles.transferSafety}><ShieldCheck size={19} aria-hidden="true" /><span>Older case months and customers with recorded visits will <strong>keep their current assignments.</strong></span></div>
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.cancelButton} onClick={cancelTransfer} disabled={submitting}>Cancel</button>
+              <button type="button" className={styles.confirmButton} onClick={() => void confirmTransfer()} disabled={submitting}>
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                {submitting ? 'Transferring…' : 'Confirm transfer'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <div className={styles.toolbar}>
         <div className="relative">
