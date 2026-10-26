@@ -36,15 +36,16 @@ export default function VisitDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
-  const [editOptions, setEditOptions] = useState({ visit_status_kunjungan: '', conversation_result: '', approved_offer: '', unpaid_reason: '' })
+  const [editOptions, setEditOptions] = useState({ visit_status_kunjungan: '', conversation_result: '', approved_offer: '', unpaid_reason: '', planned_payment_date: '' })
   function startEdit() {
     if (!row) return
-    const record = row as Visit & { visit_status_kunjungan?: string | null; conversation_result?: string | null; approved_offer?: string | null; unpaid_reason?: string | null }
+    const record = row as Visit & { visit_status_kunjungan?: string | null; conversation_result?: string | null; approved_offer?: string | null; unpaid_reason?: string | null; planned_payment_date?: string | null }
     setEditOptions({
       visit_status_kunjungan: record.visit_status_kunjungan || '',
       conversation_result: record.conversation_result || '',
       approved_offer: record.approved_offer || '',
       unpaid_reason: record.unpaid_reason || '',
+      planned_payment_date: record.planned_payment_date || '',
     })
     setEditError('')
     setEditOpen(true)
@@ -57,6 +58,11 @@ export default function VisitDetailPage() {
       return
     }
     const noContact = editOptions.conversation_result === 'Tidak bertemu pelanggan'
+    const promiseToPay = editOptions.conversation_result === 'Bersedia bayar / Promise to Pay'
+    if (promiseToPay && !editOptions.planned_payment_date) {
+      setEditError(tx('Select the planned payment date.', 'Pilih rencana tanggal pembayaran.'))
+      return
+    }
     const offers = retentionOffersForCustomer(customer?.customer_id || row.customer_id)
     if (!noContact && editOptions.approved_offer && editOptions.approved_offer !== NO_APPROVED_OFFER &&
         !offers.some((offer) => offer.value === editOptions.approved_offer)) {
@@ -71,6 +77,7 @@ export default function VisitDetailPage() {
         approved_offer: noContact ? null : editOptions.approved_offer || null,
         unpaid_reason: noContact || editOptions.conversation_result === 'Sudah melakukan pembayaran'
           ? null : editOptions.unpaid_reason || null,
+        planned_payment_date: promiseToPay ? editOptions.planned_payment_date : null,
       }
       const { data, error: updateError } = await createClient().from('visits').update(patch).eq('visit_id', row.visit_id).eq('agent_email', row.agent_email).select('*').single()
       if (updateError) throw updateError
@@ -182,6 +189,12 @@ export default function VisitDetailPage() {
                 </select>
               </label>
             ))}
+            {editOptions.conversation_result === 'Bersedia bayar / Promise to Pay' && (
+              <label className="block text-sm font-bold">
+                {tx('Planned payment date', 'Rencana tanggal pembayaran')}
+                <input type="date" className="dui-input mt-2 w-full" value={editOptions.planned_payment_date} onChange={(e) => setEditOptions((prev) => ({ ...prev, planned_payment_date: e.target.value }))} required />
+              </label>
+            )}
             {editError && <p role="alert" className="rounded-xl bg-error/10 p-3 text-sm text-error">{editError}</p>}
             <div className="flex gap-3 pt-2"><button type="button" className="dui-btn flex-1" disabled={editSaving} onClick={() => setEditOpen(false)}>{tx('Cancel', 'Batal')}</button><button type="button" className="dui-btn dui-btn-primary flex-1" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? tx('Saving…', 'Menyimpan…') : tx('Save changes', 'Simpan perubahan')}</button></div>
           </section>
