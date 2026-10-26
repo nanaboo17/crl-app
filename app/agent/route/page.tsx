@@ -67,6 +67,7 @@ export default function AgentRoutePage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [agentName, setAgentName] = useState('')
   const [assignedCount, setAssignedCount] = useState<number | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
   const [accuracy, setAccuracy] = useState<number | null>(null)
@@ -122,7 +123,7 @@ export default function AgentRoutePage() {
           .eq('actionable', true)
           .order('priority_rank', { ascending: true })
 
-        if (customerError) throw customerError
+        if (customerError) throw new Error(customerError.message || 'Customer query failed')
         if (cancelled) return
 
         setAgentName(agent.agent_name || email)
@@ -136,7 +137,7 @@ export default function AgentRoutePage() {
           setAssignedCount(null)
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : tx('Unable to load route data.', 'Tidak dapat memuat data rute.'))
+        if (!cancelled) setError(err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String(err.message) : tx('Unable to load route data.', 'Tidak dapat memuat data rute.')))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -144,7 +145,7 @@ export default function AgentRoutePage() {
 
     void loadData()
     return () => { cancelled = true }
-  }, [supabase, locale])
+  }, [supabase, locale, reloadKey])
 
   useEffect(() => {
     if (!selectedStopId || !showFat) {
@@ -382,7 +383,7 @@ export default function AgentRoutePage() {
               selectedCustomerId={selectedStopId}
               onSelectCustomer={(id) => { setSelectedStopId(id); setSheetPosition('collapsed') }}
               agentPosition={latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null} locale={locale} />
-          : <div className={styles.emptyMap}><MapPin size={30}/><strong>{assignedCount === 0 ? tx('No customers assigned', 'Belum ada pelanggan ditugaskan') : assignedCount && assignedCount > 0 ? tx('No actionable route stops', 'Tidak ada tujuan yang dapat dikunjungi') : tx('No mapped customers yet', 'Belum ada pelanggan dengan lokasi peta')}</strong><span>{assignedCount === 0 ? tx('Ask your supervisor to assign customers to your account.', 'Minta superadmin menugaskan pelanggan ke akun Anda.') : assignedCount && assignedCount > 0 ? tx(`${assignedCount} customers assigned, but none are currently actionable.`, `${assignedCount} pelanggan ditugaskan, tetapi belum ada yang dapat ditindaklanjuti.`) : tx('Check your assigned customer list or refresh the page.', 'Periksa daftar pelanggan atau muat ulang halaman.')}</span><Link href="/agent/customers" className={styles.emptyMapLink}>{tx('View my customers', 'Lihat pelanggan saya')}</Link>{error && <small role="alert">{error}</small>}</div>}
+          : <div className={styles.emptyMap}><MapPin size={30}/><strong>{assignedCount === 0 ? tx('No customers assigned', 'Belum ada pelanggan ditugaskan') : assignedCount && assignedCount > 0 ? tx('No actionable route stops', 'Tidak ada tujuan yang dapat dikunjungi') : tx('No mapped customers yet', 'Belum ada pelanggan dengan lokasi peta')}</strong><span>{assignedCount === 0 ? tx('Ask your supervisor to assign customers to your account.', 'Minta superadmin menugaskan pelanggan ke akun Anda.') : assignedCount && assignedCount > 0 ? tx(`${assignedCount} customers assigned, but none are currently actionable.`, `${assignedCount} pelanggan ditugaskan, tetapi belum ada yang dapat ditindaklanjuti.`) : tx('Check your assigned customer list or refresh the page.', 'Periksa daftar pelanggan atau muat ulang halaman.')}</span><Link href="/agent/customers" className={styles.emptyMapLink}>{tx('View my customers', 'Lihat pelanggan saya')}</Link>{error && <><small role="alert">{error}</small><button type="button" className={styles.emptyMapLink} onClick={() => setReloadKey((value) => value + 1)}>{tx('Retry loading route', 'Coba muat rute lagi')}</button></>}</div>}
         </div>
         <div className={styles.mapLegend}>{showFat && fatCandidates.length > 0 && <span style={{ color: '#0d9488', fontWeight: 800 }}>◆ FAT · 200 m radius (illustrative)</span>} <i className={styles.redDot}/> P1 <i className={styles.orangeDot}/> P2 <i className={styles.purpleDot}/> P3–P5 <i className={styles.blueDot}/> GPS</div>
         <div className={styles.routeHint}>{tx('Dashed line: suggested stop order, not a driving route.', 'Garis putus-putus: urutan kunjungan, bukan rute berkendara.')}</div>
