@@ -94,3 +94,19 @@
  .routeShell{height:100%;max-height:100%;min-height:0;border-radius:0}
  .mapPane,.sidebar{height:100%;min-height:0}
 }
+
+
+/* Mobile map controls stay inside the viewport with full labels and no overlap. */
+.emptyMap{padding:24px;text-align:center;max-width:100%;line-height:1.5}
+.emptyMap strong{font-size:16px;color:#514364}
+.emptyMap span{max-width:290px;font-size:12px;line-height:1.6}
+.emptyMapLink{display:inline-flex;align-items:center;justify-content:center;min-height:40px;margin-top:8px;padding:9px 16px;border-radius:12px;background:#7651c5;color:white!important;font-size:12px;font-weight:800;text-decoration:none}
+@media(max-width:750px){
+ .mapToolbar{left:12px;right:12px;max-width:calc(100% - 24px);width:auto;display:flex;align-items:center;gap:8px}
+ .mapToolbar>div:first-child{flex:1;min-width:0;max-width:none}
+ .mapActions{flex:0 0 auto}
+ .mapToolbar .mapActions button:first-child{min-width:49px;width:49px;max-width:49px}
+ .mobileToggle{position:absolute;top:68px;right:12px;bottom:auto;z-index:610;min-height:36px}
+ .fatStatus{top:116px;left:12px;right:12px;max-width:none;width:auto;box-sizing:border-box}
+ .emptyMap{gap:9px}
+}
