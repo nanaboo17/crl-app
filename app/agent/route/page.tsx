@@ -119,9 +119,10 @@ export default function AgentRoutePage() {
         const { data, error: customerError } = await supabase
           .from('customers')
           .select('crl_id, customer_id, customer_name, priority_rank, service_address, city, district, sub_district, given_latitude, given_longitude, visit_status, payment_status, days_left_to_churn')
-          .ilike('agent_email', email)
+          .eq('agent_email', email)
           .eq('actionable', true)
           .order('priority_rank', { ascending: true })
+          .limit(250)
 
         if (customerError) throw new Error(customerError.message || 'Customer query failed')
         if (cancelled) return
@@ -131,7 +132,7 @@ export default function AgentRoutePage() {
         if (!data?.length) {
           const { count } = await supabase.from('customers')
             .select('crl_id', { head: true, count: 'exact' })
-            .ilike('agent_email', email)
+            .eq('agent_email', email)
           if (!cancelled) setAssignedCount(count)
         } else {
           setAssignedCount(null)
