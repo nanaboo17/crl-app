@@ -429,6 +429,18 @@ export default function SuperadminReportsPage() {
         <Metric label={tx('Attendance Days', 'Hari Absensi')} value={totals.attendance} />
       </section>
 
+      <AgentProductivityReview
+        rows={visibleProductivityRows}
+        funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        loading={loading}
+        locale={locale}
+        dailyTarget={dailyTarget}
+        startDate={startDate}
+        endDate={endDate}
+        onOpenLocations={openLocations}
+      />
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
         <div className="dui-card-body gap-3 p-0 sm:p-0">
           <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
@@ -464,18 +476,6 @@ export default function SuperadminReportsPage() {
         visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
       />
 
-      <AgentProductivityReview
-        rows={visibleProductivityRows}
-        funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
-        visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
-        payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
-        loading={loading}
-        locale={locale}
-        dailyTarget={dailyTarget}
-        startDate={startDate}
-        endDate={endDate}
-        onOpenLocations={openLocations}
-      />
       {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
         <section role="dialog" aria-modal="true" aria-label={tx('Agent GPS Movement','Pergerakan GPS Agen')} className="dui-card max-h-[90vh] w-full max-w-4xl overflow-y-auto bg-base-100 shadow-xl">
           <div className="dui-card-body gap-3">
