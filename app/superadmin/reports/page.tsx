@@ -56,6 +56,7 @@ type ReportRow = {
   average_worked_minutes: number
 }
 
+type AttendanceBreakdown = {agent_email:string;on_time_days:number;late_days:number;sick_days:number;permission_days:number}
 type AgentFunnelCount = { agent_email:string; unique_previsits:number; unique_met:number; unique_ptp:number }
 type VisitedCustomerCount = { agent_email: string; visited_customers: number }
 type PaymentConversion = { agent_email: string; paid_after_visit: number; paid_after_previsit: number }
@@ -107,6 +108,7 @@ export default function SuperadminReportsPage() {
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
   const [visitedCustomerRows, setVisitedCustomerRows] = useState<VisitedCustomerCount[]>([])
   const [agentFunnelRows, setAgentFunnelRows] = useState<AgentFunnelCount[]>([])
+  const [attendanceBreakdown, setAttendanceBreakdown] = useState<AttendanceBreakdown[]>([])
   const [conversionRows, setConversionRows] = useState<PaymentConversion[]>([])
   const [locationAgent, setLocationAgent] = useState<ProductivityRow | null>(null)
   const [locationRows, setLocationRows] = useState<HistoryPoint[]>([])
@@ -120,7 +122,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult, visitedResult, funnelResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult, visitedResult, funnelResult, attendanceResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -151,6 +153,7 @@ export default function SuperadminReportsPage() {
       supabase.rpc('crl_agent_funnel_counts_v1', {
         p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
       }),
+      supabase.rpc('crl_report_attendance_breakdown_v1', {p_start_date:startDate,p_end_date:endDate,p_agent_email:agentEmail||null}),
     ])
 
     // Keep successful report sections visible if one expensive RPC times out.
@@ -161,6 +164,7 @@ export default function SuperadminReportsPage() {
     setProductivityRows(productivityResult.error ? [] : (productivityResult.data ?? []) as ProductivityRow[])
     setVisitedCustomerRows(visitedResult.error ? [] : (visitedResult.data ?? []) as VisitedCustomerCount[])
     setAgentFunnelRows(funnelResult.error ? [] : (funnelResult.data ?? []) as AgentFunnelCount[])
+    setAttendanceBreakdown(attendanceResult.error ? [] : (attendanceResult.data ?? []) as AttendanceBreakdown[])
 
     const failed = [
       agentResult.error && tx('Agent directory', 'Direktori agen'),
@@ -170,6 +174,7 @@ export default function SuperadminReportsPage() {
       productivityResult.error && tx('Productivity', 'Produktivitas'),
       visitedResult.error && tx('Visited customers', 'Pelanggan dikunjungi'),
       funnelResult.error && tx('Recovery funnel', 'Funnel pemulihan'),
+      attendanceResult.error && tx('Attendance breakdown','Rincian absensi'),
     ].filter(Boolean)
     if (failed.length) {
       console.error('Superadmin report RPC failures', { overview: reportResult.error, weekly: weeklyResult.error, productivity: productivityResult.error, conversions: conversionResult.error, visited: visitedResult.error })
@@ -291,48 +296,59 @@ export default function SuperadminReportsPage() {
     return ()=>{cancelled=true}
   },[locationAgent,locationDay,supabase])
 
+  const inOrg=(email:string)=>!organization||agents.some(a=>a.email.toLowerCase()===email.toLowerCase()&&(a.organization||'').trim()===organization)
+  const visibleFunnel=agentFunnelRows.filter(r=>inOrg(r.agent_email))
+  const visibleAttendance=attendanceBreakdown.filter(r=>inOrg(r.agent_email))
+  const visiblePayments=conversionRows.filter(r=>inOrg(r.agent_email))
+  const visibleVisited=visitedCustomerRows.filter(r=>inOrg(r.agent_email))
+  const funnelByEmail=new Map(visibleFunnel.map(r=>[r.agent_email.toLowerCase(),r]))
+  const attendanceByEmail=new Map(visibleAttendance.map(r=>[r.agent_email.toLowerCase(),r]))
+  const visitedByEmail=new Map(visibleVisited.map(r=>[r.agent_email.toLowerCase(),r]))
+  const portfolioInfo=[
+    {group:'Portfolio',title:tx('Assigned','Ditugaskan'),value:totals.assigned,description:tx('Current assigned portfolio, not a historical cohort','Portofolio penugasan saat ini, bukan kohort historis')},
+    {group:'Portfolio',title:tx('Unpaid','Belum bayar'),value:totals.unpaid,description:tx('Currently unpaid among assigned customers','Belum bayar dari pelanggan yang ditugaskan')},
+    {group:'Recovery',title:tx('Paid portfolio','Portofolio lunas'),value:totals.paid,description:tx('Current payment status, not paid-after-visit','Status pembayaran saat ini, bukan pembayaran setelah kunjungan')},
+    {group:'Field Activity',title:'Pre-Visits',value:totals.preVisits,description:tx('Recorded pre-visit submissions within period','Pengisian pre-visit selama periode')},
+    {group:'Field Activity',title:tx('Unique visited','Pelanggan dikunjungi'),value:visitedCustomerTotal,description:tx('Distinct CRL cases per agent in period','Kasus CRL unik per agen dalam periode')},
+    {group:'Field Activity',title:tx('Total visits','Total kunjungan'),value:totals.visits,description:tx('Includes follow-up and repeat visits','Termasuk kunjungan ulang')},
+    {group:'Attendance',title:tx('Attendance days','Hari hadir'),value:totals.attendance,description:tx('Total agent-days with attendance records','Total hari hadir dari seluruh agen')},
+  ]
+  const exportAgentRows=visibleProductivityRows.map(r=>{
+    const key=r.agent_email.toLowerCase(),fu=funnelByEmail.get(key),att=attendanceByEmail.get(key),v=visitedByEmail.get(key),pay=conversionsByEmail.get(key)
+    const met=Number(fu?.unique_met||0),ptp=Number(fu?.unique_ptp||0),unique=Number(v?.visited_customers||0),paid=Number(pay?.paid_after_visit||0)+Number(pay?.paid_after_previsit||0)
+    return {r,fu,att,unique,met,ptp,paid,
+      record:[r.agent_name||'',r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,
+      r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,
+      r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days,
+      r.visits_per_attendance_day??'',r.target_attainment??'',
+      unique? (met/unique*100).toFixed(1):'',met?(ptp/met*100).toFixed(1):'',unique?(paid/unique*100).toFixed(1):'',
+      r.first_pre_visit||'',r.first_visit||'',r.review]}
+  })
   function downloadCsv() {
-    const headers = [...productivityHeaders]
-    const body = visibleProductivityRows.map(r=>productivityValues(r,conversionsByEmail.get(r.agent_email.toLowerCase())).map(csvCell).join(','))
-
-    const metadata = [
-      [csvCell('CRL Superadmin Report')],
-      [csvCell('Start Date'), csvCell(startDate)],
-      [csvCell('End Date'), csvCell(endDate)],
-      [csvCell('Organization'), csvCell(organization || 'All Organizations')],
-      [csvCell('Agent'), csvCell(agentEmail || 'All Agents')],
-      [],
-    ].map((line) => line.join(','))
-
-    const weeklyHeaders = ['Agent Name', 'Agent Email', 'Week Start', 'Week End', 'Pre-Visits', 'Visits', 'Visit Conversion %']
-    const weeklyBody = visibleWeeklyRows.map((row) => [
-      row.agent_name,
-      row.agent_email,
-      row.week_start,
-      row.week_end,
-      row.pre_visits,
-      row.visits,
-      Number(row.visit_conversion || 0).toFixed(1),
-    ].map(csvCell).join(','))
-
-    const csv = `\uFEFF${[
-      ...metadata,
-      headers.map(csvCell).join(','),
-      ...body,
-      '',
-      csvCell('Weekly Activity by Agent'),
-      weeklyHeaders.map(csvCell).join(','),
-      ...weeklyBody,
-    ].join('\r\n')}`
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `crl-report-${startDate}-to-${endDate}${organization ? `-${organization.replace(/\s+/g, '-').toLowerCase()}` : ''}${agentEmail ? `-${agentEmail.split('@')[0]}` : ''}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    const agentColumns=['Agent','Email','Assigned (current portfolio)','Unique Pre-Visit','Total Visits','Unique Visited','Unique Met','Unique P2P','Paid After Activity','Attendance Days','On-Time Days','Late Days','Sick Days (approved)','Permission Days (approved)','No Activity Days','Missing Checkout Days','Long Gaps >3h','Visits / Attendance Day','Target Attainment %','Meeting Rate %','P2P Rate %','Recovery Rate %','First Pre-Visit Today (WIB timestamp)','First Visit Today (WIB timestamp)','Review']
+    const weeks=new Map<string,{start:string;end:string;pre:number;visits:number}>()
+    for(const row of visibleWeeklyRows){const w=weeks.get(row.week_start)||{start:row.week_start,end:row.week_end,pre:0,visits:0};w.pre+=Number(row.pre_visits||0);w.visits+=Number(row.visits||0);weeks.set(row.week_start,w)}
+    const weekly=[...weeks.values()].sort((a,b)=>a.start.localeCompare(b.start))
+    const toCsv=(values:(string|number|null|undefined)[])=>values.map(csvCell).join(',')
+    const lines=[
+      toCsv(['CRL Superadmin Reports']),toCsv(['Start Date',startDate]),toCsv(['End Date',endDate]),
+      toCsv(['Organization',organization||'All Organizations']),toCsv(['Agent',agentEmail||'All Agents']), '',
+      toCsv(['SUMMARY KPIS']),toCsv(['Group','Metric','Value','Definition']),
+      ...portfolioInfo.map(v=>toCsv([v.group,v.title,v.value,v.description])), '',
+      toCsv(['AGENT FUNNEL / ATTENDANCE / PRODUCTIVITY / REVIEW']),toCsv(agentColumns),
+      ...exportAgentRows.map(x=>toCsv(x.record)), '',
+      toCsv(['WEEKLY PERFORMANCE TREND']),toCsv(['Week Start (clipped)','Week End (clipped)','Pre-Visits','Visits','Visits / PV (%)']),
+      ...weekly.map(w=>toCsv([w.start<startDate?startDate:w.start,w.end>endDate?endDate:w.end,w.pre,w.visits,w.pre?(w.visits/w.pre*100).toFixed(1):''])),
+      '',toCsv(['WEEKLY AGENT ACTIVITY (detail)']),toCsv(['Agent','Email','Week Start','Week End','Pre-Visits','Visits']),
+      ...visibleWeeklyRows.map(w=>toCsv([w.agent_name||'',w.agent_email,w.week_start<startDate?startDate:w.week_start,w.week_end>endDate?endDate:w.week_end,w.pre_visits,w.visits])),
+      '',toCsv(['Export notes','Counts for assigned and paid portfolio are current; field activity is filtered by selected dates.']),
+      toCsv(['Export notes','Total visits include repeats; distinct cases are per agent. Paid after activity is attribution, not a strict sequential funnel.'])
+    ]
+    const blob=new Blob(['\\uFEFF'+lines.join('\\r\\n')],{type:'text/csv;charset=utf-8;'})
+    const url=URL.createObjectURL(blob),link=document.createElement('a')
+    link.href=url
+    link.download=`crl-report-${startDate}-to-${endDate}.csv`
+    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
   }
 
   return (
@@ -419,16 +435,12 @@ export default function SuperadminReportsPage() {
 
       {error && <div className="dui-alert dui-alert-error"><span>{error}</span></div>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
-        <Metric label={tx('Assigned', 'Ditugaskan')} value={totals.assigned} />
-        <Metric label={tx('Paid', 'Lunas')} value={totals.paid} />
-        <Metric label={tx('Unpaid', 'Belum Bayar')} value={totals.unpaid} />
-        <Metric label={tx('Pre-Visits', 'Pra-Kunjungan')} value={totals.preVisits} />
-        <Metric label={tx('Visited Customers', 'Pelanggan Dikunjungi')} value={visitedCustomerTotal} />
-        <Metric label={tx('Total Visits', 'Total Kunjungan')} value={totals.visits} />
-        <Metric label={tx('Attendance Days', 'Hari Absensi')} value={totals.attendance} />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {(['Portfolio','Field Activity','Recovery','Attendance'] as const).map(group=><div key={group} className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-black">{group==='Portfolio'?tx('Customer Portfolio','Portofolio Pelanggan'):group==='Field Activity'?tx('Field Activity','Aktivitas Lapangan'):group==='Recovery'?tx('Recovery Outcome','Hasil Pemulihan'):tx('Attendance','Kehadiran')}</h2>
+          <div className="grid grid-cols-2 gap-3">{portfolioInfo.filter(k=>k.group===group).map(k=><div key={k.title} className="min-w-0 rounded-xl bg-base-200/60 p-3" title={k.description}><p className="text-xs font-semibold opacity-70">{k.title}</p><p className="mt-1 text-2xl font-black tabular-nums">{k.value.toLocaleString('id-ID')}</p><p className="mt-1 text-[11px] leading-relaxed opacity-60">{k.description}</p></div>)}</div>
+        </div>)}
       </section>
-
       <AgentProductivityReview
         rows={visibleProductivityRows}
         funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
@@ -437,6 +449,7 @@ export default function SuperadminReportsPage() {
         loading={loading}
         locale={locale}
         dailyTarget={dailyTarget}
+        attendanceBreakdown={visibleAttendance}
         startDate={startDate}
         endDate={endDate}
         onOpenLocations={openLocations}
@@ -445,6 +458,8 @@ export default function SuperadminReportsPage() {
         funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
         payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
         visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        productivity={visibleProductivityRows}
+        comparisonEnd={today}
       />
 
       {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
