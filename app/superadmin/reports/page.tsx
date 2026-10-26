@@ -13,6 +13,7 @@ import {
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import WeeklyAgentActivity from './WeeklyAgentActivity'
+import styles from './ReportPrint.module.css'
 import AgentProductivityReview from './AgentProductivityReview'
 import dynamic from 'next/dynamic'
 import type { HistoryPoint } from '@/components/superadmin/AgentMovementMap'
@@ -328,7 +329,7 @@ export default function SuperadminReportsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
+    <div className={`mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8 ${styles.reportRoot}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-primary">
@@ -430,13 +431,22 @@ export default function SuperadminReportsPage() {
         endDate={endDate}
         onOpenLocations={openLocations}
       />
-      <section className="hidden print:block">
-        <h2 className="mb-2 text-lg font-black">Agent Performance · Funnel / Attendance / Productivity / Review</h2>
-        <p className="mb-3 text-xs">{startDate} — {endDate} · {organization || 'All organizations'} · {agentEmail || 'All agents'}</p>
-        <table className="w-full border-collapse text-[8px]">
-          <thead><tr>{['Agent','Assigned','Pre-Visit (unique)','Visits','Unique','Met','P2P','Paid after activity','Attendance','On time','Late','Sick','Permission','No activity','Missing checkout','Long gaps'].map(h=><th key={h} className="border p-1 text-left">{h}</th>)}</tr></thead>
-          <tbody>{exportAgentRows.map(({r,fu,att,unique,met,ptp,paid})=><tr key={r.agent_email}>{[r.agent_name||r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days].map((value,i)=><td key={i} className="border p-1">{value}</td>)}</tr>)}</tbody>
+      <section className={styles.printReport} aria-label={tx('Printable CRL Report','Laporan CRL untuk dicetak')}>
+        <header className={styles.printHeader}>
+          <div><h1>CRL Field Operations</h1><p>{tx('Superadmin Performance Report','Laporan Kinerja Superadmin')}</p></div>
+          <div className={styles.printMeta}><strong>{startDate} — {endDate}</strong><span>{organization || tx('All organizations','Semua organisasi')} · {agentEmail || tx('All agents','Semua agen')}</span><span>{tx('Reporting time zone','Zona waktu pelaporan')}: WIB (UTC+7)</span></div>
+        </header>
+        <h2>{tx('Performance overview','Ringkasan kinerja')}</h2>
+        <div className={styles.printMetrics}>{portfolioInfo.map(k=><article key={k.group+k.title}><small>{k.group}</small><b>{k.title}</b><strong>{k.value.toLocaleString('id-ID')}</strong><span>{k.description}</span></article>)}</div>
+        <h2>{tx('Agent performance and operational review','Kinerja agen dan evaluasi operasional')}</h2>
+        <p className={styles.printNote}>{tx('Assigned and portfolio paid are current-state figures. Field activity and payment attribution follow the selected date range. Unique cases are distinct per agent; total visits include repeat visits.','Assigned dan pelanggan lunas merupakan kondisi terkini. Aktivitas dan atribusi pembayaran mengikuti periode. Kasus unik dihitung per agen; total kunjungan termasuk kunjungan ulang.')}</p>
+        <table className={styles.printTable}><thead><tr>{['Agent','Assigned','PV unique','Visits','Visit unique','Met','P2P','Paid after activity','Attend','On time','Late','Sick','Permission','No activity','Missing checkout','Gaps >3h'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{exportAgentRows.map(({r,fu,att,unique,met,ptp,paid})=><tr key={r.agent_email}>{[r.agent_name||r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days].map((value,i)=><td key={i}>{value}</td>)}</tr>)}</tbody>
         </table>
+        <h2 className={styles.breakBefore}>{tx('Weekly performance trend','Tren kinerja mingguan')}</h2>
+        <table className={styles.printTable}><thead><tr><th>{tx('Week','Minggu')}</th><th>Pre-Visits</th><th>Visits</th><th>Visits / PV</th></tr></thead><tbody>{[...new Map(visibleWeeklyRows.map(r=>[r.week_start,r.week_end])).entries()].sort(([a],[b])=>a.localeCompare(b)).map(([start,end])=>{const matched=visibleWeeklyRows.filter(r=>r.week_start===start);const pv=matched.reduce((sum,r)=>sum+Number(r.pre_visits||0),0);const visits=matched.reduce((sum,r)=>sum+Number(r.visits||0),0);return <tr key={start}><td>{start<startDate?startDate:start} — {end>endDate?endDate:end}</td><td>{pv}</td><td>{visits}</td><td>{pv?(100*visits/pv).toFixed(1)+'%':'—'}</td></tr>})}</tbody></table>
+        <p className={styles.printNote}>{tx('Visits / Pre-Visits is an activity ratio, not a sequential customer conversion rate. Partial weeks are clipped to the selected date range.','Visits / Pre-Visits adalah rasio aktivitas, bukan konversi pelanggan berurutan. Minggu parsial dibatasi rentang tanggal yang dipilih.')}</p>
+        <footer className={styles.printFooter}>CRL Field Operations · {startDate} — {endDate} · {tx('Confidential internal report','Laporan internal terbatas')}</footer>
       </section>
       <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} startDate={startDate} endDate={endDate}
         funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
