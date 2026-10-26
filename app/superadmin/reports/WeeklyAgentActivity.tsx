@@ -17,12 +17,15 @@ type Props = {
   rows: WeeklyAgentActivityRow[]
   loading: boolean
   locale: 'en' | 'id'
+  startDate: string
+  endDate: string
 }
 
 const PAGE_SIZE = 10
 
-export default function WeeklyAgentActivity({ rows, loading, locale }: Props) {
+export default function WeeklyAgentActivity({ rows, loading, locale, startDate, endDate }: Props) {
   const tx = (en: string, id: string) => (locale === 'id' ? id : en)
+  const displayRange = (start: string, end: string) => `${start < startDate ? startDate : start} — ${end > endDate ? endDate : end}`
   const [week, setWeek] = useState('')
   const [page, setPage] = useState(1)
 
@@ -102,7 +105,7 @@ export default function WeeklyAgentActivity({ rows, loading, locale }: Props) {
                 <option value="">{tx('All weeks', 'Semua minggu')}</option>
                 {weekOptions.map((item) => (
                   <option key={item.week_start} value={item.week_start}>
-                    {item.week_start} — {item.week_end}
+                    {displayRange(item.week_start, item.week_end)}
                   </option>
                 ))}
               </select>
@@ -136,7 +139,7 @@ export default function WeeklyAgentActivity({ rows, loading, locale }: Props) {
                         <div className="font-bold">{row.agent_name || '—'}</div>
                         <div className="text-[11px] text-base-content/50">{row.agent_email}</div>
                       </td>
-                      <td>{row.week_start} — {row.week_end}</td>
+                      <td>{displayRange(row.week_start, row.week_end)}</td>
                       <td>{row.pre_visits}</td>
                       <td>{row.visits}</td>
                       <td>{Number(row.visit_conversion || 0).toFixed(1)}%</td>
@@ -184,7 +187,7 @@ export default function WeeklyAgentActivity({ rows, loading, locale }: Props) {
               {weeklyTotals.map((item) => (
                 <div key={item.week_start} className="space-y-1.5">
                   <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="font-semibold">{item.week_start} — {item.week_end}</span>
+                    <span className="font-semibold">{displayRange(item.week_start, item.week_end)}</span>
                     <span className="text-base-content/50">{item.pre_visits} PV · {item.visits} V</span>
                   </div>
                   <div className="grid grid-cols-[76px_1fr] items-center gap-2 text-[11px]">
@@ -208,9 +211,7 @@ export default function WeeklyAgentActivity({ rows, loading, locale }: Props) {
             <div>
               <div className="font-bold">{tx('Top Agent Activity', 'Aktivitas Agen Teratas')}</div>
               <div className="text-xs text-base-content/50">
-                {weekOptions.find((item) => item.week_start === chartWeek)?.week_start || chartWeek}
-                {chartWeek ? ' — ' : ''}
-                {weekOptions.find((item) => item.week_start === chartWeek)?.week_end || ''}
+                {weekOptions.find((item) => item.week_start === chartWeek) ? displayRange(weekOptions.find((item) => item.week_start === chartWeek)!.week_start, weekOptions.find((item) => item.week_start === chartWeek)!.week_end) : chartWeek}
               </div>
             </div>
             <div className="space-y-3">
