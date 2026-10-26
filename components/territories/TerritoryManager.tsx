@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowRight, CheckCircle2, Loader2, MapPin, RefreshCw, Search, ShieldCheck, UserRound, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './TerritoryManager.module.css'
@@ -173,7 +174,7 @@ export default function TerritoryManager() {
   return (
     <div className={styles.manager}>
       {error && <div className={styles.alert}>{error}</div>}
-      {pending && (
+      {pending && createPortal(
         <div className={styles.dialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelTransfer() }}>
           <section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="territory-transfer-title" aria-describedby="territory-transfer-description">
             <div className={styles.dialogHeader}>
@@ -201,7 +202,7 @@ export default function TerritoryManager() {
               </button>
             </div>
           </section>
-        </div>
+        </div>, document.body
       )}
 
       <div className={styles.toolbar}>
