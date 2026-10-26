@@ -164,10 +164,12 @@ export default function SuperadminReportsPage() {
       visitedResult.error && tx('Visited customers', 'Pelanggan dikunjungi'),
     ].filter(Boolean)
     if (failed.length) {
+      console.error('Superadmin report RPC failures', { overview: reportResult.error, weekly: weeklyResult.error, productivity: productivityResult.error, conversions: conversionResult.error, visited: visitedResult.error })
+      const details = [reportResult.error && `Overview: ${reportResult.error.message}`, weeklyResult.error && `Weekly: ${weeklyResult.error.message}`, productivityResult.error && `Productivity: ${productivityResult.error.message}`].filter(Boolean)
       setError(
         tx('Some report sections could not load', 'Sebagian laporan gagal dimuat') +
         ': ' + failed.join(', ') +
-        '. ' + tx('Try a shorter date range or select one agent, then refresh.', 'Coba rentang tanggal lebih pendek atau pilih satu agen, lalu muat ulang.')
+        '. ' + details.join(' · ')
       )
     }
     setLoading(false)
