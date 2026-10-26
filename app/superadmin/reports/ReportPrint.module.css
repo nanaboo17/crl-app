@@ -1,0 +1,28 @@
+.printReport{display:none}
+@media print{
+  @page{size:A4 landscape;margin:12mm 11mm}
+  .reportRoot{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:white!important;color:#161616!important}
+  .reportRoot > :not(.printReport){display:none!important}
+  .printReport{display:block!important;font-family:Arial,Helvetica,sans-serif!important;color:#171717!important;font-size:9pt;line-height:1.35}
+  .printHeader{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #c20074;padding-bottom:9mm;margin-bottom:6mm;gap:12mm}
+  .printHeader h1{font-size:21pt;line-height:1.2;margin:0;color:#b00070}
+  .printHeader p{margin:2mm 0 0;font-size:11pt;font-weight:600}
+  .printMeta{display:flex;flex-direction:column;align-items:flex-end;gap:1mm;font-size:8pt;text-align:right}
+  .printReport h2{font-size:13pt;margin:7mm 0 3mm;break-after:avoid;page-break-after:avoid}
+  .printMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3mm}
+  .printMetrics article{border:1px solid #ddd;border-radius:3mm;padding:3mm;display:flex;flex-direction:column;min-width:0;break-inside:avoid}
+  .printMetrics small{font-size:7pt;color:#666}
+  .printMetrics b{font-size:8pt;margin-top:1mm}
+  .printMetrics strong{font-size:15pt;margin:1mm 0}
+  .printMetrics span{font-size:7pt;color:#555}
+  .printNote{font-size:7.5pt;color:#555;margin:3mm 0 4mm}
+  .printTable{border-collapse:collapse;width:100%;table-layout:auto;font-size:7.1pt;line-height:1.25}
+  .printTable thead{display:table-header-group}
+  .printTable tr{break-inside:avoid;page-break-inside:avoid}
+  .printTable th,.printTable td{border:1px solid #d5d5d5;padding:1.7mm 1.2mm;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+  .printTable th{background:#f2edf2!important;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .printTable tr:nth-child(even) td{background:#f8f8f8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .printTable td:first-child{min-width:27mm;font-weight:600}
+  .breakBefore{break-before:page;page-break-before:always}
+  .printFooter{font-size:7pt;color:#666;border-top:1px solid #ccc;margin-top:7mm;padding-top:3mm}
+}
