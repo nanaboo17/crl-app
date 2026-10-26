@@ -468,6 +468,8 @@ export default function SuperadminReportsPage() {
         loading={loading}
         locale={locale}
         dailyTarget={dailyTarget}
+        startDate={startDate}
+        endDate={endDate}
         onOpenLocations={openLocations}
       />
       {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
