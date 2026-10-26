@@ -103,18 +103,35 @@ export default function TerritoryManager() {
   }, [filtered])
 
   async function assignAgent(territoryCode: string, email: string) {
+    if (savingCode) return
     setSavingCode(territoryCode)
     setError('')
-
-    const { error: rpcError } = await supabase.rpc('set_territory_agent_by_code', {
-      p_territory_code: territoryCode,
-      p_agent_email: email || null,
-    })
-
-    if (rpcError) setError(rpcError.message)
-    else await load()
-
-    setSavingCode(null)
+    try {
+      const { data: impacted, error: previewError } = await supabase.rpc('preview_territory_agent_transfer', {
+        p_territory_code: territoryCode,
+        p_agent_email: email || null,
+      })
+      if (previewError) throw previewError
+      const month = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }).format(new Date())
+      const count = Number(impacted || 0)
+      const target = agents.find((a) => a.email === email)?.agent_name || (email ? email : 'Unassigned')
+      const confirmed = window.confirm(
+        `Change territory ${territoryCode} owner to ${target}?\n\n` +
+        `${count.toLocaleString('en-US')} eligible unvisited customer case(s) from ${month} will be transferred.\n` +
+        'Older case months and customers with recorded visits will keep their current assignments.\n\nContinue?'
+      )
+      if (!confirmed) return
+      const { error: rpcError } = await supabase.rpc('set_territory_agent_by_code', {
+        p_territory_code: territoryCode,
+        p_agent_email: email || null,
+      })
+      if (rpcError) throw rpcError
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to change territory assignment')
+    } finally {
+      setSavingCode(null)
+    }
   }
 
   if (loading) return <div className={styles.loading} />
@@ -266,7 +283,7 @@ export default function TerritoryManager() {
                   <span className={styles.label}><UserRound className="inline h-4 w-4" /> Assigned agent</span>
                   <select
                     className={styles.select}
-                    disabled={savingCode === row.territory_code}
+                    disabled={savingCode !== null}
                     value={row.agent_email || ''}
                     onChange={(event) => void assignAgent(row.territory_code, event.target.value)}
                   >
@@ -281,7 +298,7 @@ export default function TerritoryManager() {
 
                 {assignedAgent && (
                   <p className={styles.agentNote}>
-                    {assignedAgent.agent_name} owns all unfinished unpaid customers in this territory.
+                    {assignedAgent.agent_name} is the territory owner. Changing this assignment transfers only eligible unvisited cases from the current case month; older case months are preserved.
                   </p>
                 )}
               </section>
