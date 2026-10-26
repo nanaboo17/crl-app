@@ -441,35 +441,6 @@ export default function SuperadminReportsPage() {
         endDate={endDate}
         onOpenLocations={openLocations}
       />
-      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
-        <div className="dui-card-body gap-3 p-0 sm:p-0">
-          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
-            <CalendarDays className="h-5 w-5" /> {tx('Weekly Field Activity', 'Aktivitas Lapangan Mingguan')}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="dui-table dui-table-zebra min-w-[640px] text-xs sm:text-sm">
-              <thead><tr>
-                <th>{tx('Week', 'Minggu')}</th>
-                <th>{tx('Pre-Visits', 'Pra-Kunjungan')}</th>
-                <th>{tx('Visits', 'Kunjungan')}</th>
-                <th>{tx('Visit Conversion', 'Konversi Kunjungan')}</th>
-              </tr></thead>
-              <tbody>
-                {weeklyTotals.map((row) => {
-                  const conversion = row.pre_visits > 0 ? (row.visits / row.pre_visits) * 100 : 0
-                  return <tr key={row.week_start}>
-                    <td className="font-bold">{row.week_start < startDate ? startDate : row.week_start} — {row.week_end > endDate ? endDate : row.week_end}</td>
-                    <td>{row.pre_visits}</td>
-                    <td>{row.visits}</td>
-                    <td>{conversion.toFixed(1)}%</td>
-                  </tr>
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
       <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} startDate={startDate} endDate={endDate}
         funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
         payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
