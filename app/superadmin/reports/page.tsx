@@ -9,7 +9,6 @@ import {
   RefreshCw,
   MapPin,
   X,
-  Users,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
@@ -69,13 +68,6 @@ type ProductivityRow = {
   visits_per_attendance_day: number | null; visits_per_field_day: number | null;
   target_attainment: number | null; met: number; ptp: number; missing_checkout_days: number;
   long_gap_days: number; first_pre_visit: string | null; first_visit: string | null; review: string;
-}
-const productivityHeaders = ['CRL Agent','Email','Assigned Leads','Attendance Days','No-Activity Attendance Days','Pre-Visit Days','Field Visit Days','Pre-Visit Customer-Days','Total Visits','Paid After Visit','Paid After Previsit','Visits / Attendance Day','Visits / Field Day','Target Attainment','Met','PTP','Missing Checkout Days','Long Gap Days >3h','First Pre-Visit','First Visit','Review'] as const
-function productivityValues(r:ProductivityRow, conversion?:PaymentConversion) {
- return [r.agent_name,r.agent_email,r.assigned_leads,r.attendance_days,r.no_activity_attendance_days,
- r.pre_visit_days,r.field_visit_days,r.pre_visit_customer_days,r.total_visits,
- conversion?.paid_after_visit ?? 0,conversion?.paid_after_previsit ?? 0,r.visits_per_attendance_day,r.visits_per_field_day,r.target_attainment==null?'':r.target_attainment+'%',
- r.met,r.ptp,r.missing_checkout_days,r.long_gap_days,r.first_pre_visit,r.first_visit,r.review]
 }
 
 function jakartaDate() {
@@ -226,22 +218,6 @@ export default function SuperadminReportsPage() {
     return weeklyRows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
   }, [agents, organization, weeklyRows])
 
-  const weeklyTotals = useMemo(() => {
-    const byWeek = new Map<string, { week_start: string; week_end: string; pre_visits: number; visits: number }>()
-    for (const row of visibleWeeklyRows) {
-      const current = byWeek.get(row.week_start) ?? {
-        week_start: row.week_start,
-        week_end: row.week_end,
-        pre_visits: 0,
-        visits: 0,
-      }
-      current.pre_visits += Number(row.pre_visits || 0)
-      current.visits += Number(row.visits || 0)
-      byWeek.set(row.week_start, current)
-    }
-    return Array.from(byWeek.values()).sort((a, b) => a.week_start.localeCompare(b.week_start))
-  }, [visibleWeeklyRows])
-
   const totals = useMemo(() => visibleRows.reduce(
     (acc, row) => ({
       assigned: acc.assigned + Number(row.assigned_customers || 0),
@@ -374,7 +350,7 @@ export default function SuperadminReportsPage() {
           <button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={() => window.print()} disabled={loading}>
             <Printer className="h-4 w-4" /> {tx('Print / PDF', 'Cetak / PDF')}
           </button>
-          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={downloadCsv} disabled={loading || visibleRows.length === 0}>
+          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={downloadCsv} disabled={loading || (visibleRows.length === 0 && visibleProductivityRows.length === 0)}>
             <Download className="h-4 w-4" /> {tx('Download CSV', 'Unduh CSV')}
           </button>
         </div>
@@ -503,13 +479,3 @@ export default function SuperadminReportsPage() {
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body gap-1 p-4"><span className="text-xs font-bold uppercase tracking-wide text-base-content/50">{label}</span><strong className="text-2xl font-black">{value.toLocaleString()}</strong></div></div>
-}
-
-function formatMinutes(minutes: number, locale: 'en' | 'id') {
-  const total = Math.max(0, Math.round(minutes))
-  const hours = Math.floor(total / 60)
-  const mins = total % 60
-  return locale === 'id' ? `${hours}j ${mins}m` : `${hours}h ${mins}m`
-}
