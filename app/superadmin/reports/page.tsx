@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
 import WeeklyAgentActivity from './WeeklyAgentActivity'
+import AgentProductivityReview from './AgentProductivityReview'
 import dynamic from 'next/dynamic'
 import type { HistoryPoint } from '@/components/superadmin/AgentMovementMap'
 const AgentMovementMap = dynamic(() => import('@/components/superadmin/AgentMovementMap'), { ssr: false })
@@ -55,6 +56,7 @@ type ReportRow = {
   average_worked_minutes: number
 }
 
+type AgentFunnelCount = { agent_email:string; unique_previsits:number; unique_met:number; unique_ptp:number }
 type VisitedCustomerCount = { agent_email: string; visited_customers: number }
 type PaymentConversion = { agent_email: string; paid_after_visit: number; paid_after_previsit: number }
 type AuthDirectoryUser = { id: string; email: string | null }
@@ -104,6 +106,7 @@ export default function SuperadminReportsPage() {
   const [dailyTarget, setDailyTarget] = useState('')
   const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
   const [visitedCustomerRows, setVisitedCustomerRows] = useState<VisitedCustomerCount[]>([])
+  const [agentFunnelRows, setAgentFunnelRows] = useState<AgentFunnelCount[]>([])
   const [conversionRows, setConversionRows] = useState<PaymentConversion[]>([])
   const [locationAgent, setLocationAgent] = useState<ProductivityRow | null>(null)
   const [locationRows, setLocationRows] = useState<HistoryPoint[]>([])
@@ -117,7 +120,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult, visitedResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult, visitedResult, funnelResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -145,6 +148,9 @@ export default function SuperadminReportsPage() {
       supabase.rpc('crl_report_visited_customer_counts', {
         p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
       }),
+      supabase.rpc('crl_agent_funnel_counts_v1', {
+        p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
+      }),
     ])
 
     // Keep successful report sections visible if one expensive RPC times out.
@@ -154,6 +160,7 @@ export default function SuperadminReportsPage() {
     setConversionRows(conversionResult.error ? [] : (conversionResult.data ?? []) as PaymentConversion[])
     setProductivityRows(productivityResult.error ? [] : (productivityResult.data ?? []) as ProductivityRow[])
     setVisitedCustomerRows(visitedResult.error ? [] : (visitedResult.data ?? []) as VisitedCustomerCount[])
+    setAgentFunnelRows(funnelResult.error ? [] : (funnelResult.data ?? []) as AgentFunnelCount[])
 
     const failed = [
       agentResult.error && tx('Agent directory', 'Direktori agen'),
@@ -162,6 +169,7 @@ export default function SuperadminReportsPage() {
       conversionResult.error && tx('Payment conversions', 'Konversi pembayaran'),
       productivityResult.error && tx('Productivity', 'Produktivitas'),
       visitedResult.error && tx('Visited customers', 'Pelanggan dikunjungi'),
+      funnelResult.error && tx('Recovery funnel', 'Funnel pemulihan'),
     ].filter(Boolean)
     if (failed.length) {
       console.error('Superadmin report RPC failures', { overview: reportResult.error, weekly: weeklyResult.error, productivity: productivityResult.error, conversions: conversionResult.error, visited: visitedResult.error })
@@ -452,18 +460,16 @@ export default function SuperadminReportsPage() {
 
       <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} startDate={startDate} endDate={endDate} />
 
-      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
-        <div className="dui-card-body gap-3 p-0 sm:p-0">
-          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5"><Users className="h-5 w-5"/> {tx('Agent Productivity & Review', 'Produktivitas dan Evaluasi Agen')}</div>
-          {loading ? <div className="py-12 text-center"><span className="dui-loading dui-loading-spinner dui-loading-lg"/></div>
-          : <div className="max-w-full overflow-x-auto"><table className="dui-table dui-table-zebra min-w-[2450px] text-xs">
-            <thead><tr>{productivityHeaders.map(h=><th key={h} className="whitespace-normal">{h}</th>)}</tr></thead>
-            <tbody>{visibleProductivityRows.map(r=><tr key={r.agent_email} className={r.review==='Review'?'bg-warning/5':''}>
-              {productivityValues(r,conversionsByEmail.get(r.agent_email.toLowerCase())).map((v,i)=><td key={i} className={i===0?'font-bold':''}>{i===8 ? <div className="flex items-center gap-2 whitespace-nowrap"><span>{v ?? '—'}</span><button type="button" className="dui-btn dui-btn-outline dui-btn-xs print:hidden" onClick={()=>void openLocations(r)} disabled={Number(r.total_visits)===0}><MapPin className="h-3 w-3"/>{tx('Show here','Tampilkan')}</button></div> : (i===18||i===19) && v ? new Date(String(v)).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta'}):v ?? '—'}</td>)}
-            </tr>)}</tbody>
-          </table>{visibleProductivityRows.length===0&&<div className="p-6 text-sm">{tx('No report data.', 'Tidak ada data laporan.')}</div>}</div>}
-        </div>
-      </section>
+      <AgentProductivityReview
+        rows={visibleProductivityRows}
+        funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        loading={loading}
+        locale={locale}
+        dailyTarget={dailyTarget}
+        onOpenLocations={openLocations}
+      />
       {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
         <section role="dialog" aria-modal="true" aria-label={tx('Agent GPS Movement','Pergerakan GPS Agen')} className="dui-card max-h-[90vh] w-full max-w-4xl overflow-y-auto bg-base-100 shadow-xl">
           <div className="dui-card-body gap-3">
