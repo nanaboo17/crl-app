@@ -450,7 +450,7 @@ export default function SuperadminReportsPage() {
         </div>
       </section>
 
-      <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} />
+      <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} startDate={startDate} endDate={endDate} />
 
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
         <div className="dui-card-body gap-3 p-0 sm:p-0">
