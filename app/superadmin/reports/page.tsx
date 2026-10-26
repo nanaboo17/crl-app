@@ -438,7 +438,7 @@ export default function SuperadminReportsPage() {
                 {weeklyTotals.map((row) => {
                   const conversion = row.pre_visits > 0 ? (row.visits / row.pre_visits) * 100 : 0
                   return <tr key={row.week_start}>
-                    <td className="font-bold">{row.week_start} — {row.week_end}</td>
+                    <td className="font-bold">{row.week_start < startDate ? startDate : row.week_start} — {row.week_end > endDate ? endDate : row.week_end}</td>
                     <td>{row.pre_visits}</td>
                     <td>{row.visits}</td>
                     <td>{conversion.toFixed(1)}%</td>
