@@ -344,7 +344,7 @@ export default function SuperadminReportsPage() {
       '',toCsv(['Export notes','Counts for assigned and paid portfolio are current; field activity is filtered by selected dates.']),
       toCsv(['Export notes','Total visits include repeats; distinct cases are per agent. Paid after activity is attribution, not a strict sequential funnel.'])
     ]
-    const blob=new Blob(['\\uFEFF'+lines.join('\\r\\n')],{type:'text/csv;charset=utf-8;'})
+    const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'})
     const url=URL.createObjectURL(blob),link=document.createElement('a')
     link.href=url
     link.download=`crl-report-${startDate}-to-${endDate}.csv`
