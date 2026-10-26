@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Bell, Globe, LogOut, Menu, Moon, Sun, User } from 'lucide-react'
+import { Globe, LogOut, Menu, Moon, Sun, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { superadminConfig, type ShellConfig } from '@/components/shell/config'
 import { useI18n } from '@/components/providers/i18n-provider'
 import { useTheme } from '@/components/providers/theme-provider'
 import FieldModeToggle from './FieldModeToggle'
+import SuperadminNotifications from './SuperadminNotifications'
 import chrome from './SuperadminChrome.module.css'
 
 export default function SuperadminNavbar({
@@ -109,11 +110,7 @@ export default function SuperadminNavbar({
         {playful && scopeLabel && <span className="hidden rounded-full border border-base-content/20 px-2.5 py-1 text-[11px] font-bold tracking-wide sm:inline-flex" title="Configured administration scope">{scopeLabel}</span>}
         {playful ? <FieldModeToggle /> : null}
 
-        {playful ? (
-          <button type="button" className={iconBtn} aria-label="Notifications" title="Notifications">
-            <Bell aria-hidden="true" className="h-5 w-5" />
-          </button>
-        ) : null}
+        {playful ? <SuperadminNotifications locale={locale} /> : null}
 
         <button
           type="button"
