@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
 import { CalendarClock, CheckCircle2, Gauge, Image as ImageIcon, MapPin, Navigation, NotebookText, Pencil, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import type { Visit, Customer } from '@/lib/types'
@@ -32,6 +33,53 @@ export default function VisitDetailPage() {
   }>({ payment: '', speedTest: '', other: '' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [editOptions, setEditOptions] = useState({ visit_status_kunjungan: '', conversation_result: '', approved_offer: '', unpaid_reason: '' })
+  function startEdit() {
+    if (!row) return
+    const record = row as Visit & { visit_status_kunjungan?: string | null; conversation_result?: string | null; approved_offer?: string | null; unpaid_reason?: string | null }
+    setEditOptions({
+      visit_status_kunjungan: record.visit_status_kunjungan || '',
+      conversation_result: record.conversation_result || '',
+      approved_offer: record.approved_offer || '',
+      unpaid_reason: record.unpaid_reason || '',
+    })
+    setEditError('')
+    setEditOpen(true)
+  }
+  async function saveEdit() {
+    if (!row || editSaving) return
+    setEditError('')
+    if (!editOptions.visit_status_kunjungan || !editOptions.conversation_result) {
+      setEditError(tx('Please select visit status and conversation result.', 'Pilih status kunjungan dan hasil percakapan.'))
+      return
+    }
+    const noContact = editOptions.conversation_result === 'Tidak bertemu pelanggan'
+    const offers = retentionOffersForCustomer(customer?.customer_id || row.customer_id)
+    if (!noContact && editOptions.approved_offer && editOptions.approved_offer !== NO_APPROVED_OFFER &&
+        !offers.some((offer) => offer.value === editOptions.approved_offer)) {
+      setEditError(tx('Invalid offer for this customer.', 'Offer tidak valid untuk pelanggan ini.'))
+      return
+    }
+    setEditSaving(true)
+    try {
+      const patch = {
+        visit_status_kunjungan: editOptions.visit_status_kunjungan,
+        conversation_result: editOptions.conversation_result,
+        approved_offer: noContact ? null : editOptions.approved_offer || null,
+        unpaid_reason: noContact || editOptions.conversation_result === 'Sudah melakukan pembayaran'
+          ? null : editOptions.unpaid_reason || null,
+      }
+      const { data, error: updateError } = await createClient().from('visits').update(patch).eq('visit_id', row.visit_id).eq('agent_email', row.agent_email).select('*').single()
+      if (updateError) throw updateError
+      setRow(data as Visit)
+      setEditOpen(false)
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : tx('Unable to update visit.', 'Gagal mengubah kunjungan.'))
+    } finally { setEditSaving(false) }
+  }
 
   useEffect(() => {
     ;(async () => {
@@ -112,8 +160,33 @@ export default function VisitDetailPage() {
       <section className={styles.doneCard}>
         <Pencil />
         <div><strong>{tx('Record another visit for this customer.', 'Catat kunjungan baru untuk pelanggan ini.')}</strong><span>{tx('Previous visit records, GPS and evidence photos will be preserved.', 'Catatan, GPS, dan foto bukti kunjungan sebelumnya tetap tersimpan.')}</span></div>
+        <button type="button" className={styles.mapButton} onClick={startEdit}>{tx('Edit options', 'Edit pilihan')}</button>
         {newVisitCaseId && <Link className={styles.mapButton} href={`/agent/customers/${encodeURIComponent(newVisitCaseId)}/visit`}>{tx('New Visit', 'Kunjungan Baru')}</Link>}
       </section>
+
+      {editOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm">
+          <section role="dialog" aria-modal="true" aria-labelledby="edit-visit-options" className="my-auto w-full max-w-lg space-y-4 overflow-y-auto rounded-3xl border border-base-300 bg-base-100 p-5 shadow-2xl sm:p-7" style={{ maxHeight: 'calc(100dvh - 24px)' }}>
+            <div><h2 id="edit-visit-options" className="text-xl font-black">{tx('Edit visit options', 'Edit pilihan kunjungan')}</h2>
+              <p className="mt-1 text-sm opacity-65">{tx('Only dropdown answers can be changed. GPS, photos, date, and other evidence are preserved.', 'Hanya jawaban pilihan yang bisa diubah. GPS, foto, tanggal, dan bukti lainnya tetap tersimpan.')}</p></div>
+            {([
+              ['visit_status_kunjungan', tx('Visit status', 'Status kunjungan'), ['Bertemu dengan pelanggan', 'Pelanggan tidak ada di tempat', 'Alamat tidak ditemukan', 'Pelanggan sudah pindah', 'Tidak berhasil dikunjungi', 'Lainnya']],
+              ['conversation_result', tx('Conversation result', 'Hasil percakapan'), ['Sudah melakukan pembayaran', 'Bersedia bayar / Promise to Pay', 'Masih mempertimbangkan', 'Tidak bersedia melanjutkan layanan', 'Tidak bertemu pelanggan']],
+              ['approved_offer', tx('Approved offer', 'Offer disetujui'), [NO_APPROVED_OFFER, ...retentionOffersForCustomer(customer?.customer_id || row.customer_id).map((o) => o.value)]],
+              ['unpaid_reason', tx('Unpaid reason', 'Alasan belum bayar'), ['Masalah keuangan', 'Harga / tagihan', 'Pindah ke provider lain', 'Masalah jaringan / layanan', 'Jarang digunakan', 'Pindah alamat', 'Masalah sales', 'Alasan pribadi', 'Lainnya']],
+            ] as const).filter(([key]) => !((key === 'approved_offer' || key === 'unpaid_reason') && editOptions.conversation_result === 'Tidak bertemu pelanggan') && !(key === 'unpaid_reason' && editOptions.conversation_result === 'Sudah melakukan pembayaran')).map(([key, label, options]) => (
+              <label key={key} className="block text-sm font-bold">{label}
+                <select className="dui-select mt-2 w-full" value={editOptions[key]} onChange={(e) => setEditOptions((prev) => ({ ...prev, [key]: e.target.value }))}>
+                  <option value="">{tx('Select option', 'Pilih opsi')}</option>
+                  {options.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            ))}
+            {editError && <p role="alert" className="rounded-xl bg-error/10 p-3 text-sm text-error">{editError}</p>}
+            <div className="flex gap-3 pt-2"><button type="button" className="dui-btn flex-1" disabled={editSaving} onClick={() => setEditOpen(false)}>{tx('Cancel', 'Batal')}</button><button type="button" className="dui-btn dui-btn-primary flex-1" disabled={editSaving} onClick={() => void saveEdit()}>{editSaving ? tx('Saving…', 'Menyimpan…') : tx('Save changes', 'Simpan perubahan')}</button></div>
+          </section>
+        </div>
+      )}
 
       <section className={styles.summaryGrid}>
         <article className={`${styles.summaryCard} ${styles.tonePurple}`}><CalendarClock /><div><span>{t('agent.visitDetail.visitTime')}</span><strong>{dateTime(row.visit_date)}</strong></div></article>
