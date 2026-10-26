@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
@@ -17,12 +17,16 @@ export default function WeeklyAttendanceNavigation({
   dateLabel: string
 }) {
   const [loading, setLoading] = useState<Direction | null>(null)
+  const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentUrl = pathname + '?' + searchParams.toString()
 
   useEffect(() => {
+    if (fallbackTimer.current) clearTimeout(fallbackTimer.current)
+    fallbackTimer.current = null
     setLoading(null)
+    return () => { if (fallbackTimer.current) clearTimeout(fallbackTimer.current) }
   }, [currentUrl])
 
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>, direction: Direction) => {
@@ -31,6 +35,10 @@ export default function WeeklyAttendanceNavigation({
       return
     }
     setLoading(direction)
+    const href = direction === 'previous' ? previousHref : nextHref
+    if (fallbackTimer.current) clearTimeout(fallbackTimer.current)
+    // If the Next.js RSC transition stalls, request the page directly instead.
+    fallbackTimer.current = setTimeout(() => { window.location.assign(href) }, 7000)
   }
 
   return (
