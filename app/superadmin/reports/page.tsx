@@ -290,6 +290,15 @@ export default function SuperadminReportsPage() {
     {group:'Field Activity',title:tx('Total visits','Total kunjungan'),value:totals.visits,description:tx('Includes follow-up and repeat visits','Termasuk kunjungan ulang')},
     {group:'Attendance',title:tx('Attendance days','Hari hadir'),value:totals.attendance,description:tx('Total agent-days with attendance records','Total hari hadir dari seluruh agen')},
   ]
+  const printWeeks=Array.from(visibleWeeklyRows.reduce((map,row)=>{
+    const current=map.get(row.week_start)??{start:row.week_start,end:row.week_end,pv:0,visits:0}
+    current.pv+=Number(row.pre_visits||0);current.visits+=Number(row.visits||0)
+    map.set(row.week_start,current);return map
+  },new Map<string,{start:string;end:string;pv:number;visits:number}>()).values()).sort((a,b)=>a.start.localeCompare(b.start))
+  const printMax=Math.max(1,...printWeeks.flatMap(w=>[w.pv,w.visits]))
+  const printX=(i:number)=>printWeeks.length===1?360:65+i*600/(printWeeks.length-1)
+  const printY=(n:number)=>214-170*n/printMax
+  const printLine=(key:'pv'|'visits')=>printWeeks.map((w,i)=>`${printX(i)},${printY(w[key])}`).join(' ')
   const exportAgentRows=visibleProductivityRows.map(r=>{
     const key=r.agent_email.toLowerCase(),fu=funnelByEmail.get(key),att=attendanceByEmail.get(key),v=visitedByEmail.get(key),pay=conversionsByEmail.get(key)
     const met=Number(fu?.unique_met||0),ptp=Number(fu?.unique_ptp||0),unique=Number(v?.visited_customers||0),paid=Number(pay?.paid_after_visit||0)+Number(pay?.paid_after_previsit||0)
@@ -444,6 +453,16 @@ export default function SuperadminReportsPage() {
           <tbody>{exportAgentRows.map(({r,fu,att,unique,met,ptp,paid})=><tr key={r.agent_email}>{[r.agent_name||r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days].map((value,i)=><td key={i}>{value}</td>)}</tr>)}</tbody>
         </table>
         <h2 className={styles.breakBefore}>{tx('Weekly performance trend','Tren kinerja mingguan')}</h2>
+        {printWeeks.length>0&&<div className={styles.printChart}>
+          <div className={styles.printLegend}><span><i style={{background:'#ed008c'}}/>Pre-Visits</span><span><i style={{background:'#7c3bc4'}}/>Visits</span></div>
+          <svg viewBox="0 0 720 253" role="img" aria-label={tx('Weekly Pre-Visit and Visit line chart','Grafik garis Pra-Kunjungan dan Kunjungan mingguan')}>
+            {[0,0.25,0.5,0.75,1].map(t=><g key={t}><line x1="55" x2="680" y1={214-170*t} y2={214-170*t} stroke="#dedede" strokeWidth="1"/><text x="47" y={218-170*t} textAnchor="end" fontSize="11" fill="#555">{Math.round(t*printMax)}</text></g>)}
+            <polyline points={printLine('pv')} fill="none" stroke="#ed008c" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
+            <polyline points={printLine('visits')} fill="none" stroke="#7c3bc4" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
+            {printWeeks.map((w,i)=><g key={w.start}><circle cx={printX(i)} cy={printY(w.pv)} r="4" fill="#ed008c"/><circle cx={printX(i)} cy={printY(w.visits)} r="4" fill="#7c3bc4"/><text x={printX(i)} y="238" textAnchor="middle" fontSize="11" fill="#333">{i+1}</text></g>)}
+          </svg>
+          <p>{tx('Week numbers correspond to the table below.','Nomor minggu sesuai tabel di bawah.')}</p>
+        </div>}
         <table className={styles.printTable}><thead><tr><th>{tx('Week','Minggu')}</th><th>Pre-Visits</th><th>Visits</th><th>Visits / PV</th></tr></thead><tbody>{[...new Map(visibleWeeklyRows.map(r=>[r.week_start,r.week_end])).entries()].sort(([a],[b])=>a.localeCompare(b)).map(([start,end])=>{const matched=visibleWeeklyRows.filter(r=>r.week_start===start);const pv=matched.reduce((sum,r)=>sum+Number(r.pre_visits||0),0);const visits=matched.reduce((sum,r)=>sum+Number(r.visits||0),0);return <tr key={start}><td>{start<startDate?startDate:start} — {end>endDate?endDate:end}</td><td>{pv}</td><td>{visits}</td><td>{pv?(100*visits/pv).toFixed(1)+'%':'—'}</td></tr>})}</tbody></table>
         <p className={styles.printNote}>{tx('Visits / Pre-Visits is an activity ratio, not a sequential customer conversion rate. Partial weeks are clipped to the selected date range.','Visits / Pre-Visits adalah rasio aktivitas, bukan konversi pelanggan berurutan. Minggu parsial dibatasi rentang tanggal yang dipilih.')}</p>
         <footer className={styles.printFooter}>CRL Field Operations · {startDate} — {endDate} · {tx('Confidential internal report','Laporan internal terbatas')}</footer>
