@@ -37,34 +37,30 @@ export default function AgentLocationsPage() {
     let stopped = false
     async function refresh() {
       const todayWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-      const [agentResult, locationResult, sessionResult, attendanceResult, diagnosticsResult] = await Promise.all([
-        supabase.from('agents').select('email,agent_name,region,lead_email').eq('role', 'agent').eq('active', true),
-        supabase.from('agent_location_history').select('agent_user_id,latitude,longitude,accuracy_meters,captured_at,received_at').order('captured_at', { ascending: false }).limit(10000),
-        supabase.from('agent_tracking_sessions').select('agent_user_id,status').eq('status', 'active'),
-        supabase.from('agent_attendance').select('agent_email,check_in_at,check_out_at').eq('attendance_date', todayWib),
-        supabase.from('agent_gps_diagnostics').select('agent_user_id,stage,error_code,error_message,occurred_at').order('occurred_at', { ascending: false }).limit(1000),
+      const [agentResult, overviewResult, attendanceResult, directoryResult] = await Promise.all([
+        supabase.from('agents').select('email,agent_name,region,lead_email').eq('role','agent').eq('active',true),
+        supabase.rpc('crl_agent_gps_overview_v1'),
+        supabase.from('agent_attendance').select('agent_email,check_in_at,check_out_at').eq('attendance_date',todayWib),
+        supabase.rpc('crl_circle_agent_location_directory_v2'),
       ])
       if (stopped) return
-      if (agentResult.error || locationResult.error || sessionResult.error || attendanceResult.error || diagnosticsResult.error) {
-        setError(agentResult.error?.message || locationResult.error?.message || sessionResult.error?.message || attendanceResult.error?.message || diagnosticsResult.error?.message || 'Unable to load GPS data.')
+      if (agentResult.error || overviewResult.error || attendanceResult.error || directoryResult.error) {
+        setError(agentResult.error?.message || overviewResult.error?.message || attendanceResult.error?.message || directoryResult.error?.message || 'Unable to load GPS data.')
         setLoading(false)
         return
       }
-      // Auth user IDs are resolved through a restricted, server-side lookup in the RPC.
-      const { data: users, error: userError } = await supabase.rpc('crl_circle_agent_location_directory_v2')
-      if (stopped) return
-      if (userError) { setError(userError.message); setLoading(false); return }
-      setDirectory((users as AuthUser[]) ?? [])
-      const idByEmail = new Map((users as AuthUser[] ?? []).map((u) => [(u.email ?? '').toLowerCase(), u.id]))
-      const latest = new Map<string, Point>()
-      for (const p of locationResult.data ?? []) if (!latest.has(p.agent_user_id)) latest.set(p.agent_user_id, p)
-      const active = new Set((sessionResult.data ?? []).map((s) => s.agent_user_id))
-      const failures = new Map<string, Diagnostic>()
-      for (const d of (diagnosticsResult.data ?? [])) if (!failures.has(d.agent_user_id)) failures.set(d.agent_user_id, d)
-      const onDuty = new Set((attendanceResult.data ?? []).filter(a => Boolean(a.check_in_at) && !a.check_out_at).map(a => a.agent_email?.trim().toLowerCase()))
-      setAgents((agentResult.data ?? []).map((agent) => {
-        const id = idByEmail.get(agent.email.toLowerCase())
-        return { ...agent, point: id ? latest.get(id) : undefined, tracking: id ? active.has(id) : false, onDuty: onDuty.has(agent.email.trim().toLowerCase()), diagnostic: id ? failures.get(id) : undefined }
+      const users = (directoryResult.data ?? []) as AuthUser[]
+      setDirectory(users)
+      const idByEmail = new Map(users.map(u=>[(u.email??'').trim().toLowerCase(),u.id]))
+      type Overview = Point & { tracking:boolean;stage:string|null;error_code:string|null;error_message:string|null;occurred_at:string|null }
+      const overview = new Map(((overviewResult.data??[]) as Overview[]).map(row=>[row.agent_user_id,row]))
+      const onDuty = new Set((attendanceResult.data??[]).filter(a=>Boolean(a.check_in_at)&&!a.check_out_at).map(a=>a.agent_email?.trim().toLowerCase()))
+      setAgents((agentResult.data??[]).map(agent=>{
+        const id=idByEmail.get(agent.email.trim().toLowerCase())
+        const gps=id?overview.get(id):undefined
+        const point=gps?.captured_at?{agent_user_id:gps.agent_user_id,latitude:gps.latitude,longitude:gps.longitude,accuracy_meters:gps.accuracy_meters,captured_at:gps.captured_at,received_at:gps.received_at}:undefined
+        const diagnostic=gps?.occurred_at?{agent_user_id:gps.agent_user_id,stage:gps.stage??'',error_code:gps.error_code??'',error_message:gps.error_message,occurred_at:gps.occurred_at}:undefined
+        return {...agent,point,tracking:Boolean(gps?.tracking),onDuty:onDuty.has(agent.email.trim().toLowerCase()),diagnostic}
       }))
       setError('')
       setLoading(false)
