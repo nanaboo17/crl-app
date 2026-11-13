@@ -102,58 +102,97 @@ export default function AgentCustomersPage() {
   const [preVisitedKeys, setPreVisitedKeys] = useState<Set<string>>(new Set())
   const [visitedKeys, setVisitedKeys] = useState<Set<string>>(new Set())
 
+  const [reloadKey, setReloadKey] = useState(0)
+
   useEffect(() => {
+    let cancelled = false
+
+    // PostgREST returns a limited number of rows per request. Read in bounded
+    // batches so a large agent history never becomes one expensive statement.
+    async function fetchBatches<T>(
+      makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+    ): Promise<T[]> {
+      const batchSize = 200
+      const rows: T[] = []
+      for (let offset = 0; ; offset += batchSize) {
+        if (cancelled) return []
+        const { data, error } = await makeQuery(offset, offset + batchSize - 1)
+        if (error) throw new Error(error.message)
+        const batch = data ?? []
+        rows.push(...batch)
+        if (batch.length < batchSize) break
+      }
+      return rows
+    }
+
     async function loadData() {
       setLoading(true)
       setError('')
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user?.email) {
-        window.location.href = '/login'
-        return
-      }
-
-      const email = user.email.trim().toLowerCase()
-      const { data: agentData, error: agentError } = await supabase
-        .from('agents')
-        .select('agent_name, role, active')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (agentError || !agentData || !agentData.active || agentData.role !== 'agent') {
-        window.location.href = '/auth/route'
-        return
-      }
-
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('crl_id, customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
-        .eq('agent_email', email)
-        .eq('actionable', true)
-        .order('priority_rank', { ascending: true })
-
-      if (customerError) setError(customerError.message)
-      else {
-        setCustomers(customerData ?? [])
-        const [{ data: preVisits, error: preError }, { data: visits, error: visitError }] = await Promise.all([
-          supabase.from('pre_visits').select('crl_id, customer_id').ilike('agent_email', email),
-          supabase.from('visits').select('crl_id, customer_id').ilike('agent_email', email),
-        ])
-        if (preError || visitError) setError(preError?.message || visitError?.message || '')
-        else {
-          const keys = (rows: { crl_id: string | null; customer_id: string | null }[]) =>
-            new Set(rows.map((row) => row.crl_id || (row.customer_id ? 'customer:' + row.customer_id : '')).filter(Boolean))
-          setPreVisitedKeys(keys(preVisits ?? []))
-          setVisitedKeys(keys(visits ?? []))
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (authError) throw new Error(authError.message)
+        if (!user?.email) {
+          window.location.href = '/login'
+          return
         }
-      }
 
-      setAgent(agentData)
-      setLoading(false)
+        const email = user.email.trim().toLowerCase()
+        const { data: agentData, error: agentError } = await supabase
+          .from('agents')
+          .select('agent_name, role, active')
+          .eq('email', email)
+          .maybeSingle()
+
+        if (cancelled) return
+        if (agentError) throw new Error(agentError.message)
+        if (!agentData || !agentData.active || agentData.role !== 'agent') {
+          window.location.href = '/auth/route'
+          return
+        }
+        setAgent(agentData)
+
+        const [customerData, preVisits, visits] = await Promise.all([
+          fetchBatches<CustomerRow>((from, to) =>
+            supabase.from('customers')
+              .select('crl_id, customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
+              .eq('agent_email', email)
+              .eq('actionable', true)
+              .order('crl_id', { ascending: true })
+              .range(from, to)
+          ),
+          fetchBatches<{ crl_id: string | null; customer_id: string | null }>((from, to) =>
+            supabase.from('pre_visits').select('crl_id, customer_id')
+              .eq('agent_email', email)
+              .order('previsit_id', { ascending: true })
+              .range(from, to)
+          ),
+          fetchBatches<{ crl_id: string | null; customer_id: string | null }>((from, to) =>
+            supabase.from('visits').select('crl_id, customer_id')
+              .eq('agent_email', email)
+              .order('visit_id', { ascending: true })
+              .range(from, to)
+          ),
+        ])
+
+        if (cancelled) return
+        const keys = (rows: { crl_id: string | null; customer_id: string | null }[]) =>
+          new Set(rows.map((row) => row.crl_id || (row.customer_id ? 'customer:' + row.customer_id : '')).filter(Boolean))
+        setCustomers(customerData)
+        setPreVisitedKeys(keys(preVisits))
+        setVisitedKeys(keys(visits))
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : tx('Unable to load customers.', 'Gagal memuat pelanggan.'))
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
-    loadData()
-  }, [supabase])
+    void loadData()
+    return () => { cancelled = true }
+  }, [supabase, reloadKey])
 
   useEffect(() => {
     setPendingPage(1)
@@ -234,6 +273,7 @@ export default function AgentCustomersPage() {
           agent
             ? t('agent.customers.descriptionWithName', {
                 name: agent.agent_name,
+                code: '',
               })
             : t('agent.customers.description')
         }
@@ -241,7 +281,10 @@ export default function AgentCustomersPage() {
 
       {error && (
         <div className="dui-alert dui-alert-error" role="alert">
-          <span>{error}</span>
+          <span>{tx('Could not load customer data. Please try again.', 'Data pelanggan gagal dimuat. Silakan coba lagi.')} ({error})</span>
+          <button type="button" className="dui-btn dui-btn-sm" onClick={() => setReloadKey((value) => value + 1)}>
+            {tx('Retry', 'Coba lagi')}
+          </button>
         </div>
       )}
 
