@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import SuperadminSidebar from './SuperadminSidebar'
 import SuperadminNavbar from './SuperadminNavbar'
 import GlobalBackButtonFix from '@/components/navigation/GlobalBackButtonFix'
+import NavigationProgress from '@/components/navigation/NavigationProgress'
 import {
   adminConfig,
   agentConfig,
@@ -17,15 +18,20 @@ import shellTheme from './SuperadminShellTheme.module.css'
 export default function SuperadminShell({
   agentName,
   email,
+  scopeLabel,
+  scopePending = false,
   children,
   mode = 'superadmin',
 }: {
   agentName: string
   email: string
+  scopeLabel?: string
+  scopePending?: boolean
   children: React.ReactNode
   mode?: 'agent' | 'admin' | 'superadmin'
 }) {
   const pathname = usePathname()
+  const routeFullscreen = mode === 'agent' && pathname === '/agent/route'
   const [navOpen, setNavOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -67,8 +73,9 @@ export default function SuperadminShell({
   }, [navOpen])
 
   return (
-    <div className={`min-h-screen ${playful ? shellTheme.shell : 'bg-base-200'}`}>
+    <div className={`w-full min-w-0 max-w-full overflow-x-clip ${routeFullscreen ? "h-[100dvh] overflow-hidden" : "min-h-screen"} ${playful ? shellTheme.shell : 'bg-base-200'}`}>
       <GlobalBackButtonFix />
+      <NavigationProgress />
 
       <aside
         aria-label={`${config.role} sidebar`}
@@ -118,16 +125,18 @@ export default function SuperadminShell({
         </div>
       </div>
 
-      <div className="flex min-h-screen flex-col lg:pl-64">
+      <div className={`flex w-full min-w-0 max-w-full flex-col lg:pl-64 ${routeFullscreen ? "h-full min-h-0 overflow-hidden" : "min-h-screen"}`}>
         <SuperadminNavbar
           agentName={agentName}
           email={email}
+          scopeLabel={scopeLabel}
           navigationOpen={navOpen}
           onOpenNavigation={() => setNavOpen(true)}
           menuButtonRef={menuButtonRef}
           config={config}
         />
-        <main className={`flex-1 ${playful ? shellTheme.content : ''} ${mode === 'agent' ? shellTheme.agentContent : ''}`}>
+        {scopePending && <div role="status" className="border-b border-warning/30 bg-warning/10 px-4 py-2 text-center text-xs font-semibold text-base-content sm:px-6">Circle mapping configured · Access restrictions are not active yet / Mapping Circle tersedia · Pembatasan akses belum aktif</div>}
+        <main className={`min-w-0 max-w-full flex-1 overflow-x-clip ${playful ? shellTheme.content : ''} ${mode === 'agent' ? shellTheme.agentContent : ''} ${routeFullscreen ? 'min-h-0 overflow-hidden' : ''}`}>
           {children}
         </main>
       </div>

@@ -24,7 +24,7 @@ type CustomerRow = {
   crl_id: string
   customer_id: string
   customer_name: string
-  priority_rank: number | null
+  priority_rank: string | null
   phone_number: string | null
   service_address: string | null
   city: string | null
@@ -53,6 +53,11 @@ const PRIORITY_STYLES: Record<number, { badge: string; ring: string }> = {
   3: { badge: 'dui-badge-info dui-badge-soft', ring: 'border-info/30' },
   4: { badge: 'dui-badge-ghost', ring: 'border-base-300' },
   5: { badge: 'dui-badge-ghost', ring: 'border-base-300' },
+}
+
+function priorityNumber(priority: string | null): number | null {
+  const match = priority?.trim().toUpperCase().match(/^P([1-5])$/)
+  return match ? Number(match[1]) : null
 }
 
 function badgeClass(priority: number | null) {
@@ -97,50 +102,107 @@ export default function AgentCustomersPage() {
   const [sort, setSort] = useState('priority')
   const [pendingPage, setPendingPage] = useState(1)
   const [visitedPage, setVisitedPage] = useState(1)
+  const [preVisitedPage, setPreVisitedPage] = useState(1)
+  const [activeTab, setActiveTab] = useState<'customers' | 'previsited' | 'visited'>('customers')
+  const [preVisitedKeys, setPreVisitedKeys] = useState<Set<string>>(new Set())
+  const [visitedKeys, setVisitedKeys] = useState<Set<string>>(new Set())
+
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
+
+    // PostgREST returns a limited number of rows per request. Read in bounded
+    // batches so a large agent history never becomes one expensive statement.
+    async function fetchBatches<T>(
+      makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+    ): Promise<T[]> {
+      const batchSize = 200
+      const rows: T[] = []
+      for (let offset = 0; ; offset += batchSize) {
+        if (cancelled) return []
+        const { data, error } = await makeQuery(offset, offset + batchSize - 1)
+        if (error) throw new Error(error.message)
+        const batch = data ?? []
+        rows.push(...batch)
+        if (batch.length < batchSize) break
+      }
+      return rows
+    }
+
     async function loadData() {
       setLoading(true)
       setError('')
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (authError) throw new Error(authError.message)
+        if (!user?.email) {
+          window.location.href = '/login'
+          return
+        }
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user?.email) {
-        window.location.href = '/login'
-        return
+        const email = user.email.trim().toLowerCase()
+        const { data: agentData, error: agentError } = await supabase
+          .from('agents')
+          .select('agent_name, role, active')
+          .eq('email', email)
+          .maybeSingle()
+
+        if (cancelled) return
+        if (agentError) throw new Error(agentError.message)
+        if (!agentData || !agentData.active || agentData.role !== 'agent') {
+          window.location.href = '/auth/route'
+          return
+        }
+        setAgent(agentData)
+
+        const [customerData, preVisits, visits] = await Promise.all([
+          fetchBatches<CustomerRow>((from, to) =>
+            supabase.from('customers')
+              .select('crl_id, customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
+              .eq('agent_email', email)
+              .eq('actionable', true)
+              .order('crl_id', { ascending: true })
+              .range(from, to)
+          ),
+          fetchBatches<{ crl_id: string | null; customer_id: string | null }>((from, to) =>
+            supabase.from('pre_visits').select('crl_id, customer_id')
+              .eq('agent_email', email)
+              .order('previsit_id', { ascending: true })
+              .range(from, to)
+          ),
+          fetchBatches<{ crl_id: string | null; customer_id: string | null }>((from, to) =>
+            supabase.from('visits').select('crl_id, customer_id')
+              .eq('agent_email', email)
+              .order('visit_id', { ascending: true })
+              .range(from, to)
+          ),
+        ])
+
+        if (cancelled) return
+        const keys = (rows: { crl_id: string | null; customer_id: string | null }[]) =>
+          new Set(rows.map((row) => row.crl_id || (row.customer_id ? 'customer:' + row.customer_id : '')).filter(Boolean))
+        setCustomers(customerData)
+        setPreVisitedKeys(keys(preVisits))
+        setVisitedKeys(keys(visits))
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : tx('Unable to load customers.', 'Gagal memuat pelanggan.'))
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      const email = user.email.trim().toLowerCase()
-      const { data: agentData, error: agentError } = await supabase
-        .from('agents')
-        .select('agent_name, role, active')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (agentError || !agentData || !agentData.active || agentData.role !== 'agent') {
-        window.location.href = '/auth/route'
-        return
-      }
-
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('crl_id, customer_id, customer_name, priority_rank, phone_number, service_address, city, district, sub_district, invoice_amount, payment_status, estimated_churn_date, days_left_to_churn, customer_status, visit_status')
-        .eq('agent_email', email)
-        .eq('actionable', true)
-        .order('priority_rank', { ascending: true })
-
-      if (customerError) setError(customerError.message)
-      else setCustomers(customerData ?? [])
-
-      setAgent(agentData)
-      setLoading(false)
     }
 
-    loadData()
-  }, [supabase])
+    void loadData()
+    return () => { cancelled = true }
+  }, [supabase, reloadKey])
 
   useEffect(() => {
     setPendingPage(1)
     setVisitedPage(1)
+    setPreVisitedPage(1)
   }, [search, paymentFilter, priorityFilter, sort])
 
   const filtered = useMemo(() => {
@@ -161,43 +223,47 @@ export default function AgentCustomersPage() {
           : (customer.payment_status ?? '').trim().toLowerCase() !== 'paid')
 
       const matchesPriority =
-        priorityFilter === 'all' || String(customer.priority_rank ?? '') === priorityFilter
+        priorityFilter === 'all' || customer.priority_rank?.trim().toUpperCase() === `P${priorityFilter}`
 
       return matchesSearch && matchesPayment && matchesPriority
     })
 
     return [...list].sort((a, b) =>
       sort === 'priority'
-        ? (a.priority_rank ?? 99) - (b.priority_rank ?? 99)
+        ? (priorityNumber(a.priority_rank) ?? 99) - (priorityNumber(b.priority_rank) ?? 99)
         : sort === 'churn'
           ? (a.days_left_to_churn ?? 999) - (b.days_left_to_churn ?? 999)
           : (a.customer_name ?? '').localeCompare(b.customer_name ?? '')
     )
   }, [customers, search, paymentFilter, priorityFilter, sort])
 
-  const allPending = filtered.filter(
-    (customer) => (customer.visit_status ?? '').trim().toLowerCase() !== 'visited'
-  )
-  const allVisited = filtered.filter(
-    (customer) => (customer.visit_status ?? '').trim().toLowerCase() === 'visited'
-  )
-
-  const pendingTotalPages = Math.max(1, Math.ceil(allPending.length / PAGE_SIZE))
-  const visitedTotalPages = Math.max(1, Math.ceil(allVisited.length / PAGE_SIZE))
-  const safePendingPage = Math.min(pendingPage, pendingTotalPages)
-  const safeVisitedPage = Math.min(visitedPage, visitedTotalPages)
-  const pendingStart = (safePendingPage - 1) * PAGE_SIZE
-  const visitedStart = (safeVisitedPage - 1) * PAGE_SIZE
-  const pending = allPending.slice(pendingStart, pendingStart + PAGE_SIZE)
-  const visited = allVisited.slice(visitedStart, visitedStart + PAGE_SIZE)
+  const stageOf = (customer: CustomerRow) => {
+    const key = customer.crl_id
+    const fallback = 'customer:' + customer.customer_id
+    if ((customer.visit_status ?? '').trim().toLowerCase() === 'visited' ||
+      visitedKeys.has(key) || visitedKeys.has(fallback)) return 'visited'
+    if (preVisitedKeys.has(key) || preVisitedKeys.has(fallback)) return 'previsited'
+    return 'customers'
+  }
+  const allPending = filtered.filter((customer) => stageOf(customer) === 'customers')
+  const allPreVisited = filtered.filter((customer) => stageOf(customer) === 'previsited')
+  const allVisited = filtered.filter((customer) => stageOf(customer) === 'visited')
+  const displayed = activeTab === 'visited' ? allVisited : activeTab === 'previsited' ? allPreVisited : allPending
+  const currentPage = activeTab === 'visited' ? visitedPage : activeTab === 'previsited' ? preVisitedPage : pendingPage
+  const setCurrentPage = activeTab === 'visited' ? setVisitedPage : activeTab === 'previsited' ? setPreVisitedPage : setPendingPage
+  const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const start = (safePage - 1) * PAGE_SIZE
+  const pageCustomers = displayed.slice(start, start + PAGE_SIZE)
 
   const hasActiveFilter =
     search !== '' || paymentFilter !== 'all' || priorityFilter !== 'all'
 
   const stats = [
     { label: t('agent.customers.statTotal'), value: customers.length, icon: Users, current: false },
-    { label: t('agent.customers.statPending'), value: allPending.length, icon: MapPin, current: true },
-    { label: t('agent.customers.statVisited'), value: allVisited.length, icon: ClipboardList, current: false },
+    { label: tx('Customers', 'Pelanggan'), value: allPending.length, icon: MapPin, current: activeTab === 'customers' },
+    { label: tx('Pre-visited', 'Pra-kunjungan'), value: allPreVisited.length, icon: ClipboardList, current: activeTab === 'previsited' },
+    { label: tx('Visited', 'Dikunjungi'), value: allVisited.length, icon: ClipboardList, current: activeTab === 'visited' },
   ]
 
   return (
@@ -212,6 +278,7 @@ export default function AgentCustomersPage() {
           agent
             ? t('agent.customers.descriptionWithName', {
                 name: agent.agent_name,
+                code: '',
               })
             : t('agent.customers.description')
         }
@@ -219,7 +286,10 @@ export default function AgentCustomersPage() {
 
       {error && (
         <div className="dui-alert dui-alert-error" role="alert">
-          <span>{error}</span>
+          <span>{tx('Could not load customer data. Please try again.', 'Data pelanggan gagal dimuat. Silakan coba lagi.')} ({error})</span>
+          <button type="button" className="dui-btn dui-btn-sm" onClick={() => setReloadKey((value) => value + 1)}>
+            {tx('Retry', 'Coba lagi')}
+          </button>
         </div>
       )}
 
@@ -385,41 +455,29 @@ export default function AgentCustomersPage() {
         </div>
       </section>
 
+      <div role="tablist" aria-label={tx('Customer visit stages', 'Tahap kunjungan pelanggan')} className="dui-tabs dui-tabs-box flex flex-wrap gap-2 bg-base-100 p-2">
+        {([
+          ['customers', tx('Customers', 'Pelanggan'), allPending.length],
+          ['previsited', tx('Pre-visited', 'Pra-kunjungan'), allPreVisited.length],
+          ['visited', tx('Visited', 'Dikunjungi'), allVisited.length],
+        ] as const).map(([key, label, count]) => (
+          <button key={key} type="button" role="tab" aria-selected={activeTab === key}
+            onClick={() => setActiveTab(key)}
+            className={`dui-tab h-auto min-h-11 flex-1 gap-2 rounded-lg px-3 py-2 ${activeTab === key ? 'dui-tab-active bg-primary text-primary-content' : ''}`}>
+            {label} <span className="dui-badge dui-badge-sm">{count}</span>
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <CustomerSkeleton t={t} />
       ) : (
         <>
-          <CustomerSection
-            t={t}
-            title={t('agent.customers.sectionNeedsVisit')}
-            count={allPending.length}
-            customers={pending}
-            visited={false}
-          />
-          <SectionPagination
-            label="Needs visit pagination"
-            totalItems={allPending.length}
-            page={safePendingPage}
-            totalPages={pendingTotalPages}
-            start={pendingStart}
-            setPage={setPendingPage}
-          />
-
-          <CustomerSection
-            t={t}
-            title={t('agent.customers.sectionVisited')}
-            count={allVisited.length}
-            customers={visited}
-            visited
-          />
-          <SectionPagination
-            label="Visited customers pagination"
-            totalItems={allVisited.length}
-            page={safeVisitedPage}
-            totalPages={visitedTotalPages}
-            start={visitedStart}
-            setPage={setVisitedPage}
-          />
+          <CustomerSection t={t}
+            title={activeTab === 'customers' ? tx('Customers — Not yet pre-visited', 'Pelanggan — Belum pra-kunjungan') : activeTab === 'previsited' ? tx('Pre-visited — Not yet visited', 'Sudah pra-kunjungan — Belum dikunjungi') : tx('Visited customers', 'Pelanggan sudah dikunjungi')}
+            count={displayed.length} customers={pageCustomers} visited={activeTab === 'visited'} />
+          <SectionPagination label={tx('Customer stage pagination', 'Halaman tahap pelanggan')}
+            totalItems={displayed.length} page={safePage} totalPages={totalPages} start={start} setPage={setCurrentPage} />
         </>
       )}
     </div>
@@ -504,9 +562,9 @@ function CustomerSection({
       {count > 0 ? (
         <ul className="dui-list w-full rounded-box border border-base-300 bg-base-100 shadow-sm">
           {customers.map((customer) => (
-            <li key={customer.crl_id || customer.customer_id}>
+            <li key={customer.crl_id}>
               <Link
-                href={`/agent/customers/${encodeURIComponent(customer.crl_id || customer.customer_id)}`}
+                href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`}
                 className="dui-list-row dui-list-col-grow hover:bg-base-200 transition-colors"
               >
                 <CustomerCardBody t={t} customer={customer} visited={visited} />
@@ -535,7 +593,7 @@ function CustomerCardBody({
   customer: CustomerRow
   visited: boolean
 }) {
-  const priority = customer.priority_rank
+  const priority = priorityNumber(customer.priority_rank)
   const area =
     customer.sub_district ||
     customer.district ||

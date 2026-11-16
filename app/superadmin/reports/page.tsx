@@ -7,15 +7,32 @@ import {
   FileBarChart2,
   Printer,
   RefreshCw,
-  Users,
+  MapPin,
+  X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
+import WeeklyAgentActivity from './WeeklyAgentActivity'
+import styles from './ReportPrint.module.css'
+import AgentProductivityReview from './AgentProductivityReview'
+import dynamic from 'next/dynamic'
+import type { HistoryPoint } from '@/components/superadmin/AgentMovementMap'
+const AgentMovementMap = dynamic(() => import('@/components/superadmin/AgentMovementMap'), { ssr: false })
 
 type AgentOption = {
   email: string
   agent_name: string | null
   organization: string | null
+}
+
+type WeeklyReportRow = {
+  agent_email: string
+  agent_name: string | null
+  week_start: string
+  week_end: string
+  pre_visits: number
+  visits: number
+  visit_conversion: number
 }
 
 type ReportRow = {
@@ -37,6 +54,21 @@ type ReportRow = {
   promise_to_pay: number
   attendance_days: number
   average_worked_minutes: number
+}
+
+type AttendanceBreakdown = {agent_email:string;on_time_days:number;late_days:number;sick_days:number;permission_days:number}
+type AgentFunnelCount = { agent_email:string; unique_previsits:number; unique_met:number; unique_ptp:number }
+type VisitedCustomerCount = { agent_email: string; visited_customers: number }
+type PaymentConversion = { agent_email: string; paid_after_visit: number; paid_after_previsit: number }
+type AuthDirectoryUser = { id: string; email: string | null }
+
+type ProductivityRow = {
+  agent_email: string; agent_name: string | null; assigned_leads: number;
+  attendance_days: number; no_activity_attendance_days: number; pre_visit_days: number;
+  field_visit_days: number; pre_visit_customer_days: number; total_visits: number;
+  visits_per_attendance_day: number | null; visits_per_field_day: number | null;
+  target_attainment: number | null; met: number; ptp: number; missing_checkout_days: number;
+  long_gap_days: number; first_pre_visit: string | null; first_visit: string | null; review: string;
 }
 
 function jakartaDate() {
@@ -64,6 +96,18 @@ export default function SuperadminReportsPage() {
   const [agentEmail, setAgentEmail] = useState('')
   const [agents, setAgents] = useState<AgentOption[]>([])
   const [rows, setRows] = useState<ReportRow[]>([])
+  const [productivityRows, setProductivityRows] = useState<ProductivityRow[]>([])
+  const [dailyTarget, setDailyTarget] = useState('')
+  const [weeklyRows, setWeeklyRows] = useState<WeeklyReportRow[]>([])
+  const [visitedCustomerRows, setVisitedCustomerRows] = useState<VisitedCustomerCount[]>([])
+  const [agentFunnelRows, setAgentFunnelRows] = useState<AgentFunnelCount[]>([])
+  const [attendanceBreakdown, setAttendanceBreakdown] = useState<AttendanceBreakdown[]>([])
+  const [conversionRows, setConversionRows] = useState<PaymentConversion[]>([])
+  const [locationAgent, setLocationAgent] = useState<ProductivityRow | null>(null)
+  const [locationRows, setLocationRows] = useState<HistoryPoint[]>([])
+  const [locationDay, setLocationDay] = useState(today)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -71,7 +115,7 @@ export default function SuperadminReportsPage() {
     setLoading(true)
     setError('')
 
-    const [agentResult, reportResult] = await Promise.all([
+    const [agentResult, reportResult, weeklyResult, conversionResult, productivityResult, visitedResult, funnelResult, attendanceResult] = await Promise.all([
       supabase
         .from('agents')
         .select('email,agent_name,organization')
@@ -83,23 +127,59 @@ export default function SuperadminReportsPage() {
         p_end_date: endDate,
         p_agent_email: agentEmail || null,
       }),
+      supabase.rpc('get_superadmin_weekly_report', {
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('crl_circle_report_payment_conversions_v2', {
+        p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('get_superadmin_agent_productivity', {
+        p_start_date: startDate, p_end_date: endDate,
+        p_agent_email: agentEmail || null,
+        p_daily_visit_target: Number(dailyTarget)>0 ? Number(dailyTarget) : null,
+      }),
+      supabase.rpc('crl_report_visited_customer_counts', {
+        p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('crl_agent_funnel_counts_v1', {
+        p_start_date: startDate, p_end_date: endDate, p_agent_email: agentEmail || null,
+      }),
+      supabase.rpc('crl_report_attendance_breakdown_v1', {p_start_date:startDate,p_end_date:endDate,p_agent_email:agentEmail||null}),
     ])
 
-    if (agentResult.error) {
-      setError(agentResult.error.message)
-      setLoading(false)
-      return
-    }
-    if (reportResult.error) {
-      setError(reportResult.error.message)
-      setLoading(false)
-      return
-    }
-
+    // Keep successful report sections visible if one expensive RPC times out.
     setAgents((agentResult.data ?? []) as AgentOption[])
-    setRows((reportResult.data ?? []) as ReportRow[])
+    setRows(reportResult.error ? [] : (reportResult.data ?? []) as ReportRow[])
+    setWeeklyRows(weeklyResult.error ? [] : (weeklyResult.data ?? []) as WeeklyReportRow[])
+    setConversionRows(conversionResult.error ? [] : (conversionResult.data ?? []) as PaymentConversion[])
+    setProductivityRows(productivityResult.error ? [] : (productivityResult.data ?? []) as ProductivityRow[])
+    setVisitedCustomerRows(visitedResult.error ? [] : (visitedResult.data ?? []) as VisitedCustomerCount[])
+    setAgentFunnelRows(funnelResult.error ? [] : (funnelResult.data ?? []) as AgentFunnelCount[])
+    setAttendanceBreakdown(attendanceResult.error ? [] : (attendanceResult.data ?? []) as AttendanceBreakdown[])
+
+    const failed = [
+      agentResult.error && tx('Agent directory', 'Direktori agen'),
+      reportResult.error && tx('Overview', 'Ringkasan'),
+      weeklyResult.error && tx('Weekly activity', 'Aktivitas mingguan'),
+      conversionResult.error && tx('Payment conversions', 'Konversi pembayaran'),
+      productivityResult.error && tx('Productivity', 'Produktivitas'),
+      visitedResult.error && tx('Visited customers', 'Pelanggan dikunjungi'),
+      funnelResult.error && tx('Recovery funnel', 'Funnel pemulihan'),
+      attendanceResult.error && tx('Attendance breakdown','Rincian absensi'),
+    ].filter(Boolean)
+    if (failed.length) {
+      console.error('Superadmin report RPC failures', { overview: reportResult.error, weekly: weeklyResult.error, productivity: productivityResult.error, conversions: conversionResult.error, visited: visitedResult.error })
+      const details = [reportResult.error && `Overview: ${reportResult.error.message}`, weeklyResult.error && `Weekly: ${weeklyResult.error.message}`, productivityResult.error && `Productivity: ${productivityResult.error.message}`].filter(Boolean)
+      setError(
+        tx('Some report sections could not load', 'Sebagian laporan gagal dimuat') +
+        ': ' + failed.join(', ') +
+        '. ' + details.join(' · ')
+      )
+    }
     setLoading(false)
-  }, [agentEmail, endDate, startDate, supabase])
+  }, [agentEmail, endDate, startDate, dailyTarget, supabase])
 
   useEffect(() => {
     void load()
@@ -123,6 +203,22 @@ export default function SuperadminReportsPage() {
     return rows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
   }, [agents, organization, rows])
 
+  const visibleProductivityRows = useMemo(() => {
+    if (!organization) return productivityRows
+    const allowed = new Set(agents.filter(a => (a.organization || '').trim() === organization).map(a => a.email.toLowerCase()))
+    return productivityRows.filter(r => allowed.has(r.agent_email.toLowerCase()))
+  }, [agents, organization, productivityRows])
+
+  const visibleWeeklyRows = useMemo(() => {
+    if (!organization) return weeklyRows
+    const allowed = new Set(
+      agents
+        .filter((agent) => (agent.organization || '').trim() === organization)
+        .map((agent) => agent.email.toLowerCase())
+    )
+    return weeklyRows.filter((row) => allowed.has(row.agent_email.toLowerCase()))
+  }, [agents, organization, weeklyRows])
+
   const totals = useMemo(() => visibleRows.reduce(
     (acc, row) => ({
       assigned: acc.assigned + Number(row.assigned_customers || 0),
@@ -135,75 +231,114 @@ export default function SuperadminReportsPage() {
     { assigned: 0, paid: 0, unpaid: 0, preVisits: 0, visits: 0, attendance: 0 }
   ), [visibleRows])
 
+  const visitedCustomerTotal = useMemo(() => {
+    const allowed = new Set(agents.filter(a => !organization || (a.organization || '').trim() === organization).map(a => a.email.toLowerCase()))
+    return visitedCustomerRows.reduce((sum, r) => sum + (allowed.has(r.agent_email.toLowerCase()) ? Number(r.visited_customers || 0) : 0), 0)
+  }, [agents, organization, visitedCustomerRows])
+
+  const conversionsByEmail = useMemo(() => new Map(conversionRows.map(r=>[r.agent_email.toLowerCase(),r])), [conversionRows])
+
+  function openLocations(agent:ProductivityRow) {
+    setLocationAgent(agent)
+    setLocationDay(endDate > today ? today : endDate)
+    setLocationRows([])
+    setLocationError('')
+  }
+
+  useEffect(() => {
+    if (!locationAgent) return
+    const selectedAgentEmail = locationAgent.agent_email.trim().toLowerCase()
+    let cancelled = false
+    async function loadHistory() {
+      setLocationLoading(true)
+      setLocationError('')
+      const {data: directory, error: directoryError} = await supabase.rpc('crl_circle_agent_location_directory_v2')
+      if(cancelled) return
+      if(directoryError) { setLocationError(directoryError.message); setLocationLoading(false); return }
+      const user = ((directory ?? []) as AuthDirectoryUser[]).find(u=>u.email?.trim().toLowerCase()===selectedAgentEmail)
+      if(!user) { setLocationRows([]); setLocationError(tx('No GPS account associated with this agent.','Akun GPS agen tidak ditemukan.')); setLocationLoading(false); return }
+      const start = locationDay + 'T00:00:00+07:00'
+      const end = new Date(new Date(start).getTime()+86400000).toISOString()
+      const {data,error} = await supabase.from('agent_location_history')
+        .select('latitude,longitude,accuracy_meters,captured_at')
+        .eq('agent_user_id',user.id)
+        .gte('captured_at',start).lt('captured_at',end)
+        .order('captured_at',{ascending:true}).limit(1000)
+      if(cancelled) return
+      if(error) {setLocationError(error.message);setLocationRows([])}
+      else setLocationRows(((data??[]) as HistoryPoint[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)))
+      setLocationLoading(false)
+    }
+    void loadHistory()
+    return ()=>{cancelled=true}
+  },[locationAgent,locationDay,supabase])
+
+  const inOrg=(email:string)=>!organization||agents.some(a=>a.email.toLowerCase()===email.toLowerCase()&&(a.organization||'').trim()===organization)
+  const visibleFunnel=agentFunnelRows.filter(r=>inOrg(r.agent_email))
+  const visibleAttendance=attendanceBreakdown.filter(r=>inOrg(r.agent_email))
+  const visiblePayments=conversionRows.filter(r=>inOrg(r.agent_email))
+  const visibleVisited=visitedCustomerRows.filter(r=>inOrg(r.agent_email))
+  const funnelByEmail=new Map(visibleFunnel.map(r=>[r.agent_email.toLowerCase(),r]))
+  const attendanceByEmail=new Map(visibleAttendance.map(r=>[r.agent_email.toLowerCase(),r]))
+  const visitedByEmail=new Map(visibleVisited.map(r=>[r.agent_email.toLowerCase(),r]))
+  const portfolioInfo=[
+    {group:'Portfolio',title:tx('Assigned','Ditugaskan'),value:totals.assigned,description:tx('Current assigned portfolio, not a historical cohort','Portofolio penugasan saat ini, bukan kohort historis')},
+    {group:'Portfolio',title:tx('Unpaid','Belum bayar'),value:totals.unpaid,description:tx('Currently unpaid among assigned customers','Belum bayar dari pelanggan yang ditugaskan')},
+    {group:'Recovery',title:tx('Paid portfolio','Portofolio lunas'),value:totals.paid,description:tx('Current payment status, not paid-after-visit','Status pembayaran saat ini, bukan pembayaran setelah kunjungan')},
+    {group:'Field Activity',title:'Pre-Visits',value:totals.preVisits,description:tx('Recorded pre-visit submissions within period','Pengisian pre-visit selama periode')},
+    {group:'Field Activity',title:tx('Unique visited','Pelanggan dikunjungi'),value:visitedCustomerTotal,description:tx('Distinct CRL cases per agent in period','Kasus CRL unik per agen dalam periode')},
+    {group:'Field Activity',title:tx('Total visits','Total kunjungan'),value:totals.visits,description:tx('Includes follow-up and repeat visits','Termasuk kunjungan ulang')},
+    {group:'Attendance',title:tx('Attendance days','Hari hadir'),value:totals.attendance,description:tx('Total agent-days with attendance records','Total hari hadir dari seluruh agen')},
+  ]
+  const printWeeks=Array.from(visibleWeeklyRows.reduce((map,row)=>{
+    const current=map.get(row.week_start)??{start:row.week_start,end:row.week_end,pv:0,visits:0}
+    current.pv+=Number(row.pre_visits||0);current.visits+=Number(row.visits||0)
+    map.set(row.week_start,current);return map
+  },new Map<string,{start:string;end:string;pv:number;visits:number}>()).values()).sort((a,b)=>a.start.localeCompare(b.start))
+  const printMax=Math.max(1,...printWeeks.flatMap(w=>[w.pv,w.visits]))
+  const printX=(i:number)=>printWeeks.length===1?360:65+i*600/(printWeeks.length-1)
+  const printY=(n:number)=>214-170*n/printMax
+  const printLine=(key:'pv'|'visits')=>printWeeks.map((w,i)=>`${printX(i)},${printY(w[key])}`).join(' ')
+  const exportAgentRows=visibleProductivityRows.map(r=>{
+    const key=r.agent_email.toLowerCase(),fu=funnelByEmail.get(key),att=attendanceByEmail.get(key),v=visitedByEmail.get(key),pay=conversionsByEmail.get(key)
+    const met=Number(fu?.unique_met||0),ptp=Number(fu?.unique_ptp||0),unique=Number(v?.visited_customers||0),paid=Number(pay?.paid_after_visit||0)+Number(pay?.paid_after_previsit||0)
+    return {r,fu,att,unique,met,ptp,paid,
+      record:[r.agent_name||'',r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,
+      r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,
+      r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days,
+      r.visits_per_attendance_day??'',r.target_attainment??'',
+      unique? (met/unique*100).toFixed(1):'',met?(ptp/met*100).toFixed(1):'',unique?(paid/unique*100).toFixed(1):'',
+      r.first_pre_visit||'',r.first_visit||'',r.review]}
+  })
   function downloadCsv() {
-    const headers = [
-      'Agent Name',
-      'Agent Email',
-      'Organization',
-      'Assigned Customers',
-      'Paid Customers',
-      'Unpaid Customers',
-      'P1',
-      'P2',
-      'P3',
-      'P4',
-      'P5',
-      'Pre-Visits',
-      'Ready for Visit',
-      'Direct Visit',
-      'Visits',
-      'Paid Conversations',
-      'Promise to Pay',
-      'Attendance Days',
-      'Average Worked Minutes',
+    const agentColumns=['Agent','Email','Assigned (current portfolio)','Unique Pre-Visit','Total Visits','Unique Visited','Unique Met','Unique P2P','Paid After Activity','Attendance Days','On-Time Days','Late Days','Sick Days (approved)','Permission Days (approved)','No Activity Days','Missing Checkout Days','Long Gaps >3h','Visits / Attendance Day','Target Attainment %','Meeting Rate %','P2P Rate %','Recovery Rate %','First Pre-Visit Today (WIB timestamp)','First Visit Today (WIB timestamp)','Review']
+    const weeks=new Map<string,{start:string;end:string;pre:number;visits:number}>()
+    for(const row of visibleWeeklyRows){const w=weeks.get(row.week_start)||{start:row.week_start,end:row.week_end,pre:0,visits:0};w.pre+=Number(row.pre_visits||0);w.visits+=Number(row.visits||0);weeks.set(row.week_start,w)}
+    const weekly=[...weeks.values()].sort((a,b)=>a.start.localeCompare(b.start))
+    const toCsv=(values:(string|number|null|undefined)[])=>values.map(csvCell).join(',')
+    const lines=[
+      toCsv(['CRL Superadmin Reports']),toCsv(['Start Date',startDate]),toCsv(['End Date',endDate]),
+      toCsv(['Organization',organization||'All Organizations']),toCsv(['Agent',agentEmail||'All Agents']), '',
+      toCsv(['SUMMARY KPIS']),toCsv(['Group','Metric','Value','Definition']),
+      ...portfolioInfo.map(v=>toCsv([v.group,v.title,v.value,v.description])), '',
+      toCsv(['AGENT FUNNEL / ATTENDANCE / PRODUCTIVITY / REVIEW']),toCsv(agentColumns),
+      ...exportAgentRows.map(x=>toCsv(x.record)), '',
+      toCsv(['WEEKLY PERFORMANCE TREND']),toCsv(['Week Start (clipped)','Week End (clipped)','Pre-Visits','Visits','Visits / PV (%)']),
+      ...weekly.map(w=>toCsv([w.start<startDate?startDate:w.start,w.end>endDate?endDate:w.end,w.pre,w.visits,w.pre?(w.visits/w.pre*100).toFixed(1):''])),
+      '',toCsv(['WEEKLY AGENT ACTIVITY (detail)']),toCsv(['Agent','Email','Week Start','Week End','Pre-Visits','Visits']),
+      ...visibleWeeklyRows.map(w=>toCsv([w.agent_name||'',w.agent_email,w.week_start<startDate?startDate:w.week_start,w.week_end>endDate?endDate:w.week_end,w.pre_visits,w.visits])),
+      '',toCsv(['Export notes','Counts for assigned and paid portfolio are current; field activity is filtered by selected dates.']),
+      toCsv(['Export notes','Total visits include repeats; distinct cases are per agent. Paid after activity is attribution, not a strict sequential funnel.'])
     ]
-
-    const organizationByEmail = new Map(agents.map((agent) => [agent.email.toLowerCase(), agent.organization || '']))
-    const body = visibleRows.map((row) => [
-      row.agent_name,
-      row.agent_email,
-      organizationByEmail.get(row.agent_email.toLowerCase()) || '',
-      row.assigned_customers,
-      row.paid_customers,
-      row.unpaid_customers,
-      row.p1_customers,
-      row.p2_customers,
-      row.p3_customers,
-      row.p4_customers,
-      row.p5_customers,
-      row.pre_visits,
-      row.ready_for_visit,
-      row.direct_visit,
-      row.visits,
-      row.paid_conversations,
-      row.promise_to_pay,
-      row.attendance_days,
-      row.average_worked_minutes,
-    ].map(csvCell).join(','))
-
-    const metadata = [
-      [csvCell('CRL Superadmin Report')],
-      [csvCell('Start Date'), csvCell(startDate)],
-      [csvCell('End Date'), csvCell(endDate)],
-      [csvCell('Organization'), csvCell(organization || 'All Organizations')],
-      [csvCell('Agent'), csvCell(agentEmail || 'All Agents')],
-      [],
-    ].map((line) => line.join(','))
-
-    const csv = `\uFEFF${[...metadata, headers.map(csvCell).join(','), ...body].join('\r\n')}`
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `crl-report-${startDate}-to-${endDate}${organization ? `-${organization.replace(/\s+/g, '-').toLowerCase()}` : ''}${agentEmail ? `-${agentEmail.split('@')[0]}` : ''}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'})
+    const url=URL.createObjectURL(blob),link=document.createElement('a')
+    link.href=url
+    link.download=`crl-report-${startDate}-to-${endDate}.csv`
+    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
+    <div className={`mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8 ${styles.reportRoot}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-primary">
@@ -225,7 +360,7 @@ export default function SuperadminReportsPage() {
           <button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={() => window.print()} disabled={loading}>
             <Printer className="h-4 w-4" /> {tx('Print / PDF', 'Cetak / PDF')}
           </button>
-          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={downloadCsv} disabled={loading || visibleRows.length === 0}>
+          <button type="button" className="dui-btn dui-btn-primary dui-btn-sm" onClick={downloadCsv} disabled={loading || (visibleRows.length === 0 && visibleProductivityRows.length === 0)}>
             <Download className="h-4 w-4" /> {tx('Download CSV', 'Unduh CSV')}
           </button>
         </div>
@@ -234,19 +369,19 @@ export default function SuperadminReportsPage() {
       <section className="dui-card border border-base-300 bg-base-100 shadow-sm print:hidden">
         <div className="dui-card-body gap-4">
           <div className="flex items-center gap-2 font-bold"><CalendarDays className="h-5 w-5" />{tx('Report Filters', 'Filter Laporan')}</div>
-          <div className="grid gap-3 md:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-6">
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Start date', 'Tanggal mulai')}</span>
-              <input type="date" className="dui-input w-full" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
+              <input type="date" className="dui-input w-full !h-12 !min-h-12" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('End date', 'Tanggal akhir')}</span>
-              <input type="date" className="dui-input w-full" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <input type="date" className="dui-input w-full !h-12 !min-h-12" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Organization', 'Organisasi')}</span>
               <select
-                className="dui-select w-full"
+                className="dui-select w-full !h-12 !min-h-12"
                 value={organization}
                 onChange={(e) => {
                   setOrganization(e.target.value)
@@ -259,13 +394,17 @@ export default function SuperadminReportsPage() {
             </label>
             <label className="dui-fieldset">
               <span className="dui-fieldset-legend">{tx('Agent', 'Agen')}</span>
-              <select className="dui-select w-full" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
+              <select className="dui-select w-full !h-12 !min-h-12" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)}>
                 <option value="">{tx('All agents', 'Semua agen')}</option>
                 {filteredAgents.map((agent) => <option key={agent.email} value={agent.email}>{agent.agent_name || agent.email}</option>)}
               </select>
             </label>
+            <label className="dui-fieldset">
+              <span className="dui-fieldset-legend">{tx('Daily visit target (optional)', 'Target kunjungan harian (opsional)')}</span>
+              <input type="number" min="0" step="0.5" className="dui-input w-full !h-12 !min-h-12" placeholder="—" value={dailyTarget} onChange={e=>setDailyTarget(e.target.value)}/>
+            </label>
             <div className="flex items-end">
-              <button type="button" className="dui-btn dui-btn-outline w-full" onClick={() => void load()} disabled={loading}>
+              <button type="button" className="dui-btn dui-btn-outline w-full !h-12 !min-h-12" onClick={() => void load()} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 {tx('Refresh', 'Muat ulang')}
               </button>
@@ -282,73 +421,82 @@ export default function SuperadminReportsPage() {
 
       {error && <div className="dui-alert dui-alert-error"><span>{error}</span></div>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Metric label={tx('Assigned', 'Ditugaskan')} value={totals.assigned} />
-        <Metric label={tx('Paid', 'Lunas')} value={totals.paid} />
-        <Metric label={tx('Unpaid', 'Belum Bayar')} value={totals.unpaid} />
-        <Metric label={tx('Pre-Visits', 'Pra-Kunjungan')} value={totals.preVisits} />
-        <Metric label={tx('Visits', 'Kunjungan')} value={totals.visits} />
-        <Metric label={tx('Attendance Days', 'Hari Absensi')} value={totals.attendance} />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {(['Portfolio','Field Activity','Recovery','Attendance'] as const).map(group=><div key={group} className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-black">{group==='Portfolio'?tx('Customer Portfolio','Portofolio Pelanggan'):group==='Field Activity'?tx('Field Activity','Aktivitas Lapangan'):group==='Recovery'?tx('Recovery Outcome','Hasil Pemulihan'):tx('Attendance','Kehadiran')}</h2>
+          <div className="grid grid-cols-2 gap-3">{portfolioInfo.filter(k=>k.group===group).map(k=><div key={k.title} className="min-w-0 rounded-xl bg-base-200/60 p-3" title={k.description}><p className="text-xs font-semibold opacity-70">{k.title}</p><p className="mt-1 text-2xl font-black tabular-nums">{k.value.toLocaleString('id-ID')}</p><p className="mt-1 text-[11px] leading-relaxed opacity-60">{k.description}</p></div>)}</div>
+        </div>)}
       </section>
+      <AgentProductivityReview
+        rows={visibleProductivityRows}
+        funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        loading={loading}
+        locale={locale}
+        dailyTarget={dailyTarget}
+        attendanceBreakdown={visibleAttendance}
+        startDate={startDate}
+        endDate={endDate}
+        onOpenLocations={openLocations}
+      />
+      <section className={styles.printReport} aria-label={tx('Printable CRL Report','Laporan CRL untuk dicetak')}>
+        <header className={styles.printHeader}>
+          <div><h1>CRL Field Operations</h1><p>{tx('Superadmin Performance Report','Laporan Kinerja Superadmin')}</p></div>
+          <div className={styles.printMeta}><strong>{startDate} — {endDate}</strong><span>{organization || tx('All organizations','Semua organisasi')} · {agentEmail || tx('All agents','Semua agen')}</span><span>{tx('Reporting time zone','Zona waktu pelaporan')}: WIB (UTC+7)</span></div>
+        </header>
+        <h2>{tx('Performance overview','Ringkasan kinerja')}</h2>
+        <div className={styles.printMetrics}>{portfolioInfo.map(k=><article key={k.group+k.title}><small>{k.group}</small><b>{k.title}</b><strong>{k.value.toLocaleString('id-ID')}</strong><span>{k.description}</span></article>)}</div>
+        <h2>{tx('Agent performance and operational review','Kinerja agen dan evaluasi operasional')}</h2>
+        <p className={styles.printNote}>{tx('Assigned and portfolio paid are current-state figures. Field activity and payment attribution follow the selected date range. Unique cases are distinct per agent; total visits include repeat visits.','Assigned dan pelanggan lunas merupakan kondisi terkini. Aktivitas dan atribusi pembayaran mengikuti periode. Kasus unik dihitung per agen; total kunjungan termasuk kunjungan ulang.')}</p>
+        <table className={styles.printTable}><thead><tr>{['Agent','Assigned','PV unique','Visits','Visit unique','Met','P2P','Paid after activity','Attend','On time','Late','Sick','Permission','No activity','Missing checkout','Gaps >3h'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+          <tbody>{exportAgentRows.map(({r,fu,att,unique,met,ptp,paid})=><tr key={r.agent_email}>{[r.agent_name||r.agent_email,r.assigned_leads,fu?.unique_previsits||0,r.total_visits,unique,met,ptp,paid,r.attendance_days,att?.on_time_days||0,att?.late_days||0,att?.sick_days||0,att?.permission_days||0,r.no_activity_attendance_days,r.missing_checkout_days,r.long_gap_days].map((value,i)=><td key={i}>{value}</td>)}</tr>)}</tbody>
+        </table>
+        <h2 className={styles.breakBefore}>{tx('Weekly performance trend','Tren kinerja mingguan')}</h2>
+        {printWeeks.length>0&&<div className={styles.printChart}>
+          <div className={styles.printLegend}><span><i style={{background:'#ed008c'}}/>Pre-Visits</span><span><i style={{background:'#7c3bc4'}}/>Visits</span></div>
+          <svg viewBox="0 0 720 253" role="img" aria-label={tx('Weekly Pre-Visit and Visit line chart','Grafik garis Pra-Kunjungan dan Kunjungan mingguan')}>
+            {[0,0.25,0.5,0.75,1].map(t=><g key={t}><line x1="55" x2="680" y1={214-170*t} y2={214-170*t} stroke="#dedede" strokeWidth="1"/><text x="47" y={218-170*t} textAnchor="end" fontSize="11" fill="#555">{Math.round(t*printMax)}</text></g>)}
+            <polyline points={printLine('pv')} fill="none" stroke="#ed008c" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
+            <polyline points={printLine('visits')} fill="none" stroke="#7c3bc4" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
+            {printWeeks.map((w,i)=><g key={w.start}><circle cx={printX(i)} cy={printY(w.pv)} r="4" fill="#ed008c"/><circle cx={printX(i)} cy={printY(w.visits)} r="4" fill="#7c3bc4"/><text x={printX(i)} y="238" textAnchor="middle" fontSize="11" fill="#333">{i+1}</text></g>)}
+          </svg>
+          <p>{tx('Week numbers correspond to the table below.','Nomor minggu sesuai tabel di bawah.')}</p>
+        </div>}
+        <table className={styles.printTable}><thead><tr><th>{tx('Week','Minggu')}</th><th>Pre-Visits</th><th>Visits</th><th>Visits / PV</th></tr></thead><tbody>{[...new Map(visibleWeeklyRows.map(r=>[r.week_start,r.week_end])).entries()].sort(([a],[b])=>a.localeCompare(b)).map(([start,end])=>{const matched=visibleWeeklyRows.filter(r=>r.week_start===start);const pv=matched.reduce((sum,r)=>sum+Number(r.pre_visits||0),0);const visits=matched.reduce((sum,r)=>sum+Number(r.visits||0),0);return <tr key={start}><td>{start<startDate?startDate:start} — {end>endDate?endDate:end}</td><td>{pv}</td><td>{visits}</td><td>{pv?(100*visits/pv).toFixed(1)+'%':'—'}</td></tr>})}</tbody></table>
+        <p className={styles.printNote}>{tx('Visits / Pre-Visits is an activity ratio, not a sequential customer conversion rate. Partial weeks are clipped to the selected date range.','Visits / Pre-Visits adalah rasio aktivitas, bukan konversi pelanggan berurutan. Minggu parsial dibatasi rentang tanggal yang dipilih.')}</p>
+        <footer className={styles.printFooter}>CRL Field Operations · {startDate} — {endDate} · {tx('Confidential internal report','Laporan internal terbatas')}</footer>
+      </section>
+      <WeeklyAgentActivity rows={visibleWeeklyRows} loading={loading} locale={locale} startDate={startDate} endDate={endDate}
+        funnel={agentFunnelRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        payments={conversionRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        visited={visitedCustomerRows.filter(r => !organization || agents.some(a => a.email.toLowerCase() === r.agent_email.toLowerCase() && (a.organization || '').trim() === organization))}
+        productivity={visibleProductivityRows}
+        comparisonEnd={today}
+      />
 
-      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
-        <div className="dui-card-body gap-3 p-0 sm:p-0">
-          <div className="flex items-center gap-2 px-4 pt-4 font-bold sm:px-5 sm:pt-5">
-            <Users className="h-5 w-5" /> {tx('Agent Performance', 'Kinerja Agen')}
-          </div>
-          {loading ? (
-            <div className="flex justify-center py-16"><span className="dui-loading dui-loading-spinner dui-loading-lg" /></div>
-          ) : visibleRows.length === 0 ? (
-            <div className="px-5 py-12 text-center text-sm text-base-content/60">{tx('No report data for this period.', 'Tidak ada data laporan untuk periode ini.')}</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="dui-table dui-table-zebra min-w-[1350px] text-xs sm:text-sm">
-                <thead>
-                  <tr>
-                    <th>{tx('Agent', 'Agen')}</th>
-                    <th>{tx('Organization', 'Organisasi')}</th>
-                    <th>{tx('Assigned', 'Ditugaskan')}</th>
-                    <th>{tx('Paid', 'Lunas')}</th>
-                    <th>{tx('Unpaid', 'Belum Bayar')}</th>
-                    <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th>
-                    <th>{tx('Pre-Visits', 'Pra-Kunjungan')}</th>
-                    <th>{tx('Ready', 'Siap')}</th>
-                    <th>{tx('Direct', 'Langsung')}</th>
-                    <th>{tx('Visits', 'Kunjungan')}</th>
-                    <th>{tx('Paid Conv.', 'Percakapan Lunas')}</th>
-                    <th>PTP</th>
-                    <th>{tx('Attendance', 'Absensi')}</th>
-                    <th>{tx('Avg. Work', 'Rata-rata Kerja')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleRows.map((row) => {
-                    const agent = agents.find((item) => item.email.toLowerCase() === row.agent_email.toLowerCase())
-                    return (
-                      <tr key={row.agent_email}>
-                        <td><div className="font-bold">{row.agent_name || '—'}</div><div className="text-[11px] text-base-content/50">{row.agent_email}</div></td>
-                        <td>{agent?.organization || '—'}</td>
-                        <td>{row.assigned_customers}</td>
-                        <td>{row.paid_customers}</td>
-                        <td>{row.unpaid_customers}</td>
-                        <td>{row.p1_customers}</td><td>{row.p2_customers}</td><td>{row.p3_customers}</td><td>{row.p4_customers}</td><td>{row.p5_customers}</td>
-                        <td>{row.pre_visits}</td>
-                        <td>{row.ready_for_visit}</td>
-                        <td>{row.direct_visit}</td>
-                        <td>{row.visits}</td>
-                        <td>{row.paid_conversations}</td>
-                        <td>{row.promise_to_pay}</td>
-                        <td>{row.attendance_days}</td>
-                        <td>{formatMinutes(Number(row.average_worked_minutes || 0), locale)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+      {locationAgent && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 print:hidden" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setLocationAgent(null)}}>
+        <section role="dialog" aria-modal="true" aria-label={tx('Agent GPS Movement','Pergerakan GPS Agen')} className="dui-card max-h-[90vh] w-full max-w-4xl overflow-y-auto bg-base-100 shadow-xl">
+          <div className="dui-card-body gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-lg font-bold">{locationAgent.agent_name || locationAgent.agent_email}</h2><p className="text-xs text-base-content/60">{tx('Recorded GPS movement by timestamp (WIB)','Pergerakan GPS berdasarkan waktu (WIB)')}</p></div>
+              <div className="flex items-center gap-2">
+                <input type="date" className="dui-input dui-input-sm" aria-label={tx('Movement date','Tanggal pergerakan')} min={startDate} max={endDate > today ? today : endDate} value={locationDay} onChange={e=>setLocationDay(e.target.value)}/>
+                <button type="button" className="dui-btn dui-btn-ghost dui-btn-sm" onClick={()=>setLocationAgent(null)}><X className="h-4 w-4"/>{tx('Close','Tutup')}</button>
+              </div>
             </div>
-          )}
-        </div>
-      </section>
+            {locationError && <p role="alert" className="text-sm text-error">{locationError}</p>}
+            {locationLoading ? <p className="p-6">{tx('Loading GPS points...','Memuat titik GPS...')}</p>
+            : locationRows.length ? <>
+              <AgentMovementMap points={locationRows} locale={locale}/>
+              <div className="flex flex-wrap items-center gap-3 text-xs"><span>🔵 {tx('First','Awal')}</span><span>🟣 {tx('Intermediate','Pertengahan')}</span><span>🔴 {tx('Latest','Terakhir')}</span><span>🟠 {tx('Low accuracy','Akurasi rendah')}</span><strong>{locationRows.length} {tx('recorded points','titik terekam')}</strong></div>
+              <div className="max-h-48 overflow-auto"><table className="dui-table dui-table-xs"><thead><tr><th>#</th><th>{tx('Time (WIB)','Waktu (WIB)')}</th><th>Latitude</th><th>Longitude</th><th>{tx('Accuracy','Akurasi')}</th></tr></thead><tbody>{locationRows.map((p,i)=><tr key={p.captured_at+'-'+i}><td>{i+1}</td><td>{new Date(p.captured_at).toLocaleString(locale==='id'?'id-ID':'en-GB',{timeZone:'Asia/Jakarta',hour12:false})}</td><td>{p.latitude.toFixed(6)}</td><td>{p.longitude.toFixed(6)}</td><td>{p.accuracy_meters==null?'—':Math.round(p.accuracy_meters)+' m'}</td></tr>)}</tbody></table></div>
+            </> : !locationLoading && !locationError ? <p className="p-6 text-sm">{tx('No recorded GPS points for this date.','Tidak ada titik GPS tercatat pada tanggal ini.')}</p> : null}
+          </div>
+        </section>
+      </div>}
+      <p className="text-xs text-base-content/60">{tx('Paid after visit/previsit is attributed to the most recent eligible activity, preferring a prior visit, when payment_date exists and payment happened afterward. The selected date range applies to the activity date.','Pembayaran setelah visit/previsit diatribusikan ke aktivitas terkait (mendahulukan visit), jika payment_date tersedia dan pembayaran terjadi setelahnya. Rentang tanggal berlaku pada tanggal aktivitas.')}</p>
+      <p className="text-xs text-base-content/60">{tx('Target attainment is blank until a daily visit target is entered. Missing checkout excludes today. Long gap means more than 3 hours between check-in and successive recorded pre-visit/visit events, not proof of inactivity.', 'Pencapaian target kosong sampai target harian diisi. Checkout hilang tidak menghitung hari ini. Jeda >3 jam dihitung dari check-in dan antar aktivitas pra-kunjungan/kunjungan yang tercatat, bukan bukti tidak bekerja.')}</p>
 
       <p className="text-xs text-base-content/50">
         {tx(
@@ -360,13 +508,3 @@ export default function SuperadminReportsPage() {
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body gap-1 p-4"><span className="text-xs font-bold uppercase tracking-wide text-base-content/50">{label}</span><strong className="text-2xl font-black">{value.toLocaleString()}</strong></div></div>
-}
-
-function formatMinutes(minutes: number, locale: 'en' | 'id') {
-  const total = Math.max(0, Math.round(minutes))
-  const hours = Math.floor(total / 60)
-  const mins = total % 60
-  return locale === 'id' ? `${hours}j ${mins}m` : `${hours}h ${mins}m`
-}

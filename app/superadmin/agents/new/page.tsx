@@ -10,7 +10,7 @@ import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import styles from './page.module.css'
 
 const ROLES = ['agent', 'admin', 'superadmin'] as const
-const REGIONS = ['CJ', 'EJ', 'JABO 1', 'JABO 2', 'WJ'] as const
+const REGIONS = ['CJ', 'EJ', 'JABO 1', 'JABO 2', 'WJ', 'NS', 'SS'] as const
 
 type Role = (typeof ROLES)[number]
 type Region = (typeof REGIONS)[number]
@@ -32,6 +32,8 @@ const REGION_LEAD_MAP: Record<Region, string> = {
   'JABO 1': 'hidjrah.umami@gmail.com',
   'JABO 2': 'hidjrah.umami@gmail.com',
   WJ: 'hidjrah.umami@gmail.com',
+  NS: 'anggisusanto@ioh.co.id',
+  SS: 'anggisusanto@ioh.co.id',
 }
 
 function roleLabelKey(role: Role): string {

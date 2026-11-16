@@ -1,0 +1,99 @@
+'use client'
+import { Fragment, useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase-browser'
+import { Activity, CalendarCheck, ChevronDown, MapPin, TrendingUp, Users } from 'lucide-react'
+
+export type AgentReview = {
+ agent_email:string; agent_name:string|null; assigned_leads:number; attendance_days:number; no_activity_attendance_days:number; pre_visit_days:number; field_visit_days:number; pre_visit_customer_days:number; total_visits:number; visits_per_attendance_day:number|null; visits_per_field_day:number|null; target_attainment:number|null; met:number; ptp:number; missing_checkout_days:number; long_gap_days:number; first_pre_visit:string|null; first_visit:string|null; review:string;
+}
+type Funnel = { agent_email:string; unique_previsits:number; unique_met:number; unique_ptp:number }
+type Visited = { agent_email:string; visited_customers:number }
+type Payment = { agent_email:string; paid_after_visit:number; paid_after_previsit:number }
+type AttendanceBreakdown={agent_email:string;on_time_days:number;late_days:number;sick_days:number;permission_days:number}
+type Props = {attendanceBreakdown?:AttendanceBreakdown[];rows:AgentReview[]; funnel:Funnel[]; visited:Visited[]; payments:Payment[]; loading:boolean; locale:'en'|'id'; onOpenLocations:(agent:AgentReview)=>void; dailyTarget:string; startDate:string; endDate:string}
+const n=(x:unknown)=>Number(x||0)
+const fmt=(x:number)=>x.toLocaleString('id-ID')
+const pct=(a:number,b:number)=>b>0?`${(100*a/b).toFixed(1)}%`:'—'
+export default function AgentProductivityReview({rows,funnel,visited,payments,loading,locale,onOpenLocations,dailyTarget,startDate,endDate,attendanceBreakdown=[]}:Props){
+ const id=locale==='id'
+ const [view,setView]=useState<'funnel'|'attendance'|'productivity'|'review'>('funnel')
+ const [expanded,setExpanded]=useState<string|null>(null)
+ const timeToday = (value:string|null) => value ? new Date(value).toLocaleTimeString('en-GB', { timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',hour12:false }) + ' WIB' : '—'
+ const [gaps,setGaps]=useState<{activity_date:string;start_time:string;end_time:string;gap_minutes:number}[]>([])
+ const [gapAgent,setGapAgent]=useState<string|null>(null)
+ const [gapLoading,setGapLoading]=useState(false)
+ const [gapError,setGapError]=useState('')
+ const [evidenceAgent,setEvidenceAgent]=useState<string|null>(null)
+ const [evidenceLoading,setEvidenceLoading]=useState(false)
+ const [evidenceError,setEvidenceError]=useState('')
+ const [evidenceRows,setEvidenceRows]=useState<{activity_date:string;issue:string;check_in_at:string|null;check_out_at:string|null}[]>([])
+ async function showEvidence(email:string){
+  if(evidenceAgent===email){setEvidenceAgent(null);return}
+  setEvidenceAgent(email);setEvidenceRows([]);setEvidenceError('');setEvidenceLoading(true)
+  const {data,error}=await createClient().rpc('crl_agent_review_evidence_v1',{p_agent_email:email,p_start_date:startDate,p_end_date:endDate})
+  if(error)setEvidenceError(error.message)
+  else setEvidenceRows((data||[]) as typeof evidenceRows)
+  setEvidenceLoading(false)
+ }
+ const evidenceLabel=(value:string)=>value==='late'?(id?'Check-in terlambat':'Late check-in'):value==='missing_checkout'?(id?'Checkout belum tercatat':'Missing checkout'):(id?'Tidak ada aktivitas tercatat':'No recorded activity')
+
+ async function showGaps(email:string) {
+  if(gapAgent===email){setGapAgent(null);return}
+  setGapAgent(email);setGaps([]);setGapError('');setGapLoading(true)
+  const {data,error}=await createClient().rpc('crl_agent_activity_gaps_v1',{p_agent_email:email,p_start_date:startDate,p_end_date:endDate})
+  if(error)setGapError(error.message)
+  else setGaps((data||[]) as typeof gaps)
+  setGapLoading(false)
+ }
+ const displayWib=(value:string)=>new Date(value).toLocaleTimeString('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',hour12:false})
+ const [reviewFilter,setReviewFilter]=useState<'all'|'flagged'|'clear'>('flagged')
+ const f=useMemo(()=>new Map(funnel.map(x=>[x.agent_email.toLowerCase(),x])),[funnel])
+ const v=useMemo(()=>new Map(visited.map(x=>[x.agent_email.toLowerCase(),x])),[visited])
+ const p=useMemo(()=>new Map(payments.map(x=>[x.agent_email.toLowerCase(),x])),[payments])
+ const attendanceMap=new Map(attendanceBreakdown.map(r=>[r.agent_email.toLowerCase(),r]))
+ const enriched=rows.map(r=>{const key=r.agent_email.toLowerCase();const fu=f.get(key);const pay=p.get(key);return {...r,preVisitUnique:n(fu?.unique_previsits),uniqueVisit:n(v.get(key)?.visited_customers),uniqueMet:n(fu?.unique_met),uniquePtp:n(fu?.unique_ptp),paid:n(pay?.paid_after_visit)+n(pay?.paid_after_previsit),attendanceExtra:attendanceMap.get(key)}})
+ const total=(key:'assigned_leads'|'preVisitUnique'|'total_visits'|'uniqueVisit'|'uniqueMet'|'uniquePtp'|'paid')=>enriched.reduce((sum,r)=>sum+n(r[key]),0)
+ const stages=[{name:id?'Ditugaskan':'Assigned',value:total('assigned_leads')},{name:'Pre-Visit',value:total('preVisitUnique')},{name:id?'Jumlah Kunjungan':'Visit Count',value:total('total_visits')},{name:id?'Kunjungan Unik':'Unique Visit',value:total('uniqueVisit')},{name:id?'Bertemu':'Met',value:total('uniqueMet')},{name:'P2P',value:total('uniquePtp')},{name:id?'Dibayar':'Paid',value:total('paid')}]
+ const tabs=[{key:'funnel',name:id?'Funnel Pemulihan':'Recovery Funnel',Icon:TrendingUp},{key:'attendance',name:id?'Kehadiran':'Attendance',Icon:CalendarCheck},{key:'productivity',name:id?'Produktivitas':'Productivity',Icon:Activity},{key:'review',name:id?'Evaluasi':'Review',Icon:Users}] as const
+ const reasons=(r:AgentReview)=>[
+  ...(n(r.no_activity_attendance_days)>0?[{label:id?'Hari tanpa aktivitas':'No activity days',value:n(r.no_activity_attendance_days)}]:[]),
+  ...(n(r.missing_checkout_days)>0?[{label:id?'Belum checkout':'Missing checkout',value:n(r.missing_checkout_days)}]:[]),
+  ...(n(attendanceMap.get(r.agent_email.toLowerCase())?.late_days)>0?[{label:id?'Terlambat check-in':'Late check-ins',value:n(attendanceMap.get(r.agent_email.toLowerCase())?.late_days)}]:[]),
+  ...(n(r.long_gap_days)>0?[{label:id?'Jeda aktivitas >3 jam':'Activity gap >3h',value:n(r.long_gap_days)}]:[])
+ ]
+ const flagged=enriched.filter(r=>reasons(r).length>0)
+ const reviewRows=enriched.filter(r=>reviewFilter==='all'||(reviewFilter==='flagged'?reasons(r).length>0:reasons(r).length===0))
+ const header=view==='funnel'?['Agent','Assigned','Pre-Visit','Visits','Unique Visit','Met','P2P','Paid']:view==='attendance'?['Agent','Attendance Days','On Time','Late','Sick','Permission','No Activity','Missing Checkout','Long Gaps >3h']:view==='productivity'?['Agent','Visits / Attendance Day','Visits / Field Day','Unique / Day','Target Attainment','Met Rate','P2P Rate','Recovery Rate']:['Agent','Status','No Activity','Missing Checkout','Long Gaps','First Pre-Visit','First Visit','GPS']
+ function cells(r:typeof enriched[number]):(string|number)[]{
+  if(view==='funnel')return [r.agent_name||r.agent_email,fmt(n(r.assigned_leads)),fmt(r.preVisitUnique),fmt(n(r.total_visits)),fmt(r.uniqueVisit),fmt(r.uniqueMet),fmt(r.uniquePtp),fmt(r.paid)]
+  if(view==='attendance')return [r.agent_name||r.agent_email,fmt(n(r.attendance_days)),fmt(n(r.attendanceExtra?.on_time_days)),fmt(n(r.attendanceExtra?.late_days)),fmt(n(r.attendanceExtra?.sick_days)),fmt(n(r.attendanceExtra?.permission_days)),fmt(n(r.no_activity_attendance_days)),fmt(n(r.missing_checkout_days)),fmt(n(r.long_gap_days))]
+  if(view==='productivity')return [r.agent_name||r.agent_email,r.visits_per_attendance_day == null?'—':Number(r.visits_per_attendance_day).toFixed(2),r.visits_per_field_day==null?'—':Number(r.visits_per_field_day).toFixed(2),n(r.attendance_days)>0?(r.uniqueVisit/n(r.attendance_days)).toFixed(2):'—',r.target_attainment==null?'—':`${r.target_attainment}%`,pct(r.uniqueMet,r.uniqueVisit),pct(r.uniquePtp,r.uniqueMet),pct(r.paid,r.uniqueVisit)]
+  return [r.agent_name||r.agent_email,r.review,fmt(n(r.no_activity_attendance_days)),fmt(n(r.missing_checkout_days)),fmt(n(r.long_gap_days)),timeToday(r.first_pre_visit),timeToday(r.first_visit),'GPS']
+ }
+ return <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+ <div className="dui-card-body gap-4 p-4 sm:p-5">
+ <div><h2 className="text-lg font-black">{id?'Produktivitas & Evaluasi Agen':'Agent Productivity & Review'}</h2><p className="text-xs text-base-content/60">{id?'Funnel kasus pelanggan, kehadiran, produktivitas, dan evaluasi operasional':'Customer case funnel, attendance, productivity and operational review'}</p></div>
+ <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 print:hidden">{tabs.map(t=><button key={t.key} type="button" aria-pressed={view===t.key} onClick={()=>setView(t.key)} className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold sm:text-sm ${view===t.key?'border-primary bg-primary text-primary-content':'border-base-300 bg-base-200/50'}`}><t.Icon size={16}/>{t.name}</button>)}</div>
+ {view==='funnel'&&<><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{stages.map((stage,index)=><div key={stage.name} className={`rounded-xl border p-3 ${index===6?'border-emerald-200 bg-emerald-50 text-emerald-900':'border-violet-100 bg-violet-50/70'}`}><p className="text-[11px] font-bold opacity-70">{stage.name}</p><strong className="text-xl font-black tabular-nums">{fmt(stage.value)}</strong></div>)}</div><p className="text-xs text-base-content/60">{id?'Jumlah Kunjungan termasuk kunjungan ulang. Tahap unik dihitung berdasarkan CRL ID. Kunjungan langsung dan pembayaran tanpa P2P diperbolehkan, sehingga funnel bukan konversi berurutan mutlak.':'Visit Count includes repeat visits. Unique stages use CRL IDs. Direct visits and payments without P2P are possible, so the funnel is not strictly sequential.'}</p></>}
+ {view==='productivity'&&<p className="text-xs text-base-content/60">{id?'Rasio dihitung berdasarkan hari hadir dan kasus unik. Pencapaian target tersedia saat target harian diisi.':'Rates use attendance days and unique cases. Target attainment is available when a daily target is provided.'} {dailyTarget&&`Target: ${dailyTarget}`}</p>}
+ {view==='review'&&<p className="text-xs text-base-content/60">{id?'Status review adalah indikator untuk ditindaklanjuti, bukan penilaian otomatis kinerja pegawai.':'Review flags indicate follow-up needs, not automatic employee performance judgments.'}</p>}
+ {view==='review'&&<div className="space-y-3">
+ <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+  <div className="rounded-xl border border-base-300 bg-base-200/40 p-3"><p className="text-xs opacity-65">{id?'Total agen':'Total agents'}</p><strong className="text-2xl font-black">{enriched.length}</strong></div>
+  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950"><p className="text-xs">{id?'Perlu ditinjau':'Needs follow-up'}</p><strong className="text-2xl font-black">{flagged.length}</strong></div>
+  <div className="col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-950 sm:col-span-1"><p className="text-xs">{id?'Tidak ada flag':'No recorded flags'}</p><strong className="text-2xl font-black">{enriched.length-flagged.length}</strong></div>
+ </div>
+ <div className="flex flex-wrap gap-2 print:hidden">
+ {(['flagged','all','clear'] as const).map(option=><button key={option} type="button" onClick={()=>setReviewFilter(option)} aria-pressed={reviewFilter===option} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${reviewFilter===option?'border-primary bg-primary text-primary-content':'border-base-300'}`}>{option==='flagged'?(id?'Perlu ditinjau':'Needs follow-up'):option==='clear'?(id?'Tanpa flag':'No flags'):(id?'Semua agen':'All agents')}</button>)}
+ </div>
+ </div>}
+ {loading?<div className="flex justify-center py-12"><span className="dui-loading dui-loading-spinner dui-loading-lg"/></div>:<>{view==='review'?<div className="space-y-2">{reviewRows.map(r=><article key={r.agent_email} className="rounded-xl border border-base-300 bg-base-100 p-3 sm:p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><button type="button" onClick={()=>setExpanded(expanded===r.agent_email?null:r.agent_email)} className="flex items-center gap-1 text-left font-bold hover:underline">{r.agent_name||r.agent_email}<ChevronDown size={15}/></button><p className="break-all text-xs text-base-content/55">{r.agent_email}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${reasons(r).length?'bg-amber-100 text-amber-900':'bg-emerald-100 text-emerald-900'}`}>{reasons(r).length?(id?'Perlu ditinjau':'Needs follow-up'):(id?'Tidak ada flag':'No flags')}</span></div><div className="mt-3 flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{reasons(r).length?reasons(r).map(item=><span key={item.label} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"><b>{item.value}</b> {item.label}</span>):<span className="text-xs text-base-content/60">{id?'Tidak ada pengecualian aktivitas yang tercatat.':'No recorded activity exceptions.'}</span>}</div><button type="button" onClick={()=>onOpenLocations(r)} className="dui-btn dui-btn-outline dui-btn-sm"><MapPin size={14}/>{id?'Riwayat GPS':'GPS history'}</button></div>{reasons(r).length>0&&<div className="mt-3"><button type="button" className="rounded-lg border border-base-300 bg-base-100 px-3 py-2 text-xs font-bold" onClick={()=>void showEvidence(r.agent_email)} aria-expanded={evidenceAgent===r.agent_email}>{evidenceAgent===r.agent_email?(id?'Sembunyikan bukti absensi':'Hide attendance evidence'):(id?'Lihat bukti absensi':'View attendance evidence')}</button>
+ {evidenceAgent===r.agent_email&&<div className="mt-2 max-h-72 overflow-auto rounded-xl border border-base-300 bg-base-200/30 p-3">{evidenceLoading?<p className="text-xs">{id?'Memuat data…':'Loading records…'}</p>:evidenceError?<p role="alert" className="text-xs text-error">{evidenceError}</p>:evidenceRows.length===0?<p className="text-xs opacity-65">{id?'Tidak ada detail absensi dalam periode ini.':'No attendance exceptions in this period.'}</p>:<table className="w-full text-left text-xs"><thead><tr><th className="p-2">{id?'Tanggal':'Date'}</th><th className="p-2">{id?'Alasan':'Reason'}</th><th className="p-2">Check-in WIB</th><th className="p-2">Checkout WIB</th></tr></thead><tbody>{evidenceRows.map((e,i)=><tr key={e.activity_date+e.issue+i} className="border-t border-base-300"><td className="p-2">{e.activity_date}</td><td className="p-2">{evidenceLabel(e.issue)}</td><td className="p-2">{e.check_in_at?displayWib(e.check_in_at):'—'}</td><td className="p-2">{e.check_out_at?displayWib(e.check_out_at):'—'}</td></tr>)}</tbody></table>}</div>}</div>}
+{n(r.long_gap_days)>0&&<div className="mt-3"><button type="button" className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-900" onClick={()=>void showGaps(r.agent_email)} aria-expanded={gapAgent===r.agent_email}>{gapAgent===r.agent_email?(id?'Tutup detail jeda':'Hide gap details'):(id?'Lihat kapan jeda terjadi':'See when gaps occurred')}</button>{gapAgent===r.agent_email&&<div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">{gapLoading?<p>{id?'Memuat waktu jeda…':'Loading gap times…'}</p>:gapError?<p role="alert">{gapError}</p>:gaps.length===0?<p>{id?'Tidak ada detail jeda pada periode ini.':'No gap details in this period.'}</p>:<div className="max-h-64 overflow-auto"><table className="w-full text-left"><thead><tr><th className="p-2">{id?'Tanggal':'Date'}</th><th className="p-2">{id?'Dari':'From'}</th><th className="p-2">{id?'Ke':'To'}</th><th className="p-2">{id?'Durasi':'Duration'}</th></tr></thead><tbody>{gaps.map((g,i)=><tr key={g.start_time+'-'+i} className="border-t border-amber-200"><td className="p-2">{g.activity_date}</td><td className="p-2">{displayWib(g.start_time)}</td><td className="p-2">{displayWib(g.end_time)}</td><td className="p-2">{(Number(g.gap_minutes)/60).toFixed(1)}h</td></tr>)}</tbody></table></div>}<p className="mt-2 opacity-70">{id?'Jeda antara check-in dan aktivitas tercatat berikutnya, bukan bukti tidak bekerja.':'Gaps between recorded check-in and subsequent activity; not proof of inactivity.'}</p></div>}</div>}
+{expanded===r.agent_email&&<div className="mt-3 grid grid-cols-2 gap-2 border-t border-base-300 pt-3 text-xs sm:grid-cols-4"><span>{id?'Hari hadir':'Attendance days'}: <b>{fmt(n(r.attendance_days))}</b></span><span>{id?'Kunjungan':'Visits'}: <b>{fmt(n(r.total_visits))}</b></span><span>{id?'Pra-Kunjungan pertama hari ini':'First Pre-Visit Today'}: <b>{timeToday(r.first_pre_visit)}</b></span><span>{id?'Kunjungan pertama hari ini':'First Visit Today'}: <b>{timeToday(r.first_visit)}</b></span></div>}</article>)}{reviewRows.length===0&&<p className="py-8 text-center text-sm opacity-60">{id?'Tidak ada agen pada filter ini.':'No agents in this filter.'}</p>}</div>:<div className="max-w-full overflow-x-auto"><table className="dui-table dui-table-zebra w-full text-xs sm:text-sm"><thead><tr>{header.map(h=><th key={h} className="whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{enriched.map(r=><Fragment key={r.agent_email}><tr>{cells(r).map((x,i)=><td key={i} className={i===0?'min-w-44 font-bold':''}>{i===0?<button type="button" className="text-left underline-offset-2 hover:underline" aria-expanded={expanded===r.agent_email} onClick={()=>setExpanded(expanded===r.agent_email?null:r.agent_email)} title={id?'Lihat detail':'Show details'}>{String(x)} <ChevronDown size={12} className="inline"/></button>:x}</td>)}</tr>{expanded===r.agent_email&&<tr className="bg-base-200/40"><td colSpan={header.length} className="p-3 sm:p-4"><div className="rounded-xl border border-base-300 bg-base-100 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><strong>{r.agent_name||r.agent_email}</strong><p className="text-xs text-base-content/60">{r.agent_email}</p></div><button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={()=>onOpenLocations(r)}><MapPin size={14}/>{id?'Lokasi GPS':'GPS history'}</button></div><div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><span>{id?'Ditugaskan':'Assigned'}: <b>{fmt(n(r.assigned_leads))}</b></span><span>Pre-Visit: <b>{fmt(r.preVisitUnique)}</b></span><span>{id?'Kunjungan unik':'Unique Visit'}: <b>{fmt(r.uniqueVisit)}</b></span><span>Paid: <b>{fmt(r.paid)}</b></span><span>{id?'Hari hadir':'Attendance'}: <b>{fmt(n(r.attendance_days))}</b></span><span>{id?'Tidak ada aktivitas':'No activity'}: <b>{fmt(n(r.no_activity_attendance_days))}</b></span><span>P2P: <b>{fmt(r.uniquePtp)}</b></span><span>{id?'Status evaluasi':'Review'}: <b>{r.review}</b></span></div></div></td></tr>}</Fragment>)}</tbody></table></div>}
+ {enriched.length===0&&<p className="py-5 text-center text-sm text-base-content/60">{id?'Tidak ada data agen pada filter ini.':'No agent data for these filters.'}</p>}
+
+ </>}
+ <p className="text-[11px] text-base-content/50">{id?'Assigned adalah portofolio saat ini; aktivitas dan pembayaran mengikuti periode dan agen terkait. Paid merupakan pembayaran setelah aktivitas, bukan semua pelanggan berstatus paid.':'Assigned is the current portfolio; activities and payment attribution follow the report period and relevant agent. Paid reflects payments after activity, not all customers currently marked paid.'}</p>
+ </div></section>
+}

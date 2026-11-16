@@ -29,11 +29,18 @@ export default async function AgentVisitDaysPage({
   const { data: agent } = await supabase.from('agents').select('email, agent_name').eq('email', decodedEmail).maybeSingle()
   if (!agent) return <main className={styles.page}><div className={styles.errorCard}>{t('superadmin.visits.agentDays.notFound')}</div></main>
 
-  const { data: visits, error } = await supabase
-    .from('visits')
-    .select('visit_id, visit_date, location_match, conversation_result')
-    .eq('agent_email', decodedEmail)
-    .order('visit_date', { ascending: false })
+  const visits: { visit_id: string; visit_date: string; location_match: boolean | null; conversation_result: string | null }[] = []
+  let error: { message: string } | null = null
+  for (let offset = 0; ; offset += 500) {
+    const result = await supabase.from('visits')
+      .select('visit_id, visit_date, location_match, conversation_result')
+      .eq('agent_email', decodedEmail).order('visit_date', { ascending: false })
+      .order('visit_id', { ascending: false }).range(offset, offset + 499)
+    if (result.error) { error = result.error; break }
+    const batch = result.data ?? []
+    visits.push(...batch)
+    if (batch.length < 500) break
+  }
 
   if (error) return <main className={styles.page}><div className={styles.errorCard}>{error.message}</div></main>
 

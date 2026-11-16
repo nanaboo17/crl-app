@@ -19,6 +19,7 @@ import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import styles from './page.module.css'
 import mode from './dashboard-mode.module.css'
+import DashboardCount from './DashboardCount'
 
 function startOfTodayWib() {
   const now = new Date()
@@ -56,10 +57,6 @@ export default async function SuperadminPage() {
 
   const todayStart = startOfTodayWib()
   const [
-    agentsResult,
-    customersResult,
-    preVisitsResult,
-    visitsResult,
     activeAgentsResult,
     todayVisitsResult,
     todayPreVisitsResult,
@@ -67,10 +64,6 @@ export default async function SuperadminPage() {
     recentVisitsResult,
     recentPreVisitsResult,
   ] = await Promise.all([
-    supabase.from('agents').select('*', { count: 'exact', head: true }).eq('active', true),
-    supabase.from('customers').select('*', { count: 'exact', head: true }),
-    supabase.from('pre_visits').select('*', { count: 'exact', head: true }),
-    supabase.from('visits').select('*', { count: 'exact', head: true }),
     supabase.from('agents').select('email,agent_name').eq('active', true).eq('role', 'agent').order('agent_name').limit(5),
     supabase.from('visits').select('agent_email,visit_date,location_match').gte('visit_date', todayStart),
     supabase.from('pre_visits').select('agent_email,contact_attempt_date,previsit_status').gte('contact_attempt_date', todayStart),
@@ -107,15 +100,18 @@ export default async function SuperadminPage() {
   const checkedInAgents = new Set(attendance.map((item) => item.agent_email)).size
   const gpsMismatchToday = todayVisits.filter((item) => item.location_match === false).length
 
+  // Counts load independently in the browser so slow Circle-scoped RLS counts
+  // never block the initial dashboard response or display false zeros.
   const stats = [
-    { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), count: agentsResult.count ?? 0, icon: Users, tone: 'purple' },
-    { href: '/superadmin/customers', label: tl('superadmin.dashboard.statCustomers'), count: customersResult.count ?? 0, icon: Building2, tone: 'green' },
-    { href: '/superadmin/pre-visits', label: tl('superadmin.dashboard.statPreVisits'), count: preVisitsResult.count ?? 0, icon: ClipboardList, tone: 'yellow' },
-    { href: '/superadmin/visits', label: tl('superadmin.dashboard.statVisits'), count: visitsResult.count ?? 0, icon: MapPin, tone: 'blue' },
+    { href: '/superadmin/agents', label: tl('superadmin.dashboard.statAgents'), table: 'agents' as const, icon: Users, tone: 'purple' },
+    { href: '/superadmin/customers', label: tl('superadmin.dashboard.statCustomers'), table: 'customers' as const, icon: Building2, tone: 'green' },
+    { href: '/superadmin/pre-visits', label: tl('superadmin.dashboard.statPreVisits'), table: 'pre_visits' as const, icon: ClipboardList, tone: 'yellow' },
+    { href: '/superadmin/visits', label: tl('superadmin.dashboard.statVisits'), table: 'visits' as const, icon: MapPin, tone: 'blue' },
   ]
 
   const quickAccess = [
     { href: '/superadmin/agents', title: tx('Manage Agents', 'Kelola Agen'), icon: Users, tone: 'purple' },
+    { href: '/superadmin/agent-locations', title: tx('Agent GPS Locations', 'Lokasi GPS Agen'), icon: MapPin, tone: 'blue' },
     { href: '/superadmin/customers', title: tx('Customer List', 'Daftar Pelanggan'), icon: Building2, tone: 'green' },
     { href: '/superadmin/pre-visits', title: tx('Pre-Visit Monitor', 'Monitor Pra-Kunjungan'), icon: ClipboardList, tone: 'yellow' },
     { href: '/superadmin/visits', title: tx('Visit Monitor', 'Monitor Kunjungan'), icon: MapPin, tone: 'blue' },
@@ -210,10 +206,10 @@ export default async function SuperadminPage() {
       </section>
 
       <section aria-label={tl('superadmin.dashboard.statisticsAria')} className={`${styles.statsGrid} ${mode.generalOnly}`}>
-        {stats.map(({ href, label, count, icon: Icon, tone }) => (
+        {stats.map(({ href, label, table, icon: Icon, tone }) => (
           <Link key={href} href={href} className={`${styles.statCard} ${styles[`tone_${tone}`]} ${mode.themeCard}`}>
             <div className={styles.statIcon}><Icon aria-hidden="true" /></div>
-            <strong>{count.toLocaleString('id-ID')}</strong>
+            <DashboardCount table={table} />
             <span>{label}</span>
             <small>↗ {tx('Open details', 'Buka detail')}</small>
           </Link>

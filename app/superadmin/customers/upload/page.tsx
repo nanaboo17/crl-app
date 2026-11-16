@@ -2,13 +2,13 @@
 
 import { ChangeEvent, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, Upload, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, FileSpreadsheet, Loader2, PlusCircle, RefreshCw, Upload, XCircle } from 'lucide-react'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { useI18n } from '@/components/providers/i18n-provider'
 import styles from './page.module.css'
 
 type RawRow = Record<string, string>
-type ValidationRow = { row: number; customer_id: string; status: 'valid' | 'warning' | 'error'; messages: string[] }
+type ValidationRow = { row: number; customer_id: string; case_month?: string; status: 'valid' | 'warning' | 'error'; messages: string[] }
 type ValidationResponse = {
   summary: { total: number; valid: number; warnings: number; errors: number; existing: number }
   rows: ValidationRow[]
@@ -16,11 +16,22 @@ type ValidationResponse = {
 
 const fields = [
   ['customer_id', 'Customer ID', true],
+  ['case_month', 'CRL Month', true],
   ['customer_name', 'Customer Name', true],
   ['phone_number', 'Phone Number', false],
   ['service_address', 'Service Address', false],
   ['product', 'Product', false],
+  ['site_id', 'Site ID', false],
+  ['territory', 'Territory', false],
   ['outstanding_amount', 'Outstanding Amount', false],
+  ['invoice_num', 'Invoice Number', false],
+  ['invoice_amount', 'Invoice Amount', false],
+  ['invoice_date', 'Invoice Date', false],
+  ['billing_cycle', 'Billing Cycle', false],
+  ['payment_due_date', 'Payment Due Date', false],
+  ['suspension_date', 'Suspension Date', false],
+  ['unpaid_since', 'Unpaid Since', false],
+  ['customer_tenure', 'Customer Tenure', false],
   ['payment_status', 'Payment Status', false],
   ['priority_rank', 'Priority', false],
   ['days_left_to_churn', 'Days Left to Churn', false],
@@ -39,11 +50,22 @@ type FieldKey = typeof fields[number][0]
 
 const aliases: Record<FieldKey, string[]> = {
   customer_id: ['customer_id', 'customer id', 'cust_id', 'ba_id', 'billing_account', 'billing account'],
+  case_month: ['case_month', 'case month', 'crl_month', 'crl month', 'month', 'bulan crl'],
   customer_name: ['customer_name', 'customer name', 'name', 'nama pelanggan'],
   phone_number: ['phone_number', 'phone number', 'phone', 'msisdn', 'nomor telepon'],
   service_address: ['service_address', 'service address', 'address', 'alamat'],
   product: ['product', 'package', 'package_name', 'nama paket'],
-  outstanding_amount: ['outstanding_amount', 'outstanding amount', 'outstanding', 'invoice_amount', 'invoice amount'],
+  site_id: ['site_id', 'site id', 'site'],
+  territory: ['territory', 'territory_code', 'territory code', 'teritory', 'teritori'],
+  outstanding_amount: ['outstanding_amount', 'outstanding amount', 'outstanding', 'balance_out_mny', 'balance out mny'],
+  invoice_num: ['invoice_num', 'invoice number', 'invoice no', 'invoice_no', 'invoice'],
+  invoice_amount: ['invoice_amount', 'invoice amount', 'bill_amount', 'bill amount'],
+  invoice_date: ['invoice_date', 'invoice date', 'actual_bill_dtm', 'actual bill dtm'],
+  billing_cycle: ['billing_cycle', 'billing cycle', 'bill_cycle', 'bill cycle'],
+  payment_due_date: ['payment_due_date', 'payment due date', 'payment_due_dat', 'payment due dat', 'due_date', 'due date'],
+  suspension_date: ['suspension_date', 'suspension date', 'ac_st_dt', 'ac st dt'],
+  unpaid_since: ['unpaid_since', 'unpaid since'],
+  customer_tenure: ['customer_tenure', 'customer tenure', 'tenure', 'tenure_day', 'tenure day'],
   payment_status: ['payment_status', 'payment status'],
   priority_rank: ['priority_rank', 'priority rank', 'priority'],
   days_left_to_churn: ['days_left_to_churn', 'days left to churn', 'days_to_churn'],
@@ -153,6 +175,38 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<string[][]> {
   return result.filter((r) => r.some((value) => String(value).trim()))
 }
 
+
+function formatCaseMonthPreview(value: string, locale: string) {
+  const raw = String(value || '').trim()
+  if (!raw) return '—'
+
+  let date: Date | null = null
+
+  const serial = Number(raw)
+  if (Number.isFinite(serial) && serial >= 20000 && serial <= 80000) {
+    const excelEpoch = Date.UTC(1899, 11, 30)
+    date = new Date(excelEpoch + Math.floor(serial) * 86400000)
+  } else {
+    const iso = raw.match(/^(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?$/)
+    if (iso) {
+      date = new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3] || 1)))
+    } else {
+      const dmy = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+      if (dmy) {
+        date = new Date(Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1])))
+      }
+    }
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return raw
+
+  return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)
+}
+
 function buildRawRows(matrix: string[][]) {
   if (matrix.length < 2) return { headers: [] as string[], rows: [] as RawRow[] }
   const headers = matrix[0].map((value, index) => String(value || `Column ${index + 1}`).trim())
@@ -169,7 +223,8 @@ export default function UploadCustomersPage() {
   const [mapping, setMapping] = useState<Partial<Record<FieldKey, string>>>({})
   const [validation, setValidation] = useState<ValidationResponse | null>(null)
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null)
+  const [mode, setMode] = useState<'insert' | 'update'>('insert')
+  const [result, setResult] = useState<{ inserted: number; updated: number; skipped: number; autoAssigned: number; rolledForward: number } | null>(null)
   const [error, setError] = useState('')
 
   const normalizedRows = useMemo(() => rawRows.map((row) => {
@@ -178,6 +233,7 @@ export default function UploadCustomersPage() {
       const source = mapping[key]
       out[key] = source ? (row[source] ?? '') : ''
     }
+    if (out.payment_due_date) out.unpaid_since = out.payment_due_date
     return out
   }), [rawRows, mapping])
 
@@ -204,24 +260,43 @@ export default function UploadCustomersPage() {
     } finally { setBusy(false) }
   }
 
-  async function callApi(action: 'validate' | 'import') {
+  async function callApi(action: 'validate' | 'apply') {
     setBusy(true); setError('')
     try {
       const response = await fetch('/api/superadmin/customers/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, rows: normalizedRows }),
+        body: JSON.stringify({
+          action,
+          mode,
+          rows: normalizedRows,
+          mappedFields: Object.keys(mapping).filter((key) => Boolean(mapping[key as FieldKey])),
+        }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data?.error || 'Request failed.')
       if (action === 'validate') setValidation(data)
-      else { setResult({ inserted: data.inserted, skipped: data.skipped }); setValidation(data.validation) }
+      else {
+        setResult({
+          inserted: data.inserted || 0,
+          updated: data.updated || 0,
+          skipped: data.skipped || 0,
+          autoAssigned: data.assignmentRefresh?.auto_assigned || 0,
+          rolledForward: data.assignmentRefresh?.rolled_forward || 0,
+        })
+        setValidation(data.validation)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed.')
     } finally { setBusy(false) }
   }
 
-  const canValidate = rawRows.length > 0 && Boolean(mapping.customer_id && mapping.customer_name && mapping.given_latitude && mapping.given_longitude)
+  const updateFields: FieldKey[] = ['territory', 'speed', 'unpaid_since', 'customer_tenure', 'site_id', 'invoice_num', 'invoice_amount', 'invoice_date', 'billing_cycle', 'payment_due_date', 'suspension_date']
+  const canValidate = rawRows.length > 0 && (
+    mode === 'insert'
+      ? Boolean(mapping.customer_id && mapping.case_month && mapping.customer_name && mapping.given_latitude && mapping.given_longitude)
+      : Boolean(mapping.customer_id && mapping.case_month && updateFields.some((key) => mapping[key]))
+  )
   const preview = normalizedRows.slice(0, 8)
 
   return (
@@ -230,10 +305,40 @@ export default function UploadCustomersPage() {
         breadcrumbs={[{ label: 'Superadmin', href: '/superadmin' }, { label: tx('Customers', 'Pelanggan'), href: '/superadmin/customers' }, { label: tx('Upload Data', 'Upload Data'), icon: Upload }]}
         title={tx('Upload Customer Data', 'Upload Data Pelanggan')}
         description={tx('Upload CSV or XLSX, map columns, validate the rows, then import clean customer records.', 'Upload CSV atau XLSX, petakan kolom, validasi data, lalu impor data pelanggan yang bersih.')}
-        actions={<Link href="/superadmin/customers" className={styles.back}><ArrowLeft className="size-4" />{tx('Back to Customers', 'Kembali ke Pelanggan')}</Link>}
+        actions={<Link href="/superadmin/customers" className={styles.back}><ChevronLeft aria-hidden="true" />{tx('Back to Customers', 'Kembali ke Pelanggan')}</Link>}
       />
 
-      <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe import mode', 'Mode impor aman')}</strong><span>{tx('While customer_id is still the primary key, existing Customer IDs are blocked instead of overwritten. New CRL-cycle imports will be enabled after the PK migration.', 'Selama customer_id masih menjadi primary key, Customer ID yang sudah ada akan diblokir dan tidak ditimpa. Impor CRL cycle baru akan diaktifkan setelah migrasi PK.')}</span></div></div>
+      <div className={styles.notice}><AlertTriangle /><div><strong>{tx('Safe customer upload', 'Upload pelanggan aman')}</strong><span>{mode === 'insert' ? tx('Insert mode creates new CRL cases and never overwrites an existing Customer ID + CRL Month.', 'Mode insert membuat case CRL baru dan tidak menimpa Customer ID + Bulan CRL yang sudah ada.') : tx('Update mode only changes mapped enrichment fields on an existing Customer ID + CRL Month: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, invoice_amount, invoice_date, billing_cycle, payment_due_date, and suspension_date. Unpaid Since follows Payment Due Date automatically.', 'Mode update hanya mengubah field enrichment yang dipetakan pada Customer ID + Bulan CRL yang sudah ada: territory, speed, unpaid_since, customer_tenure, site_id, invoice_num, invoice_amount, invoice_date, billing_cycle, payment_due_date, dan suspension_date. Unpaid Since otomatis mengikuti Payment Due Date.')}</span></div></div>
+
+      <section className={styles.card}>
+        <div className={styles.stepHead}><span>0</span><div><h2>{tx('Choose upload mode', 'Pilih mode upload')}</h2><p>{tx('Use Update Existing for your 9 October enrichment file.', 'Gunakan Update Existing untuk file enrichment tanggal 9 Oktober.')}</p></div></div>
+        <div className={styles.modeSelector} role="group" aria-label={tx('Upload mode', 'Mode upload')}>
+          <button
+            type="button"
+            aria-pressed={mode === 'insert'}
+            onClick={() => { setMode('insert'); setValidation(null); setResult(null) }}
+            className={`${styles.modeButton} ${mode === 'insert' ? styles.modeButtonActive : ''}`}
+          >
+            <span className={styles.modeIcon}><PlusCircle aria-hidden="true" /></span>
+            <span className={styles.modeCopy}>
+              <strong>{tx('Insert New Cases', 'Insert Case Baru')}</strong>
+              <small>{tx('Create a new CRL cycle without overwriting existing data.', 'Buat cycle CRL baru tanpa menimpa data yang sudah ada.')}</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'update'}
+            onClick={() => { setMode('update'); setValidation(null); setResult(null) }}
+            className={`${styles.modeButton} ${mode === 'update' ? styles.modeButtonActive : ''}`}
+          >
+            <span className={styles.modeIcon}><RefreshCw aria-hidden="true" /></span>
+            <span className={styles.modeCopy}>
+              <strong>{tx('Update Existing', 'Update Data Existing')}</strong>
+              <small>{tx('Enrich matching Customer ID + CRL Month records.', 'Perbarui field enrichment untuk Customer ID + Bulan CRL yang cocok.')}</small>
+            </span>
+          </button>
+        </div>
+      </section>
 
       <section className={styles.card}>
         <div className={styles.stepHead}><span>1</span><div><h2>{tx('Upload file', 'Upload file')}</h2><p>{tx('CSV and XLSX are supported. XLSX reads the first worksheet.', 'CSV dan XLSX didukung. XLSX membaca worksheet pertama.')}</p></div></div>
@@ -258,22 +363,22 @@ export default function UploadCustomersPage() {
 
       {preview.length > 0 && (
         <section className={styles.card}>
-          <div className={styles.stepHead}><span>3</span><div><h2>{tx('Preview & validate', 'Preview & validasi')}</h2><p>{tx('Previewing the first 8 rows. Validation checks required fields, coordinates, duplicates, agents, and existing Customer IDs.', 'Menampilkan 8 baris pertama. Validasi memeriksa field wajib, koordinat, duplikasi, agen, dan Customer ID yang sudah ada.')}</p></div></div>
-          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>Name</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{row.customer_name || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
-          <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx('Validate Data', 'Validasi Data')}</button></div>
+          <div className={styles.stepHead}><span>3</span><div><h2>{tx('Preview & validate', 'Preview & validasi')}</h2><p>{tx('Previewing the first 8 rows. Validation checks required fields, coordinates, duplicate Customer ID + CRL Month cases, and assigned agents.', 'Menampilkan 8 baris pertama. Validasi memeriksa field wajib, koordinat, duplikasi Customer ID + Bulan CRL, dan agen yang ditugaskan.')}</p></div></div>
+          <div className={styles.tableWrap}><table><thead><tr><th>Customer ID</th><th>CRL Month</th><th>Name</th><th>Site ID</th><th>Territory</th><th>Invoice #</th><th>Invoice Amount</th><th>Invoice Date</th><th>Billing Cycle</th><th>Payment Due</th><th>Suspension Date</th><th>Unpaid Since</th><th>Tenure</th><th>Speed</th><th>Region</th><th>City</th><th>Latitude</th><th>Longitude</th><th>Agent</th></tr></thead><tbody>{preview.map((row, index) => <tr key={index}><td>{row.customer_id || '—'}</td><td>{formatCaseMonthPreview(row.case_month, locale)}</td><td>{row.customer_name || '—'}</td><td>{row.site_id || '—'}</td><td>{row.territory || '—'}</td><td>{row.invoice_num || '—'}</td><td>{row.invoice_amount || '—'}</td><td>{row.invoice_date || '—'}</td><td>{row.billing_cycle || '—'}</td><td>{row.payment_due_date || '—'}</td><td>{row.suspension_date || '—'}</td><td>{row.unpaid_since || '—'}</td><td>{row.customer_tenure || '—'}</td><td>{row.speed || '—'}</td><td>{row.region || '—'}</td><td>{row.city || '—'}</td><td>{row.given_latitude || '—'}</td><td>{row.given_longitude || '—'}</td><td>{row.agent_email || '—'}</td></tr>)}</tbody></table></div>
+          <div className={styles.actionRow}><button disabled={!canValidate || busy} onClick={() => callApi('validate')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{tx(mode === 'update' ? 'Validate Updates' : 'Validate Data', mode === 'update' ? 'Validasi Update' : 'Validasi Data')}</button></div>
         </section>
       )}
 
       {validation && (
         <section className={styles.card}>
-          <div className={styles.stepHead}><span>4</span><div><h2>{tx('Validation result', 'Hasil validasi')}</h2><p>{tx('Only valid rows will be imported. Existing Customer IDs remain untouched.', 'Hanya baris valid yang akan diimpor. Customer ID yang sudah ada tidak akan diubah.')}</p></div></div>
+          <div className={styles.stepHead}><span>4</span><div><h2>{tx('Validation result', 'Hasil validasi')}</h2><p>{mode === 'update' ? tx('Only existing Customer ID + CRL Month rows will be updated, and only mapped enrichment fields will change.', 'Hanya Customer ID + Bulan CRL yang sudah ada yang akan di-update, dan hanya field enrichment yang dipetakan yang akan berubah.') : tx('Only valid CRL cases will be imported. Existing Customer ID + CRL Month cases remain untouched.', 'Hanya case CRL valid yang akan diimpor. Kombinasi Customer ID + Bulan CRL yang sudah ada tidak akan diubah.')}</p></div></div>
           <div className={styles.stats}><Stat label={tx('Total', 'Total')} value={validation.summary.total} /><Stat label={tx('Valid', 'Valid')} value={validation.summary.valid} good /><Stat label={tx('Warnings', 'Peringatan')} value={validation.summary.warnings} /><Stat label={tx('Errors', 'Error')} value={validation.summary.errors} bad /><Stat label={tx('Existing', 'Sudah ada')} value={validation.summary.existing} /></div>
           {validation.rows.some((row) => row.status !== 'valid') && <div className={styles.issueList}>{validation.rows.filter((row) => row.status !== 'valid').slice(0, 50).map((row) => <div key={row.row} className={row.status === 'error' ? styles.issueError : styles.issueWarning}>{row.status === 'error' ? <XCircle /> : <AlertTriangle />}<div><strong>{tx('Row', 'Baris')} {row.row} · {row.customer_id || '—'}</strong><span>{row.messages.join(' · ')}</span></div></div>)}</div>}
-          <div className={styles.actionRow}><button disabled={busy || validation.summary.valid === 0} onClick={() => callApi('import')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <Upload />}{tx(`Import ${validation.summary.valid} Valid Rows`, `Impor ${validation.summary.valid} Baris Valid`)}</button></div>
+          <div className={styles.actionRow}><button disabled={busy || validation.summary.valid === 0} onClick={() => callApi('apply')} className={styles.primary}>{busy ? <Loader2 className="animate-spin" /> : <Upload />}{mode === 'update' ? tx(`Update ${validation.summary.valid} Existing Rows`, `Update ${validation.summary.valid} Baris Existing`) : tx(`Import ${validation.summary.valid} Valid Rows`, `Impor ${validation.summary.valid} Baris Valid`)}</button></div>
         </section>
       )}
 
-      {result && <div className={styles.success}><CheckCircle2 /><div><strong>{tx('Import complete', 'Impor selesai')}</strong><span>{result.inserted} {tx('rows inserted', 'baris berhasil diimpor')} · {result.skipped} {tx('rows skipped', 'baris dilewati')}</span></div></div>}
+      {result && <div className={styles.success}><CheckCircle2 /><div><strong>{tx(mode === 'update' ? 'Update complete' : 'Import complete', mode === 'update' ? 'Update selesai' : 'Impor selesai')}</strong><span>{mode === 'update' ? `${result.updated} ${tx('rows updated', 'baris berhasil di-update')}` : `${result.inserted} ${tx('rows inserted', 'baris berhasil diimpor')}`} · {result.skipped} {tx('rows skipped', 'baris dilewati')} · {result.autoAssigned} {tx('newly auto-assigned', 'baru ter-assign otomatis')} · {result.rolledForward} {tx('existing assignments refreshed', 'assignment existing diperbarui')}</span></div></div>}
       {error && <div className={styles.error}><XCircle /><span>{error}</span></div>}
     </div>
   )

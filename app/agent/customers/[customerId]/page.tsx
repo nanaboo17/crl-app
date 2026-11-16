@@ -40,19 +40,20 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   if (error) return <ErrorBlock message={error.message} backHref="/agent/customers" t={t} />
   if (!customer) return <ErrorBlock message={t('agent.customer.notFound')} backHref="/agent/customers" t={t} />
 
-  const [{ data: preVisits }, { data: visit }, { data: followups }] = await Promise.all([
+  const [{ data: preVisits }, { data: visits }, { data: followups }] = await Promise.all([
     supabase.from('pre_visits').select('previsit_id,previsit_status,created_at,updated_at,appointment_date,rescheduled_contact_date,reschedule_date,contact_result').eq('crl_id', customer.crl_id).eq('agent_email', email).order('created_at', { ascending: false }),
-    supabase.from('visits').select('visit_id,visit_date,visit_status_kunjungan,conversation_result,visit_result').eq('crl_id', customer.crl_id).eq('agent_email', email).maybeSingle(),
+    supabase.from('visits').select('visit_id,visit_date,visit_status_kunjungan,conversation_result,visit_result').eq('crl_id', customer.crl_id).eq('agent_email', email).order('visit_date', { ascending: false }),
     supabase.from('customer_followups').select('followup_id,due_at,note,status,created_at,completed_at').eq('crl_id', customer.crl_id).eq('agent_email', email).order('due_at', { ascending: true }),
   ])
 
   const preVisit = preVisits?.[0] ?? null
+  const visit = visits?.[0] ?? null
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString('id-ID', { timeZone: TIMEZONE }) : '-'
   const formatMoney = (value: number | string | null) => `Rp${Number(value ?? 0).toLocaleString('id-ID')}`
   const priority = customer.priority_rank
   const days = customer.days_left_to_churn
   const area = customer.sub_district || customer.district || customer.city || '-'
-  const customerRouteId = customer.crl_id || customer.customer_id
+  const customerRouteId = customer.crl_id
   const preVisitHref = `/agent/customers/${encodeURIComponent(customerRouteId)}/pre-visit`
   const prefixedComplaintName = complaintCustomerName(customer.customer_name)
 
@@ -80,7 +81,7 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
   const timeline = [
     customer.assignment_date ? { at: customer.assignment_date, title: tx('Customer assigned', 'Pelanggan ditugaskan'), detail: email } : null,
     ...preVisitTimeline,
-    visit?.visit_date ? { at: visit.visit_date, title: tx('Visit submitted', 'Kunjungan dikirim'), detail: visit.visit_result || visit.visit_status_kunjungan || visit.conversation_result || '' } : null,
+    ...(visits || []).map((v) => ({ at: v.visit_date, title: tx('Visit submitted', 'Kunjungan dikirim'), detail: `${v.visit_id} · ${v.visit_result || v.visit_status_kunjungan || v.conversation_result || ''}` })),
     ...(followups || []).map((row: any) => ({ at: row.due_at, title: row.status === 'completed' ? tx('Follow-up completed', 'Tindak lanjut selesai') : tx('Follow-up reminder', 'Pengingat tindak lanjut'), detail: row.note })),
   ].filter(Boolean).sort((a: any, b: any) => new Date(a.at).getTime() - new Date(b.at).getTime()) as { at: string; title: string; detail: string }[]
 
@@ -96,13 +97,13 @@ export default async function AgentCustomerDetailPage({ params }: { params: Prom
 
       <SensitiveCustomerData customerId={customer.customer_id} crlId={customer.crl_id} agentEmail={email} locale={locale} contactItems={[[t('agent.customer.phoneMain'), customer.phone_number],[t('agent.customer.phoneAlt1'), customer.alternative_phone_1],[t('agent.customer.phoneAlt2'), customer.alternative_phone_2],[t('agent.customer.phoneAlt3'), customer.alternative_phone_3],[t('agent.customer.address'), customer.service_address]]} locationItems={[[t('agent.customer.region'), customer.region],[t('agent.customer.city'), customer.city],[t('agent.customer.district'), customer.district],[t('agent.customer.subDistrict'), customer.sub_district]]} canStartPreVisit={!visit && !preVisit} preVisitHref={preVisitHref} initiallyUnlocked={Boolean(preVisit)} />
 
-      <section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body gap-3"><div><h2 className="text-base font-bold">{tx('Customer Complaint', 'Komplain Pelanggan')}</h2><p className="text-sm text-base-content/60">{tx('Name, city, BA ID and phone number will be prefilled in the complaint form.', 'Nama, kota, BA ID, dan nomor telepon akan terisi otomatis di form komplain.')}</p></div><a href={complaintHref} target="_blank" rel="noreferrer" className="dui-btn dui-btn-primary w-full gap-2"><ExternalLink className="h-5 w-5" />{tx('Create / Check Customer Complaint', 'Buat / Cek Komplain Pelanggan')}</a></div></section>
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body gap-3"><div><h2 className="text-base font-bold">{tx('Customer Complaint', 'Komplain Pelanggan')}</h2><p className="text-sm text-base-content/60">{tx('Name, city, BA ID and phone number will be prefilled in the complaint form.', 'Nama, kota, BA ID, dan nomor telepon akan terisi otomatis di form komplain.')}</p></div><a href={complaintHref} className="dui-btn dui-btn-primary w-full gap-2"><ExternalLink className="h-5 w-5" />{tx('Create / Check Customer Complaint', 'Buat / Cek Komplain Pelanggan')}</a></div></section>
 
       <InfoCard title={t('agent.customer.cardSales')} icon={Store}><InfoGrid t={t} items={[[tx('Package Name', 'Nama Paket'), customer.product],[t('agent.customer.aeName'), customer.ae_name],[t('agent.customer.tlName'), customer.tl_name],[t('agent.customer.smName'), customer.sm_name],[t('agent.customer.salesChannel'), customer.sales_channel],[t('agent.customer.billingCycle'), customer.billing_cycle]]} /></InfoCard>
       <InfoCard title={t('agent.customer.cardBilling')} icon={Building2}><InfoGrid t={t} items={[[t('agent.customer.invoiceDate'), formatDate(customer.invoice_date)],[t('agent.customer.dueDate'), formatDate(customer.payment_due_date)],[t('agent.customer.suspensionDate'), formatDate(customer.suspension_date)],[t('agent.customer.estimatedChurn'), formatDate(customer.estimated_churn_date)],[t('agent.customer.invoiceAmount'), formatMoney(customer.invoice_amount)],[t('agent.customer.paymentStatus'), customer.payment_status ? customer.payment_status.toUpperCase() : t('agent.customer.notSet')],[t('agent.customer.tenure'), customer.customer_tenure],[t('agent.customer.visitStatus'), customer.visit_status || t('agent.customer.notStarted')]]} /></InfoCard>
       <InfoCard title={t('agent.customer.cardOffer')} icon={Sparkles}><InfoGrid t={t} items={[[t('agent.customer.recommendedOffer'), customer.recommended_offer],[t('agent.customer.maximumOffer'), customer.maximum_offer]]} /></InfoCard>
 
-      {visit ? (<section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body"><Link href={`/agent/customers/${encodeURIComponent(customerRouteId)}/visit-result`} className="dui-btn dui-btn-primary w-full"><BadgeCheck className="h-5 w-5" />{t('agent.customer.viewVisitResult')}</Link></div></section>) : preVisit ? (<section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body">{preVisit.previsit_status !== 'Ready for Visit' && preVisit.previsit_status !== 'Direct Visit' ? <Link href={preVisitHref} className="dui-btn dui-btn-secondary w-full"><ClipboardList className="h-5 w-5" />{t('agent.customer.continuePreVisit')}</Link> : <><div className="flex items-center gap-2 rounded-box bg-success/10 px-4 py-3 text-sm font-semibold text-success"><CheckCircle2 className="h-5 w-5" />{t('agent.customer.preVisitReady')}</div><Link href={`/agent/customers/${encodeURIComponent(customerRouteId)}/visit`} className="dui-btn dui-btn-primary w-full"><MapPin className="h-5 w-5" />{t('agent.customer.startVisit')}</Link></>}</div></section>) : null}
+      {visit ? (<section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body"><Link href={`/agent/customers/${encodeURIComponent(customerRouteId)}/visit-result`} className="dui-btn dui-btn-primary w-full"><BadgeCheck className="h-5 w-5" />{t('agent.customer.viewVisitResult')}</Link><Link href={`/agent/customers/${encodeURIComponent(customerRouteId)}/visit`} className="dui-btn dui-btn-outline w-full"><MapPin className="h-5 w-5" />{tx('Record another visit', 'Catat kunjungan lagi')}</Link></div></section>) : preVisit ? (<section className="dui-card border border-base-300 bg-base-100 shadow-sm"><div className="dui-card-body">{preVisit.previsit_status !== 'Ready for Visit' && preVisit.previsit_status !== 'Direct Visit' ? <Link href={preVisitHref} className="dui-btn dui-btn-secondary w-full"><ClipboardList className="h-5 w-5" />{t('agent.customer.continuePreVisit')}</Link> : <><div className="flex items-center gap-2 rounded-box bg-success/10 px-4 py-3 text-sm font-semibold text-success"><CheckCircle2 className="h-5 w-5" />{t('agent.customer.preVisitReady')}</div><Link href={`/agent/customers/${encodeURIComponent(customerRouteId)}/visit`} className="dui-btn dui-btn-primary w-full"><MapPin className="h-5 w-5" />{t('agent.customer.startVisit')}</Link></>}</div></section>) : null}
     </div>
   )
 }

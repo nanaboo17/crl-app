@@ -19,6 +19,7 @@ type StatusFilter = (typeof STATUS_FILTERS)[number]
 type CustomerRow = {
   crl_id: string
   customer_id: string
+  case_month: string | null
   customer_name: string | null
   phone_number: string | null
   outstanding_amount: number | null
@@ -56,6 +57,8 @@ type CustomerCache = {
 }
 
 function cycleSort(a: CustomerRow, b: CustomerRow) {
+  const monthCompare = String(b.case_month || '').localeCompare(String(a.case_month || ''))
+  if (monthCompare !== 0) return monthCompare
   return (b.crl_id || '').localeCompare(a.crl_id || '', undefined, { numeric: true })
 }
 
@@ -93,6 +96,9 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) redirect('/login')
 
+  const { data: nationalAccess, error: nationalAccessError } = await supabase.rpc('crl_is_national_superadmin')
+  const canUploadCustomers = !nationalAccessError && nationalAccess === true
+
   const buildCustomersHref = (nextStatus: StatusFilter = status, nextPage = 1, nextRegion = region, nextLeadEmail = leadEmail, nextSearch = search) => {
     const query = new URLSearchParams()
     query.set('status', nextStatus)
@@ -103,80 +109,21 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     return `/superadmin/customers?${query.toString()}`
   }
 
+  // One RLS-aware RPC returns only the requested 10 grouped customers,
+  // with Circle-scoped totals and filter lists. No full-table HTTP paging.
   const loadPage = async (page: number): Promise<CustomerCache> => {
-    const rows: CustomerRow[] = []
-    const chunkSize = 1000
-
-    for (let from = 0; ; from += chunkSize) {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('crl_id, customer_id, customer_name, phone_number, outstanding_amount, customer_status, visit_status, agent_email, lead_email, priority_rank, region, city, district, payment_status, assign_status, assignment_date, suspension_date, estimated_churn_date')
-        .order('customer_id')
-        .range(from, from + chunkSize - 1)
-
-      if (error) throw error
-      const chunk = (data ?? []) as CustomerRow[]
-      rows.push(...chunk)
-      if (chunk.length < chunkSize) break
+    const { data, error } = await supabase.rpc('crl_superadmin_customers_page_v1', {
+      p_page: page,
+      p_status: status,
+      p_region: region,
+      p_lead_email: leadEmail,
+      p_search: safeSearch,
+    })
+    if (error) throw error
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Customer pagination RPC returned no result')
     }
-
-    const allGroups = groupCustomers(rows)
-
-    const groupHas = (group: CustomerGroup, predicate: (row: CustomerRow) => boolean) => group.cycles.some(predicate)
-    const isAssigned = (row: CustomerRow) => Boolean(row.agent_email)
-    const isVisited = (row: CustomerRow) => String(row.customer_status || '').toLowerCase().includes('visited') || String(row.visit_status || '').toLowerCase() === 'visited'
-    const isPaid = (row: CustomerRow) => String(row.payment_status || '').toLowerCase() === 'paid' || String(row.customer_status || '').toLowerCase().includes('paid')
-    const isUnassigned = (row: CustomerRow) => !row.agent_email
-
-    const matchesCycle = (row: CustomerRow) => {
-      if (status === 'unassigned' && !isUnassigned(row)) return false
-      if (status === 'assigned' && !isAssigned(row)) return false
-      if (status === 'visited' && !isVisited(row)) return false
-      if (status === 'paid' && !isPaid(row)) return false
-      if (region !== 'all' && row.region !== region) return false
-      if (leadEmail !== 'all' && row.lead_email !== leadEmail) return false
-      if (safeSearch) {
-        const haystack = [
-          row.crl_id,
-          row.customer_id,
-          row.customer_name,
-          row.phone_number,
-          row.agent_email,
-          row.lead_email,
-          row.region,
-          row.city,
-          row.district,
-        ].map((value) => String(value || '').toLowerCase()).join(' ')
-        if (!haystack.includes(safeSearch)) return false
-      }
-      return true
-    }
-
-    const filteredGroups = allGroups
-      .filter((group) => group.cycles.some(matchesCycle))
-      .sort((a, b) => {
-        const nameA = String(a.latest.customer_name || a.customer_id)
-        const nameB = String(b.latest.customer_name || b.customer_id)
-        return nameA.localeCompare(nameB)
-      })
-
-    const start = (page - 1) * PAGE_SIZE
-    const paged = filteredGroups.slice(start, start + PAGE_SIZE)
-
-    const regions = Array.from(new Set(rows.map((row) => row.region?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b))
-    const leadEmails = Array.from(new Set(rows.map((row) => row.lead_email?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b))
-
-    return {
-      totalAll: allGroups.length,
-      assigned: allGroups.filter((group) => groupHas(group, isAssigned)).length,
-      visited: allGroups.filter((group) => groupHas(group, isVisited)).length,
-      paid: allGroups.filter((group) => groupHas(group, isPaid)).length,
-      unassigned: allGroups.filter((group) => groupHas(group, isUnassigned)).length,
-      filteredTotal: filteredGroups.length,
-      customers: paged,
-      regions,
-      leadEmails,
-    }
+    return data as unknown as CustomerCache
   }
 
   let payload: CustomerCache
@@ -184,9 +131,9 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
     const cacheRegion = encodeURIComponent(region.toLowerCase())
     const cacheLead = encodeURIComponent(leadEmail.toLowerCase())
     const cacheSearch = encodeURIComponent(safeSearch)
-    payload = await cacheGetOrSet(`crl:superadmin:customers:v7-grouped:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
+    payload = await cacheGetOrSet(`crl:superadmin:customers:v9-batch-retry-user:${user.id}:${status}:${cacheRegion}:${cacheLead}:${cacheSearch}:${requestedPage}`, CACHE_TTL, () => loadPage(requestedPage))
   } catch (error) {
-    console.error('superadmin/customers:', error)
+    console.error('superadmin/customers load failure:', error instanceof Error ? { message: error.message, stack: error.stack } : error)
     return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={t('superadmin.customers.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.customers.errorTitle')} description={t('superadmin.customers.errorDesc')} /></div>
   }
 
@@ -237,7 +184,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString('id-ID') : '—'
 
   return <div className={styles.page}>
-    <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('Customers are grouped by Customer ID. Open a customer to see every CRL cycle linked to the same account.', 'Pelanggan dikelompokkan berdasarkan Customer ID. Buka pelanggan untuk melihat seluruh CRL cycle pada akun yang sama.')} actions={<><Link href="/superadmin/customers/upload" className={styles.addButton}><Upload aria-hidden="true" className="size-4" />{tx('Upload Data', 'Upload Data')}</Link><Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link></>} />
+    <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.customers') }]} title={t('superadmin.customers.title')} description={tx('Customers are grouped by Customer ID. Open a customer to see every CRL cycle linked to the same account.', 'Pelanggan dikelompokkan berdasarkan Customer ID. Buka pelanggan untuk melihat seluruh CRL cycle pada akun yang sama.')} actions={<>{canUploadCustomers && <Link href="/superadmin/customers/upload" className={styles.addButton}><Upload aria-hidden="true" className="size-4" />{tx('Upload Data', 'Upload Data')}</Link>}<Link href="/superadmin/customers/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{t('superadmin.customers.addCustomer')}</Link></>} />
 
     <section className={styles.hero}><div><span className={styles.heroEyebrow}>{tx('Customer journey', 'Perjalanan pelanggan')}</span><h2>{tx('One customer, multiple CRL cycles.', 'Satu pelanggan, beberapa CRL cycle.')}</h2><p>{tx('The customer list is unique by Customer ID. Each CRL record stays available inside the customer card.', 'Daftar pelanggan unik berdasarkan Customer ID. Setiap record CRL tetap tersedia di dalam kartu pelanggan.')}</p></div><div className={styles.heroScene} aria-hidden="true"><span className={styles.house}>🏡</span><span className={styles.pin}>📍</span><span className={styles.tree}>🌳</span></div></section>
 
@@ -296,7 +243,7 @@ export default async function ManageCustomersPage({ searchParams }: { searchPara
                 <div className={styles.cycleList}>
                   {group.cycles.map((cycle, cycleIndex) => <article key={cycle.crl_id} className={styles.cycleCard}>
                     <div className={styles.cycleTop}>
-                      <div><strong>{cycle.crl_id}</strong><span>{cycleIndex === 0 ? tx('Latest cycle', 'Cycle terbaru') : tx('Previous cycle', 'Cycle sebelumnya')}</span></div>
+                      <div><strong>{cycle.crl_id}</strong><span>{cycle.case_month ? new Date(cycle.case_month).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : (cycleIndex === 0 ? tx('Latest cycle', 'Cycle terbaru') : tx('Previous cycle', 'Cycle sebelumnya'))}</span></div>
                       <Link href={`/superadmin/customers/${encodeURIComponent(cycle.crl_id)}`} className={styles.viewButton}><Eye aria-hidden="true" className="size-4" />{tx('Open CRL', 'Buka CRL')}</Link>
                     </div>
                     <div className={styles.cycleGrid}>

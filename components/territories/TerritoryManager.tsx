@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Search, UserRound } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowRight, CheckCircle2, Loader2, MapPin, RefreshCw, Search, ShieldCheck, UserRound, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import styles from './TerritoryManager.module.css'
 
 type Agent = {
   email: string
   agent_name: string
-  sales_code: string | null
 }
 
 type CoverageRow = {
@@ -41,6 +41,8 @@ export default function TerritoryManager() {
   const [loading, setLoading] = useState(true)
   const [savingCode, setSavingCode] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [pending, setPending] = useState<{ territoryCode: string; email: string; target: string; count: number; month: string } | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -49,7 +51,7 @@ export default function TerritoryManager() {
     const [agentsResult, coverageResult] = await Promise.all([
       supabase
         .from('agents')
-        .select('email,agent_name,sales_code')
+        .select('email,agent_name')
         .eq('role', 'agent')
         .eq('active', true)
         .order('agent_name'),
@@ -104,25 +106,104 @@ export default function TerritoryManager() {
   }, [filtered])
 
   async function assignAgent(territoryCode: string, email: string) {
+    if (savingCode || pending) return
     setSavingCode(territoryCode)
     setError('')
+    try {
+      const { data: impacted, error: previewError } = await supabase.rpc('preview_territory_agent_transfer', {
+        p_territory_code: territoryCode,
+        p_agent_email: email || null,
+      })
+      if (previewError) throw previewError
+      setPending({
+        territoryCode,
+        email,
+        target: agents.find((a) => a.email === email)?.agent_name || (email || 'Unassigned'),
+        count: Number(impacted || 0),
+        month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }).format(new Date()),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to preview territory assignment')
+      setSavingCode(null)
+    }
+  }
 
-    const { error: rpcError } = await supabase.rpc('set_territory_agent_by_code', {
-      p_territory_code: territoryCode,
-      p_agent_email: email || null,
-    })
-
-    if (rpcError) setError(rpcError.message)
-    else await load()
-
+  function cancelTransfer() {
+    if (submitting) return
+    setPending(null)
     setSavingCode(null)
   }
+
+  async function confirmTransfer() {
+    if (!pending || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const { error: rpcError } = await supabase.rpc('set_territory_agent_by_code', {
+        p_territory_code: pending.territoryCode,
+        p_agent_email: pending.email || null,
+      })
+      if (rpcError) throw rpcError
+      setPending(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to change territory assignment')
+      setPending(null)
+    } finally {
+      setSubmitting(false)
+      setSavingCode(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!pending) return
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !submitting) cancelTransfer()
+    }
+    document.addEventListener('keydown', handleEscape)
+    const priorOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = priorOverflow
+    }
+  }, [pending, submitting])
 
   if (loading) return <div className={styles.loading} />
 
   return (
     <div className={styles.manager}>
       {error && <div className={styles.alert}>{error}</div>}
+      {pending && createPortal(
+        <div className={styles.dialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelTransfer() }}>
+          <section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="territory-transfer-title" aria-describedby="territory-transfer-description">
+            <div className={styles.dialogHeader}>
+              <span className={styles.dialogIcon}><MapPin size={23} /></span>
+              <button type="button" className={styles.dialogClose} onClick={cancelTransfer} disabled={submitting} aria-label="Close confirmation"><X size={19} /></button>
+            </div>
+            <span className={styles.dialogEyebrow}>TERRITORY ASSIGNMENT</span>
+            <h2 id="territory-transfer-title" className={styles.dialogTitle}>Confirm agent transfer</h2>
+            <p id="territory-transfer-description" className={styles.dialogSubtitle}>Review the assignment changes before updating this territory.</p>
+            <div className={styles.transferRoute}>
+              <div><span>Territory</span><strong>{pending.territoryCode}</strong></div>
+              <ArrowRight size={19} aria-hidden="true" />
+              <div><span>New agent</span><strong>{pending.target}</strong></div>
+            </div>
+            <div className={styles.transferImpact}>
+              <span className={styles.impactNumber}>{pending.count.toLocaleString('en-US')}</span>
+              <div><strong>Customer cases will be transferred</strong><span>Eligible, unvisited cases · {pending.month}</span></div>
+            </div>
+            <div className={styles.transferSafety}><ShieldCheck size={19} aria-hidden="true" /><span>Older case months and customers with recorded visits will <strong>keep their current assignments.</strong></span></div>
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.cancelButton} onClick={cancelTransfer} disabled={submitting}>Cancel</button>
+              <button type="button" className={styles.confirmButton} onClick={() => void confirmTransfer()} disabled={submitting}>
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                {submitting ? 'Transferring…' : 'Confirm transfer'}
+              </button>
+            </div>
+          </section>
+        </div>, document.body
+      )}
 
       <div className={styles.toolbar}>
         <div className="relative">
@@ -267,14 +348,14 @@ export default function TerritoryManager() {
                   <span className={styles.label}><UserRound className="inline h-4 w-4" /> Assigned agent</span>
                   <select
                     className={styles.select}
-                    disabled={savingCode === row.territory_code}
+                    disabled={savingCode !== null}
                     value={row.agent_email || ''}
                     onChange={(event) => void assignAgent(row.territory_code, event.target.value)}
                   >
                     <option value="">Unassigned</option>
                     {agents.map((agent) => (
                       <option key={agent.email} value={agent.email}>
-                        {agent.agent_name} · {agent.sales_code || agent.email}
+                        {agent.agent_name} · {agent.email}
                       </option>
                     ))}
                   </select>
@@ -282,7 +363,7 @@ export default function TerritoryManager() {
 
                 {assignedAgent && (
                   <p className={styles.agentNote}>
-                    {assignedAgent.agent_name} owns all unfinished unpaid customers in this territory.
+                    {assignedAgent.agent_name} is the territory owner. Changing this assignment transfers only eligible unvisited cases from the current case month; older case months are preserved.
                   </p>
                 )}
               </section>

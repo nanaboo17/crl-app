@@ -3,27 +3,54 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
-  Gauge,
+  Camera,
+  CheckCircle2,
   MapPin,
-  MessageSquareText,
-  NotebookText,
+  Navigation,
   Phone,
   Save,
-  Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
+import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
+import { useI18n } from '@/components/providers/i18n-provider'
+
+const LOCATION_LIMIT_METERS = 200
+const MAX_EDIT_PHOTOS = 5
+const MAX_PHOTO_DIMENSION = 1600
+
+type NewVisitPhoto = {
+  file: File
+  stamped: Blob
+  preview: string
+  capturedAt: string
+}
 
 export default function EditVisitPage() {
+  const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => locale === 'id' ? id : en
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const id = decodeURIComponent(params.id)
   const [row, setRow] = useState<any>(null)
+  const eligibleOffers = retentionOffersForCustomer(row?.customer_id)
   const [currentSpeed, setCurrentSpeed] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [gettingGps, setGettingGps] = useState(false)
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null)
+  const [distanceMeters, setDistanceMeters] = useState<number | null>(null)
+  const [locationMatch, setLocationMatch] = useState<boolean | null>(null)
+  const [locationCapturedThisEdit, setLocationCapturedThisEdit] = useState(false)
+  const [givenLatitude, setGivenLatitude] = useState<number | null>(null)
+  const [givenLongitude, setGivenLongitude] = useState<number | null>(null)
+  const [newPhotos, setNewPhotos] = useState<NewVisitPhoto[]>([])
   const [form, setForm] = useState({
     visit_status_kunjungan: '',
     conversation_result: '',
@@ -36,6 +63,23 @@ export default function EditVisitPage() {
     speed_test_download_mbps: '',
     speed_test_upload_mbps: '',
   })
+
+  useEffect(() => {
+    if (form.conversation_result === 'Sudah melakukan pembayaran') {
+      setForm((current) => ({
+        ...current,
+        unpaid_reason: 'Sudah bayar',
+        planned_payment_date: '',
+      }))
+    } else if (form.conversation_result === 'Tidak bertemu pelanggan') {
+      setForm((current) => ({
+        ...current,
+        approved_offer: NO_APPROVED_OFFER,
+        planned_payment_date: '',
+        unpaid_reason: '',
+      }))
+    }
+  }, [form.conversation_result])
 
   useEffect(() => {
     const supabase = createClient()
@@ -58,12 +102,20 @@ export default function EditVisitPage() {
 
       const { data: customerData } = await supabase
         .from('customers')
-        .select('speed,customer_name')
+        .select('speed,customer_name,given_latitude,given_longitude')
         .eq('crl_id', data.crl_id)
         .ilike('agent_email', user.email.trim())
         .maybeSingle()
 
       setCurrentSpeed(customerData?.speed == null ? null : Number(customerData.speed))
+      setGivenLatitude(customerData?.given_latitude == null ? null : Number(customerData.given_latitude))
+      setGivenLongitude(customerData?.given_longitude == null ? null : Number(customerData.given_longitude))
+      setLatitude(data.latitude == null ? null : Number(data.latitude))
+      setLongitude(data.longitude == null ? null : Number(data.longitude))
+      setGpsAccuracy(data.gps_accuracy == null ? null : Number(data.gps_accuracy))
+      setGpsCapturedAt(data.gps_captured_at || null)
+      setDistanceMeters(data.distance_to_customer_meters == null ? null : Number(data.distance_to_customer_meters))
+      setLocationMatch(data.location_match == null ? null : Boolean(data.location_match))
       setRow({ ...data, customer_name: customerData?.customer_name || null })
       setForm({
         visit_status_kunjungan: data.visit_status_kunjungan || '',
@@ -81,11 +133,178 @@ export default function EditVisitPage() {
     })()
   }, [id, router])
 
+  function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const radius = 6371000
+    const toRad = (value: number) => (value * Math.PI) / 180
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+    return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  function captureGps() {
+    if (!navigator.geolocation) {
+      setError(tx('Geolocation is not supported by this browser.', 'Geolokasi tidak didukung oleh browser ini.'))
+      return
+    }
+
+    setGettingGps(true)
+    setError('')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLat = position.coords.latitude
+        const nextLong = position.coords.longitude
+        setLatitude(nextLat)
+        setLongitude(nextLong)
+        setGpsAccuracy(position.coords.accuracy)
+        setGpsCapturedAt(new Date().toISOString())
+        setLocationCapturedThisEdit(true)
+
+        if (givenLatitude !== null && givenLongitude !== null) {
+          const distance = haversineDistance(givenLatitude, givenLongitude, nextLat, nextLong)
+          setDistanceMeters(distance)
+          setLocationMatch(distance <= LOCATION_LIMIT_METERS)
+        } else {
+          setDistanceMeters(null)
+          setLocationMatch(null)
+        }
+        setGettingGps(false)
+      },
+      (gpsError) => {
+        setError(tx(`Unable to capture location: ${gpsError.message}`, `Gagal mengambil lokasi: ${gpsError.message}`))
+        setGettingGps(false)
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    )
+  }
+
+  async function stampImage(file: File, capturedAt: string) {
+    if (latitude === null || longitude === null) {
+      throw new Error(tx('Capture location before adding new photos.', 'Ambil lokasi terlebih dahulu sebelum menambah foto baru.'))
+    }
+
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    try {
+      const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(bitmap.width, bitmap.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error(tx('Unable to process photo.', 'Foto tidak dapat diproses.'))
+
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+
+      const shortSide = Math.min(canvas.width, canvas.height)
+      const fontSize = Math.max(20, Math.min(40, Math.round(shortSide * 0.025)))
+      const padding = Math.max(18, Math.round(shortSide * 0.018))
+      const lineHeight = Math.round(fontSize * 1.4)
+      const timestamp = new Date(capturedAt).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour12: false,
+      })
+      const lines = [
+        `Lat: ${latitude.toFixed(7)}`,
+        `Lng: ${longitude.toFixed(7)}`,
+        `${tx('Edited', 'Edit')}: ${timestamp} WIB`,
+        `Visit: ${id}`,
+      ]
+      const overlayHeight = lineHeight * lines.length + padding * 2
+      const y = Math.max(0, canvas.height - overlayHeight)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.72)'
+      ctx.fillRect(0, y, canvas.width, overlayHeight)
+      ctx.fillStyle = '#fff'
+      ctx.font = `600 ${fontSize}px Arial, sans-serif`
+      ctx.textBaseline = 'top'
+      lines.forEach((line, index) => {
+        ctx.fillText(line, padding, y + padding + lineHeight * index, canvas.width - padding * 2)
+      })
+
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error(tx('Unable to save photo.', 'Foto tidak dapat disimpan.'))),
+          'image/jpeg',
+          0.84
+        )
+      })
+    } finally {
+      bitmap.close()
+    }
+  }
+
+  async function addPhoto(file: File | null) {
+    if (!file) return
+    if (!locationCapturedThisEdit || latitude === null || longitude === null || !gpsCapturedAt) {
+      setError(tx('Capture a new location before adding new photos.', 'Ambil lokasi baru terlebih dahulu sebelum menambah foto baru.'))
+      return
+    }
+    if (newPhotos.length >= MAX_EDIT_PHOTOS) {
+      setError(tx('Maximum 5 new photos per edit.', 'Maksimal 5 foto baru per edit.'))
+      return
+    }
+
+    try {
+      const capturedAt = new Date().toISOString()
+      const stamped = await stampImage(file, capturedAt)
+      const preview = URL.createObjectURL(stamped)
+      setNewPhotos((current) => [...current, { file, stamped, preview, capturedAt }].slice(0, MAX_EDIT_PHOTOS))
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : tx('Unable to process photo.', 'Foto tidak dapat diproses.'))
+    }
+  }
+
+  async function addPhotoFiles(files: FileList | null) {
+    if (!files?.length) return
+    const remaining = MAX_EDIT_PHOTOS - newPhotos.length
+    for (const file of Array.from(files).slice(0, remaining)) {
+      await addPhoto(file)
+    }
+    if (files.length > remaining) {
+      setError(tx(
+        `Maximum 5 new photos. Only ${remaining} more photo(s) were accepted.`,
+        `Maksimal 5 foto baru. Hanya ${remaining} foto tambahan yang diterima.`
+      ))
+    }
+  }
+
+  function removeNewPhoto(index: number) {
+    setNewPhotos((current) => {
+      const removed = current[index]
+      if (removed) URL.revokeObjectURL(removed.preview)
+      return current.filter((_, itemIndex) => itemIndex !== index)
+    })
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!row) return
     if (!form.visit_status_kunjungan || !form.conversation_result) {
       setError('Visit status and conversation result are required.')
+      return
+    }
+
+    if (form.conversation_result !== 'Tidak bertemu pelanggan' && !form.approved_offer) {
+      setError(tx('Please select an approved offer.', 'Mohon pilih offer yang disetujui.'))
+      return
+    }
+
+    if (form.approved_offer && form.approved_offer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === form.approved_offer)) {
+      setError(tx('Selected offer is not available for this Customer ID.', 'Offer yang dipilih tidak tersedia untuk Customer ID ini.'))
+      return
+    }
+
+    if (form.conversation_result === 'Bersedia bayar / Promise to Pay' && !form.planned_payment_date) {
+      setError(tx('Please select the planned payment date.', 'Mohon pilih rencana tanggal pembayaran.'))
+      return
+    }
+
+    if (
+      form.conversation_result !== 'Sudah melakukan pembayaran' &&
+      form.conversation_result !== 'Tidak bertemu pelanggan' &&
+      !form.unpaid_reason
+    ) {
+      setError(tx('Please select the unpaid reason.', 'Mohon pilih alasan belum bayar.'))
       return
     }
 
@@ -102,6 +321,44 @@ export default function EditVisitPage() {
     setSaving(true)
     setError('')
     const supabase = createClient()
+    const uploadedPaths: string[] = []
+
+    if (newPhotos.length > 0) {
+      if (!locationCapturedThisEdit || latitude === null || longitude === null || !gpsCapturedAt) {
+        setError(tx('Capture a new location before uploading new photos.', 'Ambil lokasi baru terlebih dahulu sebelum mengunggah foto baru.'))
+        setSaving(false)
+        return
+      }
+
+      const safeVisitId = id.replace(/[^a-zA-Z0-9_-]/g, '_')
+      const batchId = Date.now()
+      for (let index = 0; index < newPhotos.length; index++) {
+        const filePath = `${row.agent_email}/${safeVisitId}/edit-${batchId}-${index + 1}-stamped.jpg`
+        const { error: uploadError } = await supabase.storage
+          .from('visit-evidence')
+          .upload(filePath, newPhotos[index].stamped, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+            upsert: false,
+          })
+
+        if (uploadError) {
+          if (uploadedPaths.length > 0) {
+            await supabase.storage.from('visit-evidence').remove(uploadedPaths)
+          }
+          setError(tx(`Photo upload failed: ${uploadError.message}`, `Upload foto gagal: ${uploadError.message}`))
+          setSaving(false)
+          return
+        }
+        uploadedPaths.push(filePath)
+      }
+    }
+
+    const previousPhotoUrls = Array.isArray(row.visit_photo_urls)
+      ? row.visit_photo_urls.filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+      : (row.visit_photo_url ? [row.visit_photo_url] : [])
+    const combinedPhotoUrls = [...previousPhotoUrls, ...uploadedPaths]
+
     const payload = {
       visit_status_kunjungan: form.visit_status_kunjungan,
       conversation_result: form.conversation_result,
@@ -114,6 +371,14 @@ export default function EditVisitPage() {
       updated_phone: form.updated_phone.trim() || null,
       speed_test_download_mbps: downloadValue,
       speed_test_upload_mbps: uploadValue,
+      latitude,
+      longitude,
+      gps_accuracy: gpsAccuracy,
+      gps_captured_at: gpsCapturedAt,
+      distance_to_customer_meters: distanceMeters,
+      location_match: locationMatch,
+      visit_photo_url: combinedPhotoUrls[0] || null,
+      visit_photo_urls: combinedPhotoUrls,
     }
 
     const { data: updatedVisit, error: visitError } = await supabase
@@ -124,6 +389,9 @@ export default function EditVisitPage() {
       .maybeSingle()
 
     if (visitError || !updatedVisit) {
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from('visit-evidence').remove(uploadedPaths)
+      }
       setError(visitError?.message || 'Visit could not be updated.')
       setSaving(false)
       return
@@ -166,303 +434,457 @@ export default function EditVisitPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-5 p-4 pb-28 sm:p-6 lg:p-8">
-      <button
-        type="button"
-        onClick={() => router.back()}
-        className="dui-btn dui-btn-ghost dui-btn-sm gap-2 px-0"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to visit detail
-      </button>
+    <div className="mx-auto w-full max-w-3xl space-y-4 p-4 pb-28 sm:p-6 lg:p-8">
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="dui-btn dui-btn-ghost dui-btn-sm gap-2 px-0"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {tx('Back to visit detail', 'Kembali ke detail kunjungan')}
+        </button>
+        <span className="dui-badge dui-badge-primary dui-badge-outline">
+          {tx('Edit Visit', 'Edit Kunjungan')}
+        </span>
+      </div>
 
-      <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-        <div className="bg-gradient-to-r from-primary/12 via-primary/5 to-transparent px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="dui-badge dui-badge-primary dui-badge-sm">EDIT VISIT</span>
-                <span className="dui-badge dui-badge-ghost dui-badge-sm">{id}</span>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                {row?.customer_name || row?.customer_id || 'Visit data'}
-              </h1>
-              <p className="mt-1 text-sm text-base-content/60">
-                Customer ID: <span className="font-semibold text-base-content/75">{row?.customer_id}</span>
-                {row?.crl_id ? <> · CRL ID: <span className="font-semibold text-base-content/75">{row.crl_id}</span></> : null}
-              </p>
-            </div>
-            <div className="rounded-xl border border-base-300 bg-base-100/80 px-4 py-3 text-sm backdrop-blur sm:text-right">
-              <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">Original record</div>
-              <div className="mt-1 font-semibold">GPS & evidence stay attached</div>
-            </div>
+      <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+        <div className="dui-card-body gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="dui-badge dui-badge-primary dui-badge-sm">{tx('EDIT MODE', 'MODE EDIT')}</span>
+            <span className="dui-badge dui-badge-ghost dui-badge-sm">{id}</span>
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-tight sm:text-2xl">
+              {row?.customer_name || row?.customer_id || tx('Visit data', 'Data kunjungan')}
+            </h1>
+            <p className="mt-1 text-sm text-base-content/60">
+              {tx('Customer ID', 'Customer ID')}: <span className="font-semibold text-base-content">{row?.customer_id}</span>
+              {row?.crl_id ? <> · CRL ID: <span className="font-semibold text-base-content">{row.crl_id}</span></> : null}
+            </p>
+          </div>
+          <div className="dui-alert dui-alert-info py-3">
+            <MapPin className="h-5 w-5 shrink-0" />
+            <span className="text-sm">
+              {tx(
+                'You can recapture GPS and add new evidence photos. Existing evidence will stay attached.',
+                'Anda dapat mengambil ulang GPS dan menambahkan foto bukti baru. Bukti lama tetap tersimpan.'
+              )}
+            </span>
           </div>
         </div>
       </section>
 
       {error && (
-        <div className="dui-alert dui-alert-error shadow-sm" role="alert">
+        <div className="dui-alert dui-alert-error" role="alert">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {row && (
-        <form onSubmit={submit} className="space-y-5">
-          <SectionCard
-            icon={<MessageSquareText className="h-5 w-5" />}
-            eyebrow="VISIT OUTCOME"
-            title="Visit & conversation result"
-            description="Update the visit status and what happened during the customer interaction."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Visit status" required>
-                <select
-                  className="dui-select dui-select-bordered w-full"
-                  value={form.visit_status_kunjungan}
-                  onChange={(e) => setForm({ ...form, visit_status_kunjungan: e.target.value })}
-                >
-                  <option value="">Select visit status</option>
-                  <option value="Bertemu dengan pelanggan">Bertemu dengan pelanggan</option>
-                  <option value="Pelanggan tidak ada di tempat">Pelanggan tidak ada di tempat</option>
-                  <option value="Alamat tidak ditemukan">Alamat tidak ditemukan</option>
-                  <option value="Pelanggan sudah pindah">Pelanggan sudah pindah</option>
-                  <option value="Tidak berhasil dikunjungi">Tidak berhasil dikunjungi</option>
-                  <option value="Lainnya">Lainnya</option>
-                </select>
-              </FormField>
-
-              <FormField label="Conversation result" required>
-                <select
-                  className="dui-select dui-select-bordered w-full"
-                  value={form.conversation_result}
-                  onChange={(e) => setForm({ ...form, conversation_result: e.target.value })}
-                >
-                  <option value="">Select result</option>
-                  <option value="Sudah melakukan pembayaran">Sudah melakukan pembayaran</option>
-                  <option value="Bersedia bayar / Promise to Pay">Bersedia bayar / Promise to Pay</option>
-                  <option value="Masih mempertimbangkan">Masih mempertimbangkan</option>
-                  <option value="Tidak bersedia melanjutkan layanan">Tidak bersedia melanjutkan layanan</option>
-                  <option value="Tidak bertemu pelanggan">Tidak bertemu pelanggan</option>
-                </select>
-              </FormField>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            icon={<MapPin className="h-5 w-5" />}
-            eyebrow="CUSTOMER CONTACT"
-            title="Address & contact"
-            description="Adjust only if the field information collected during the visit is different."
-          >
-            <FormField label="Visit address">
+        <form onSubmit={submit} className="space-y-4">
+          <StepCard step="1" title={t('agent.visit.step1')}>
+            <Field label={tx('Visit address', 'Alamat kunjungan')}>
               <textarea
-                className="dui-textarea dui-textarea-bordered min-h-28 w-full resize-y"
+                className="dui-textarea w-full"
+                rows={3}
                 value={form.visit_address}
                 onChange={(e) => setForm({ ...form, visit_address: e.target.value })}
-                placeholder="Customer visit address"
+                placeholder={tx('Customer visit address', 'Alamat kunjungan pelanggan')}
               />
-            </FormField>
+            </Field>
 
-            <FormField label="Updated phone" icon={<Phone className="h-4 w-4" />}>
-              <input
-                type="tel"
-                inputMode="tel"
-                className="dui-input dui-input-bordered w-full"
-                value={form.updated_phone}
-                onChange={(e) => setForm({ ...form, updated_phone: e.target.value })}
-                placeholder="08xxxxxxxxxx or 62xxxxxxxxxxx"
-              />
-            </FormField>
-          </SectionCard>
+            <div className="grid grid-cols-2 gap-3">
+              <ReadOnly label={tx('Given latitude', 'Latitude pelanggan')} value={givenLatitude == null ? '—' : givenLatitude.toFixed(7)} />
+              <ReadOnly label={tx('Given longitude', 'Longitude pelanggan')} value={givenLongitude == null ? '—' : givenLongitude.toFixed(7)} />
+            </div>
 
-          <SectionCard
-            icon={<Gauge className="h-5 w-5" />}
-            eyebrow="NETWORK QUALITY"
-            title="Speed test result"
-            description="Compare the customer's subscribed speed with the measured download and upload result."
-          >
+            <button
+              type="button"
+              className="dui-btn dui-btn-primary w-full"
+              onClick={captureGps}
+              disabled={gettingGps || saving}
+            >
+              <Navigation className="h-5 w-5" />
+              {gettingGps
+                ? tx('Capturing location...', 'Mengambil lokasi...')
+                : tx('Capture New Location', 'Ambil Lokasi Baru')}
+            </button>
+
+            {latitude !== null && longitude !== null && (
+              <>
+                <div className="dui-alert dui-alert-success">
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
+                  <span>{locationCapturedThisEdit
+                    ? tx('New location captured for this edit.', 'Lokasi baru berhasil diambil untuk edit ini.')
+                    : tx('Saved location from the original visit.', 'Lokasi tersimpan dari kunjungan awal.')}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <ReadOnly label={tx('Latitude', 'Latitude')} value={latitude.toFixed(7)} />
+                  <ReadOnly label={tx('Longitude', 'Longitude')} value={longitude.toFixed(7)} />
+                  <ReadOnly label={tx('Accuracy', 'Akurasi')} value={gpsAccuracy == null ? '—' : `${gpsAccuracy.toFixed(1)} m`} />
+                  <ReadOnly
+                    label={tx('Captured at', 'Diambil pada')}
+                    value={gpsCapturedAt ? new Date(gpsCapturedAt).toLocaleString(locale === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta', hour12: false }) + ' WIB' : '—'}
+                  />
+                </div>
+                {distanceMeters !== null && (
+                  <div className={locationMatch ? 'dui-alert dui-alert-success' : 'dui-alert dui-alert-warning'}>
+                    {locationMatch ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertTriangle className="h-5 w-5 shrink-0" />}
+                    <span>
+                      {tx('Distance from customer location', 'Jarak dari lokasi pelanggan')}: <strong>{distanceMeters.toFixed(1)} m</strong>
+                    </span>
+                  </div>
+                )}
+                <a
+                  href={`https://www.google.com/maps?q=${latitude},${longitude}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="dui-btn dui-btn-outline w-full"
+                >
+                  <MapPin className="h-5 w-5" />
+                  {tx('Open in Maps', 'Buka di Maps')}
+                </a>
+              </>
+            )}
+          </StepCard>
+
+          <StepCard step="2" title={t('agent.visit.step2')}>
+            <Field label={tx('Updated phone number', 'Nomor telepon terbaru')}>
+              <div className="relative">
+                <Phone className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-base-content/40" />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  className="dui-input w-full pl-10"
+                  value={form.updated_phone}
+                  onChange={(e) => setForm({ ...form, updated_phone: e.target.value })}
+                  placeholder="08xxxxxxxxxx / 62xxxxxxxxxxx"
+                />
+              </div>
+            </Field>
+          </StepCard>
+
+          <StepCard step="3" title={t('agent.visit.step3')}>
+            <div className="dui-alert dui-alert-info">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <span className="text-sm">
+                {tx(
+                  'Existing visit photos are kept. Capture a new location first, then add up to 5 new photos to the same visit.',
+                  'Foto kunjungan lama tetap disimpan. Ambil lokasi baru terlebih dahulu, lalu tambahkan maksimal 5 foto baru ke kunjungan yang sama.'
+                )}
+              </span>
+            </div>
+
+            <ReadOnly
+              label={tx('Existing evidence photos', 'Foto bukti yang sudah ada')}
+              value={String(Array.isArray(row.visit_photo_urls) ? row.visit_photo_urls.length : (row.visit_photo_url ? 1 : 0))}
+            />
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className={`dui-btn dui-btn-primary w-full cursor-pointer ${!locationCapturedThisEdit ? 'dui-btn-disabled' : ''}`}>
+                <Camera className="h-5 w-5" />
+                {tx('Take New Photo', 'Ambil Foto Baru')}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  disabled={!locationCapturedThisEdit || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
+                  onChange={(event) => {
+                    void addPhoto(event.target.files?.[0] || null)
+                    event.currentTarget.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <label className={`dui-btn dui-btn-outline w-full cursor-pointer ${!locationCapturedThisEdit ? 'dui-btn-disabled' : ''}`}>
+                <Camera className="h-5 w-5" />
+                {tx('Choose Photos', 'Pilih Foto')}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={!locationCapturedThisEdit || saving || newPhotos.length >= MAX_EDIT_PHOTOS}
+                  onChange={(event) => {
+                    void addPhotoFiles(event.target.files)
+                    event.currentTarget.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {!locationCapturedThisEdit && (
+              <div className="dui-alert dui-alert-warning">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <span>{tx('Capture a new location before adding new photos.', 'Ambil lokasi baru terlebih dahulu sebelum menambah foto baru.')}</span>
+              </div>
+            )}
+
+            {newPhotos.length > 0 && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {newPhotos.map((photo, index) => (
+                  <div key={photo.preview} className="rounded-box border border-base-300 bg-base-100 p-3">
+                    <img src={photo.preview} alt={tx(`New visit photo ${index + 1}`, `Foto kunjungan baru ${index + 1}`)} className="aspect-[4/3] w-full rounded-box object-cover" />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-xs text-base-content/60">
+                        {tx('New photo', 'Foto baru')} {index + 1}/{MAX_EDIT_PHOTOS}
+                      </span>
+                      <button
+                        type="button"
+                        className="dui-btn dui-btn-error dui-btn-xs"
+                        onClick={() => removeNewPhoto(index)}
+                        disabled={saving}
+                      >
+                        {tx('Remove', 'Hapus')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-base-content/60">
+              {tx(
+                `${newPhotos.length}/${MAX_EDIT_PHOTOS} new photos selected. They will be appended when you save changes.`,
+                `${newPhotos.length}/${MAX_EDIT_PHOTOS} foto baru dipilih. Foto akan ditambahkan saat Simpan Perubahan.`
+              )}
+            </p>
+
+            <div className="divider my-1" />
+
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricField
-                label="Speed Current"
+              <ReadOnly
+                label={tx('Subscribed speed', 'Speed pelanggan')}
                 value={currentSpeed == null ? '—' : `${currentSpeed} Mbps`}
-                muted
               />
-
               <SpeedInput
-                label="Download"
+                label={tx('Download', 'Download')}
                 value={form.speed_test_download_mbps}
                 onChange={(value) => setForm({ ...form, speed_test_download_mbps: value })}
               />
-
               <SpeedInput
-                label="Upload"
+                label={tx('Upload', 'Upload')}
                 value={form.speed_test_upload_mbps}
                 onChange={(value) => setForm({ ...form, speed_test_upload_mbps: value })}
               />
             </div>
-          </SectionCard>
+          </StepCard>
 
-          <SectionCard
-            icon={<Sparkles className="h-5 w-5" />}
-            eyebrow="RETENTION"
-            title="Offer & payment"
-            description="Keep the agreed offer and payment follow-up aligned with the visit outcome."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Approved offer">
-                <input
-                  className="dui-input dui-input-bordered w-full"
+          <StepCard step="4" title={t('agent.visit.step4')}>
+            <Field label={tx('Visit status', 'Status kunjungan')}>
+              <select
+                className="dui-select w-full"
+                value={form.visit_status_kunjungan}
+                onChange={(e) => setForm({ ...form, visit_status_kunjungan: e.target.value })}
+              >
+                <option value="">{tx('Select visit status', 'Pilih status kunjungan')}</option>
+                <option value="Bertemu dengan pelanggan">Bertemu dengan pelanggan</option>
+                <option value="Pelanggan tidak ada di tempat">Pelanggan tidak ada di tempat</option>
+                <option value="Alamat tidak ditemukan">Alamat tidak ditemukan</option>
+                <option value="Pelanggan sudah pindah">Pelanggan sudah pindah</option>
+                <option value="Tidak berhasil dikunjungi">Tidak berhasil dikunjungi</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </Field>
+
+            <Field label={tx('Conversation result', 'Hasil percakapan')}>
+              <select
+                className="dui-select w-full"
+                value={form.conversation_result}
+                onChange={(e) => setForm({ ...form, conversation_result: e.target.value })}
+              >
+                <option value="">{tx('Select conversation result', 'Pilih hasil percakapan')}</option>
+                <option value="Sudah melakukan pembayaran">Sudah melakukan pembayaran</option>
+                <option value="Bersedia bayar / Promise to Pay">Bersedia bayar / Promise to Pay</option>
+                <option value="Masih mempertimbangkan">Masih mempertimbangkan</option>
+                <option value="Tidak bersedia melanjutkan layanan">Tidak bersedia melanjutkan layanan</option>
+                <option value="Tidak bertemu pelanggan">Tidak bertemu pelanggan</option>
+              </select>
+            </Field>
+          </StepCard>
+
+          {form.conversation_result !== 'Tidak bertemu pelanggan' && (
+            <StepCard step="5" title={t('agent.visit.step5')}>
+              <p className="text-sm text-base-content/60">
+                {tx(
+                  'Keep the approved retention offer aligned with the original visit flow.',
+                  'Pastikan offer retention yang disetujui sesuai dengan alur kunjungan awal.'
+                )}
+              </p>
+              <Field label={tx('Approved offer', 'Offer yang disetujui')}>
+                <select
+                  className="dui-select w-full"
                   value={form.approved_offer}
-                  onChange={(e) => setForm({ ...form, approved_offer: e.target.value })}
-                  placeholder="Approved retention offer"
-                />
-              </FormField>
+                  onChange={(event) => setForm({ ...form, approved_offer: event.target.value })}
+                >
+                  <option value="">{tx('Select offer', 'Pilih offer')}</option>
+                  {eligibleOffers.map((offer) => (
+                    <option key={offer.value} value={offer.value}>{offer.label}</option>
+                  ))}
+                  <option value={NO_APPROVED_OFFER}>{tx('No approved offer yet', 'Belum ada offer yang disetujui')}</option>
+                  {form.approved_offer &&
+                    form.approved_offer !== NO_APPROVED_OFFER &&
+                    !eligibleOffers.some((offer) => offer.value === form.approved_offer) && (
+                      <option value={form.approved_offer} disabled>
+                        {form.approved_offer} ({tx('previous offer — unavailable', 'offer sebelumnya — tidak tersedia')})
+                      </option>
+                    )}
+                </select>
+              </Field>
+            </StepCard>
+          )}
 
-              <FormField label="Planned payment date" icon={<CalendarDays className="h-4 w-4" />}>
-                <input
-                  type="date"
-                  className="dui-input dui-input-bordered w-full"
-                  value={form.planned_payment_date}
-                  onChange={(e) => setForm({ ...form, planned_payment_date: e.target.value })}
-                />
-              </FormField>
-            </div>
+          <StepCard step="6" title={t('agent.visit.step6')}>
+            {form.conversation_result === 'Bersedia bayar / Promise to Pay' && (
+              <Field label={tx('Planned payment date', 'Rencana tanggal pembayaran')}>
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-base-content/40" />
+                  <input
+                    type="date"
+                    className="dui-input w-full pl-10"
+                    value={form.planned_payment_date}
+                    onChange={(e) => setForm({ ...form, planned_payment_date: e.target.value })}
+                  />
+                </div>
+              </Field>
+            )}
 
-            <FormField label="Unpaid reason">
-              <input
-                className="dui-input dui-input-bordered w-full"
-                value={form.unpaid_reason}
-                onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })}
-                placeholder="Reason customer has not paid"
-              />
-            </FormField>
-          </SectionCard>
+            {form.conversation_result === 'Sudah melakukan pembayaran' ? (
+              <div className="dui-alert dui-alert-success">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <span>{tx('Customer has completed payment.', 'Pelanggan sudah melakukan pembayaran.')}</span>
+              </div>
+            ) : form.conversation_result === 'Tidak bertemu pelanggan' ? (
+              <div className="dui-alert dui-alert-info">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <span>{tx('Customer was not met during the visit.', 'Pelanggan tidak bertemu saat kunjungan.')}</span>
+              </div>
+            ) : (
+              <Field label={tx('Unpaid reason', 'Alasan belum bayar')}>
+                <select
+                  className="dui-select w-full"
+                  value={form.unpaid_reason}
+                  onChange={(e) => setForm({ ...form, unpaid_reason: e.target.value })}
+                >
+                  <option value="">{tx('Select unpaid reason', 'Pilih alasan belum bayar')}</option>
+                  <option value="Masalah keuangan">Masalah keuangan</option>
+                  <option value="Harga / tagihan">Harga / tagihan</option>
+                  <option value="Pindah ke provider lain">Pindah ke provider lain</option>
+                  <option value="Masalah jaringan / layanan">Masalah jaringan / layanan</option>
+                  <option value="Jarang digunakan">Jarang digunakan</option>
+                  <option value="Pindah alamat">Pindah alamat</option>
+                  <option value="Masalah sales">Masalah sales</option>
+                  <option value="Alasan pribadi">Alasan pribadi</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+              </Field>
+            )}
+          </StepCard>
 
-          <SectionCard
-            icon={<NotebookText className="h-5 w-5" />}
-            eyebrow="NOTES"
-            title="Additional notes"
-            description="Add any context that will help the next follow-up."
-          >
-            <FormField label="Notes">
+          <StepCard step="7" title={t('agent.visit.step7')}>
+            <p className="text-sm text-base-content/60">
+              {tx(
+                'Update important information collected from the customer.',
+                'Perbarui informasi penting yang didapat dari pelanggan.'
+              )}
+            </p>
+            <Field label={tx('Additional notes', 'Catatan tambahan')}>
               <textarea
-                className="dui-textarea dui-textarea-bordered min-h-32 w-full resize-y"
+                className="dui-textarea w-full"
+                rows={4}
                 value={form.additional_notes}
                 onChange={(e) => setForm({ ...form, additional_notes: e.target.value })}
-                placeholder="Add visit notes..."
+                placeholder={tx('Add visit notes...', 'Tambahkan catatan kunjungan...')}
               />
-            </FormField>
-          </SectionCard>
+            </Field>
+          </StepCard>
 
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100/95 p-3 backdrop-blur">
             <div className="mx-auto flex max-w-3xl gap-2">
               <button
                 type="button"
+                className="dui-btn flex-1"
                 onClick={() => router.back()}
                 disabled={saving}
-                className="dui-btn flex-1 sm:flex-none sm:min-w-32"
               >
-                Cancel
+                {tx('Cancel', 'Batal')}
               </button>
               <button
                 type="submit"
+                className="dui-btn dui-btn-primary flex-1"
                 disabled={saving}
-                className="dui-btn dui-btn-primary flex-1 gap-2 sm:min-w-48 sm:flex-none sm:ml-auto"
               >
                 {saving ? (
-                  <span className="dui-loading dui-loading-spinner dui-loading-sm" />
+                  <>
+                    <span className="dui-loading dui-loading-spinner dui-loading-sm" />
+                    {tx('Saving...', 'Menyimpan...')}
+                  </>
                 ) : (
-                  <Save className="h-4 w-4" />
+                  <>
+                    <Save className="h-5 w-5" />
+                    {tx('Save Changes', 'Simpan Perubahan')}
+                  </>
                 )}
-                {saving ? 'Saving changes…' : 'Save changes'}
               </button>
             </div>
           </div>
         </form>
       )}
-    </main>
+    </div>
   )
 }
 
-function SectionCard({
-  icon,
-  eyebrow,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ReactNode
-  eyebrow: string
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
+function StepCard({ step, title, children }: { step: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-      <div className="border-b border-base-200 px-5 py-4 sm:px-6">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/80">{eyebrow}</div>
-            <h2 className="mt-0.5 text-base font-bold sm:text-lg">{title}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-base-content/55 sm:text-sm">{description}</p>
-          </div>
-        </div>
+    <section className="dui-card border border-base-300 bg-base-100 shadow-sm">
+      <div className="dui-card-body gap-4">
+        <h2 className="flex items-center gap-2 text-base font-bold tracking-tight">
+          <span className="dui-badge dui-badge-primary dui-badge-sm">{step}</span>
+          {title}
+        </h2>
+        {children}
       </div>
-      <div className="space-y-4 p-5 sm:p-6">{children}</div>
     </section>
   )
 }
 
-function FormField({
-  label,
-  required = false,
-  icon,
-  children,
-}: {
-  label: string
-  required?: boolean
-  icon?: React.ReactNode
-  children: React.ReactNode
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="flex items-center gap-1.5 text-sm font-semibold text-base-content/80">
-        {icon}
-        {label}
-        {required && <span className="text-error">*</span>}
-      </span>
+    <div className="dui-fieldset">
+      <div className="dui-fieldset-label"><span>{label}</span></div>
       {children}
-    </label>
+    </div>
   )
 }
 
-function MetricField({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
+function ReadOnly({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-xl border p-4 ${muted ? 'border-base-300 bg-base-200/45' : 'border-base-300 bg-base-100'}`}>
-      <div className="text-[11px] font-bold uppercase tracking-wide text-base-content/45">{label}</div>
-      <div className="mt-2 text-xl font-bold tracking-tight">{value}</div>
+    <div className="rounded-box bg-base-200/60 px-3 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-base-content/50">{label}</div>
+      <div className="mt-1 text-lg font-bold">{value}</div>
     </div>
   )
 }
 
 function SpeedInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className="rounded-xl border border-base-300 bg-base-100 p-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-base-content/45">{label}</span>
-      <div className="mt-2 flex items-end gap-2">
+    <label className="rounded-box border border-base-300 bg-base-100 p-3">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-base-content/50">{label}</span>
+      <div className="mt-1 flex items-end gap-2">
         <input
           type="number"
           min="0"
           step="0.01"
           inputMode="decimal"
-          className="min-w-0 flex-1 bg-transparent text-xl font-bold outline-none"
+          className="min-w-0 flex-1 bg-transparent text-lg font-bold outline-none"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
         />
-        <span className="pb-0.5 text-xs font-semibold text-base-content/45">Mbps</span>
+        <span className="pb-0.5 text-xs text-base-content/50">Mbps</span>
       </div>
     </label>
   )

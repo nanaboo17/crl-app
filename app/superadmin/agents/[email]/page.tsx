@@ -73,15 +73,14 @@ export default function EditAgentPage() {
     setSaving(true)
     setError('')
 
-    const { error: saveError } = await supabase
-      .from('agents')
-      .update({
-        agent_name: name.trim(),
-        organization: organization.trim() || null,
-        role,
-        active,
-      })
-      .eq('email', email)
+    // The RPC enforces the administrator's Circle on the database side.
+    // Unlike a client-side filter, a caller cannot update an agent in another Circle.
+    const { error: saveError } = await supabase.rpc('crl_update_circle_agent_profile_v2', {
+      p_agent_email: email,
+      p_agent_name: name.trim(),
+      p_organization: organization.trim() || '',
+      p_active: active,
+    })
 
     if (saveError) {
       setError(saveError.message)
@@ -102,7 +101,7 @@ export default function EditAgentPage() {
           { label: name || email },
         ]}
         title={t('superadmin.agents.edit.title')}
-        description={tx('Update account ownership, access level, organization, and field identity.', 'Perbarui identitas akun, tingkat akses, organisasi, dan status pengguna lapangan.')}
+        description={tx('Update agent name, organization and active status. Role and Circle changes are National-only.', 'Perbarui nama agen, organisasi, dan status aktif. Perubahan role dan Circle hanya untuk Nasional.')}
       />
 
       <section className={styles.hero}>
@@ -145,7 +144,7 @@ export default function EditAgentPage() {
 
             <div className={styles.field}>
               <label htmlFor="agent-role">{t('superadmin.agents.edit.roleLabel')}</label>
-              <select id="agent-role" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={loading || saving} className={styles.select}>
+              <select id="agent-role" value={role} disabled className={styles.select}>
                 {ROLES.map((option) => <option key={option} value={option}>{t(roleLabelKey(option))}</option>)}
               </select>
             </div>

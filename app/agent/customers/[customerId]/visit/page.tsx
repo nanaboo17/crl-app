@@ -18,6 +18,9 @@ import {
 import { createClient } from '@/lib/supabase-browser'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import { useI18n } from '@/components/providers/i18n-provider'
+import CmsCustomFields, { validateCmsCustomFields } from '@/components/forms/CmsCustomFields'
+import { cmsField, cmsLabel, cmsOptions, loadCmsFormFields, type CmsFormField } from '@/lib/form-cms'
+import { retentionOffersForCustomer, NO_APPROVED_OFFER } from '@/lib/retention-offers'
 import styles from './page.module.css'
 
 const LOCATION_LIMIT_METERS = 200
@@ -59,6 +62,7 @@ function formatVisitTimestamp(iso: string) {
 
 export default function VisitPage() {
   const { t, locale } = useI18n()
+  const tx = (en: string, id: string) => locale === 'id' ? id : en
   const params = useParams()
   const router = useRouter()
   const customerId = decodeURIComponent(params.customerId as string)
@@ -97,12 +101,27 @@ export default function VisitPage() {
   const [plannedPaymentDate, setPlannedPaymentDate] = useState('')
   const [unpaidReason, setUnpaidReason] = useState('')
   const [additionalNotes, setAdditionalNotes] = useState('')
+  const [cmsFields, setCmsFields] = useState<CmsFormField[]>([])
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>({})
   const [draftReady, setDraftReady] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
   const [capturingPhoto, setCapturingPhoto] = useState(false)
   const [showComplaintModal, setShowComplaintModal] = useState(false)
+
+  const visitField = (key: string) => cmsField(cmsFields, key)
+  const visitStatusField = visitField('visit_status_kunjungan')
+  const conversationField = visitField('conversation_result')
+  const approvedOfferField = visitField('approved_offer')
+  const eligibleOffers = retentionOffersForCustomer(customer?.customer_id)
+  const offerChoices = eligibleOffers.map((offer) => ({
+    ...offer,
+    label: cmsOptions(approvedOfferField, locale).find((item) => item.value === offer.value)?.label || offer.label,
+  }))
+  const plannedPaymentField = visitField('planned_payment_date')
+  const unpaidReasonField = visitField('unpaid_reason')
+  const additionalNotesField = visitField('additional_notes')
 
   const alternativePhones = useMemo(
     () => [customer?.alternative_phone_1, customer?.alternative_phone_2, customer?.alternative_phone_3]
@@ -125,6 +144,7 @@ export default function VisitPage() {
   useEffect(() => {
     const supabase = createClient()
     async function loadPage() {
+      try { setCmsFields(await loadCmsFormFields('visit')) } catch {}
       const { data: { user } } = await supabase.auth.getUser()
       if (!user?.email) return router.replace('/login')
       const email = user.email.trim().toLowerCase()
@@ -168,18 +188,6 @@ export default function VisitPage() {
         return
       }
 
-      const { data: existingVisit } = await supabase
-        .from('visits')
-        .select('visit_id')
-        .eq('crl_id', customerData.crl_id)
-        .maybeSingle()
-      if (existingVisit) {
-        try { sessionStorage.removeItem(draftKey) } catch {}
-        setError(t('agent.visit.alreadySubmitted'))
-        setLoading(false)
-        return
-      }
-
       setAgent(agentData)
       setCustomer(customerData)
 
@@ -191,12 +199,6 @@ export default function VisitPage() {
           const savedAt = Number(draft.savedAt || 0)
           if (savedAt && Date.now() - savedAt <= VISIT_DRAFT_MAX_AGE_MS) {
             if (typeof draft.visitAddress === 'string') setVisitAddress(draft.visitAddress)
-            if (typeof draft.latitude === 'number') setLatitude(draft.latitude)
-            if (typeof draft.longitude === 'number') setLongitude(draft.longitude)
-            if (typeof draft.gpsAccuracy === 'number') setGpsAccuracy(draft.gpsAccuracy)
-            if (typeof draft.gpsCapturedAt === 'string') setGpsCapturedAt(draft.gpsCapturedAt)
-            if (typeof draft.distanceMeters === 'number') setDistanceMeters(draft.distanceMeters)
-            if (typeof draft.locationMatch === 'boolean') setLocationMatch(draft.locationMatch)
             if (typeof draft.phoneCorrect === 'boolean') setPhoneCorrect(draft.phoneCorrect)
             if (typeof draft.updatedPhone === 'string') setUpdatedPhone(draft.updatedPhone)
             if (typeof draft.consentGiven === 'boolean') setConsentGiven(draft.consentGiven)
@@ -229,12 +231,6 @@ export default function VisitPage() {
       sessionStorage.setItem(draftKey, JSON.stringify({
         savedAt: Date.now(),
         visitAddress,
-        latitude,
-        longitude,
-        gpsAccuracy,
-        gpsCapturedAt,
-        distanceMeters,
-        locationMatch,
         phoneCorrect,
         updatedPhone,
         consentGiven,
@@ -249,8 +245,7 @@ export default function VisitPage() {
       // A visit must still work if browser storage is unavailable.
     }
   }, [
-    draftReady, draftKey, visitAddress, latitude, longitude, gpsAccuracy, gpsCapturedAt,
-    distanceMeters, locationMatch, phoneCorrect, updatedPhone, consentGiven,
+    draftReady, draftKey, visitAddress, phoneCorrect, updatedPhone, consentGiven,
     visitStatusKunjungan, conversationResult, approvedOffer, plannedPaymentDate,
     unpaidReason, additionalNotes,
   ])
@@ -534,6 +529,9 @@ export default function VisitPage() {
     if (!visitStatusKunjungan) return setError(t('agent.visit.err.selectVisitStatus'))
     if (!conversationResult) return setError(t('agent.visit.err.selectConversation'))
     if (conversationResult !== 'Tidak bertemu pelanggan' && !approvedOffer) return setError(t('agent.visit.err.selectOffer'))
+    if (conversationResult !== 'Tidak bertemu pelanggan' && approvedOffer !== NO_APPROVED_OFFER && !eligibleOffers.some((offer) => offer.value === approvedOffer)) {
+      return setError(tx('Selected offer is not available for this Customer ID.', 'Offer tidak tersedia untuk ID Pelanggan ini.'))
+    }
     if (conversationResult === 'Bersedia bayar / Promise to Pay' && !plannedPaymentDate) return setError(t('agent.visit.err.plannedDate'))
     if (
       conversationResult !== 'Sudah melakukan pembayaran' &&
@@ -542,6 +540,8 @@ export default function VisitPage() {
     ) return setError(t('agent.visit.err.unpaidReason'))
     if (photos.length === 0) return setError(t('agent.visit.err.photoRequired'))
     if (!consentGiven) return setError(t('agent.visit.err.consentRequired'))
+    const customValidation = validateCmsCustomFields(cmsFields, customValues, locale)
+    if (customValidation) return setError(customValidation)
 
     setSaving(true)
     const supabase = createClient()
@@ -625,6 +625,7 @@ export default function VisitPage() {
           ? null
           : (unpaidReason || null),
       additional_notes: additionalNotes.trim() || null,
+      extra_data: customValues,
     })
     if (visitError) {
       await supabase.storage.from('visit-evidence').remove([...uploadedPaths, ...optionalUploadedPaths])
@@ -636,7 +637,8 @@ export default function VisitPage() {
     const customerUpdate: Record<string, string> = {
       visit_status: 'Visited',
       customer_status: '5. Visited',
-      payment_status: conversationResult === 'Sudah melakukan pembayaran' ? 'paid' : 'unpaid',
+      // Never downgrade a confirmed payment because of a follow-up visit.
+      ...(conversationResult === 'Sudah melakukan pembayaran' ? { payment_status: 'paid' } : {}),
     }
     if (correctedPhone) customerUpdate.phone_number = correctedPhone
 
@@ -737,13 +739,13 @@ export default function VisitPage() {
         <div className="flex items-center gap-2 text-sm font-bold"><Phone className="h-4 w-4" /> {locale === 'id' ? 'Nomor telepon terdaftar' : 'Registered phone'}</div>
         <ReadOnly label={t('agent.visit.fieldCurrentPhone')} value={customer?.phone_number || '-'} />
         {alternativePhones.length > 0 && <div className="grid gap-2 sm:grid-cols-3">{alternativePhones.map((phone: string, index: number) => <ReadOnly key={`${phone}-${index}`} label={locale === 'id' ? `Alternatif ${index + 1}` : `Alternative ${index + 1}`} value={phone} />)}</div>}
-        <Field label={locale === 'id' ? 'Apakah nomor telepon terdaftar sudah benar?' : 'Is the registered phone number correct?'}>
+        <Field label={cmsLabel(visitField('phone_correct'), locale, 'Is the registered phone number correct?', 'Apakah nomor telepon terdaftar sudah benar?')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button type="button" className={`dui-btn ${phoneCorrect === true ? 'dui-btn-success' : 'dui-btn-outline'}`} onClick={() => { setPhoneCorrect(true); setUpdatedPhone('') }}><CheckCircle2 className="h-4 w-4" /> {locale === 'id' ? 'Ya, benar' : 'Yes, correct'}</button>
             <button type="button" className={`dui-btn ${phoneCorrect === false ? 'dui-btn-warning' : 'dui-btn-outline'}`} onClick={() => setPhoneCorrect(false)}><AlertTriangle className="h-4 w-4" /> {locale === 'id' ? 'Tidak, perbarui' : 'No, update'}</button>
           </div>
         </Field>
-        {phoneCorrect === false && <Field label={t('agent.visit.fieldUpdatedPhone')}><input type="tel" inputMode="tel" value={updatedPhone} onChange={(e) => setUpdatedPhone(e.target.value)} className={`dui-input w-full ${updatedPhone && !isValidPhone(updatedPhone) ? 'dui-input-error' : ''}`} placeholder="08xxxxxxxxxx atau 62xxxxxxxxxxx" />{updatedPhone && <div className={`mt-1 text-xs ${isValidPhone(updatedPhone) ? 'text-success' : 'text-error'}`}>{isValidPhone(updatedPhone) ? (locale === 'id' ? 'Nomor telepon valid' : 'Valid phone number') : (locale === 'id' ? 'Gunakan 10–15 digit diawali 0 atau 62' : 'Use 10–15 digits starting with 0 or 62')}</div>}</Field>}
+        {phoneCorrect === false && <Field label={cmsLabel(visitField('updated_phone'), locale, t('agent.visit.fieldUpdatedPhone'), t('agent.visit.fieldUpdatedPhone'))}><input type="tel" inputMode="tel" value={updatedPhone} onChange={(e) => setUpdatedPhone(e.target.value)} className={`dui-input w-full ${updatedPhone && !isValidPhone(updatedPhone) ? 'dui-input-error' : ''}`} placeholder="08xxxxxxxxxx atau 62xxxxxxxxxxx" />{updatedPhone && <div className={`mt-1 text-xs ${isValidPhone(updatedPhone) ? 'text-success' : 'text-error'}`}>{isValidPhone(updatedPhone) ? (locale === 'id' ? 'Nomor telepon valid' : 'Valid phone number') : (locale === 'id' ? 'Gunakan 10–15 digit diawali 0 atau 62' : 'Use 10–15 digits starting with 0 or 62')}</div>}</Field>}
       </StepCard>
 
       <StepCard t={t} step="3" title={t('agent.visit.step3')}>
@@ -873,18 +875,20 @@ export default function VisitPage() {
       </StepCard>
 
       <StepCard t={t} step="4" title={t('agent.visit.step4')}>
-        <Field label={t('agent.visit.fieldVisitStatus')}><select value={visitStatusKunjungan} onChange={(e) => setVisitStatusKunjungan(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.visitStatusPlaceholder')}</option><option value="Bertemu dengan pelanggan">{t('agent.visit.status.met')}</option><option value="Pelanggan tidak ada di tempat">{t('agent.visit.status.notAtPlace')}</option><option value="Alamat tidak ditemukan">{t('agent.visit.status.addressNotFound')}</option><option value="Pelanggan sudah pindah">{t('agent.visit.status.moved')}</option><option value="Tidak berhasil dikunjungi">{t('agent.visit.status.unreachable')}</option><option value="Lainnya">{t('agent.visit.status.other')}</option></select></Field>
-        <Field label={t('agent.visit.fieldConversation')}><select value={conversationResult} onChange={(e) => setConversationResult(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.conversationPlaceholder')}</option><option value="Sudah melakukan pembayaran">{t('agent.visit.conv.paid')}</option><option value="Bersedia bayar / Promise to Pay">{t('agent.visit.conv.promiseToPay')}</option><option value="Masih mempertimbangkan">{t('agent.visit.conv.stillConsidering')}</option><option value="Tidak bersedia melanjutkan layanan">{t('agent.visit.conv.notWilling')}</option><option value="Tidak bertemu pelanggan">{t('agent.visit.conv.notMet')}</option></select></Field>
+        {visitStatusField?.visible !== false && <Field label={cmsLabel(visitStatusField, locale, t('agent.visit.fieldVisitStatus'), t('agent.visit.fieldVisitStatus'))}><select value={visitStatusKunjungan} onChange={(e) => setVisitStatusKunjungan(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.visitStatusPlaceholder')}</option>{(cmsOptions(visitStatusField, locale).length ? cmsOptions(visitStatusField, locale) : [{value:'Bertemu dengan pelanggan',label:t('agent.visit.status.met')},{value:'Pelanggan tidak ada di tempat',label:t('agent.visit.status.notAtPlace')},{value:'Alamat tidak ditemukan',label:t('agent.visit.status.addressNotFound')},{value:'Pelanggan sudah pindah',label:t('agent.visit.status.moved')},{value:'Tidak berhasil dikunjungi',label:t('agent.visit.status.unreachable')},{value:'Lainnya',label:t('agent.visit.status.other')}]).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>}
+        {conversationField?.visible !== false && <Field label={cmsLabel(conversationField, locale, t('agent.visit.fieldConversation'), t('agent.visit.fieldConversation'))}><select value={conversationResult} onChange={(e) => setConversationResult(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.conversationPlaceholder')}</option>{(cmsOptions(conversationField, locale).length ? cmsOptions(conversationField, locale) : [{value:'Sudah melakukan pembayaran',label:t('agent.visit.conv.paid')},{value:'Bersedia bayar / Promise to Pay',label:t('agent.visit.conv.promiseToPay')},{value:'Masih mempertimbangkan',label:t('agent.visit.conv.stillConsidering')},{value:'Tidak bersedia melanjutkan layanan',label:t('agent.visit.conv.notWilling')},{value:'Tidak bertemu pelanggan',label:t('agent.visit.conv.notMet')}]).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>}
       </StepCard>
 
-      {conversationResult !== 'Tidak bertemu pelanggan' && <StepCard t={t} step="5" title={t('agent.visit.step5')}><p className="text-sm text-base-content/60">{t('agent.visit.offerHint')}</p><Field label={t('agent.visit.fieldApprovedOffer')}><select value={approvedOffer} onChange={(e) => setApprovedOffer(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.offerPlaceholder')}</option><option value="Diskon 20% selama 3 bulan + Voucher Rp100.000">{t('agent.visit.offer.discount20')}</option><option value="Diskon 30% selama 3 bulan + Voucher Rp100.000">{t('agent.visit.offer.discount30100')}</option><option value="Diskon 30% selama 3 bulan + Voucher Rp200.000">{t('agent.visit.offer.discount30200')}</option><option value="Belum ada offer yang disetujui">{t('agent.visit.offer.none')}</option></select></Field></StepCard>}
+      {conversationResult !== 'Tidak bertemu pelanggan' && approvedOfferField?.visible !== false && <StepCard t={t} step="5" title={t('agent.visit.step5')}><p className="text-sm text-base-content/60">{t('agent.visit.offerHint')}</p><Field label={cmsLabel(approvedOfferField, locale, t('agent.visit.fieldApprovedOffer'), t('agent.visit.fieldApprovedOffer'))}><select value={approvedOffer} onChange={(e) => setApprovedOffer(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.offerPlaceholder')}</option>{offerChoices.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}<option value={NO_APPROVED_OFFER}>{tx('No approved offer yet', 'Belum ada offer yang disetujui')}</option></select></Field></StepCard>}
 
       <StepCard t={t} step="6" title={t('agent.visit.step6')}>
-        {conversationResult === 'Bersedia bayar / Promise to Pay' && <Field label={t('agent.visit.fieldPlannedDate')}><input type="date" value={plannedPaymentDate} onChange={(e) => setPlannedPaymentDate(e.target.value)} className="dui-input w-full" /></Field>}
-        {conversationResult === 'Sudah melakukan pembayaran' ? <div className="dui-alert dui-alert-success"><CheckCircle2 className="h-5 w-5 shrink-0" /><span>{t('agent.visit.paid')}</span></div> : conversationResult !== 'Tidak bertemu pelanggan' ? <Field label={t('agent.visit.fieldUnpaidReason')}><select value={unpaidReason} onChange={(e) => setUnpaidReason(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.unpaidPlaceholder')}</option><option value="Masalah keuangan">{t('agent.visit.unpaid.financial')}</option><option value="Harga / tagihan">{t('agent.visit.unpaid.price')}</option><option value="Pindah ke provider lain">{t('agent.visit.unpaid.provider')}</option><option value="Masalah jaringan / layanan">{t('agent.visit.unpaid.network')}</option><option value="Jarang digunakan">{t('agent.visit.unpaid.rarelyUsed')}</option><option value="Pindah alamat">{t('agent.visit.unpaid.movedAddress')}</option><option value="Masalah sales">{t('agent.visit.unpaid.sales')}</option><option value="Alasan pribadi">{t('agent.visit.unpaid.personal')}</option><option value="Lainnya">{t('agent.visit.unpaid.other')}</option></select></Field> : <div className="dui-alert dui-alert-info"><AlertTriangle className="h-5 w-5 shrink-0" /><span>{t('agent.visit.conv.notMet')}</span></div>}
+        {conversationResult === 'Bersedia bayar / Promise to Pay' && plannedPaymentField?.visible !== false && <Field label={cmsLabel(plannedPaymentField, locale, t('agent.visit.fieldPlannedDate'), t('agent.visit.fieldPlannedDate'))}><input type="date" value={plannedPaymentDate} onChange={(e) => setPlannedPaymentDate(e.target.value)} className="dui-input w-full" /></Field>}
+        {conversationResult === 'Sudah melakukan pembayaran' ? <div className="dui-alert dui-alert-success"><CheckCircle2 className="h-5 w-5 shrink-0" /><span>{t('agent.visit.paid')}</span></div> : conversationResult !== 'Tidak bertemu pelanggan' && unpaidReasonField?.visible !== false ? <Field label={cmsLabel(unpaidReasonField, locale, t('agent.visit.fieldUnpaidReason'), t('agent.visit.fieldUnpaidReason'))}><select value={unpaidReason} onChange={(e) => setUnpaidReason(e.target.value)} className="dui-select w-full"><option value="">{t('agent.visit.unpaidPlaceholder')}</option>{(cmsOptions(unpaidReasonField, locale).length ? cmsOptions(unpaidReasonField, locale) : [{value:'Masalah keuangan',label:t('agent.visit.unpaid.financial')},{value:'Harga / tagihan',label:t('agent.visit.unpaid.price')},{value:'Pindah ke provider lain',label:t('agent.visit.unpaid.provider')},{value:'Masalah jaringan / layanan',label:t('agent.visit.unpaid.network')},{value:'Jarang digunakan',label:t('agent.visit.unpaid.rarelyUsed')},{value:'Pindah alamat',label:t('agent.visit.unpaid.movedAddress')},{value:'Masalah sales',label:t('agent.visit.unpaid.sales')},{value:'Alasan pribadi',label:t('agent.visit.unpaid.personal')},{value:'Lainnya',label:t('agent.visit.unpaid.other')}]).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field> : conversationResult === 'Tidak bertemu pelanggan' ? <div className="dui-alert dui-alert-info"><AlertTriangle className="h-5 w-5 shrink-0" /><span>{t('agent.visit.conv.notMet')}</span></div> : null}
       </StepCard>
 
-      <StepCard t={t} step="7" title={t('agent.visit.step7')}><p className="text-sm text-base-content/60">{t('agent.visit.notesHint')}</p><Field label={t('agent.visit.fieldNotes')}><textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} className="dui-textarea w-full" rows={3} placeholder={t('agent.visit.notesPlaceholder')} /></Field></StepCard>
+      {additionalNotesField?.visible !== false && <StepCard t={t} step="7" title={t('agent.visit.step7')}><p className="text-sm text-base-content/60">{t('agent.visit.notesHint')}</p><Field label={cmsLabel(additionalNotesField, locale, t('agent.visit.fieldNotes'), t('agent.visit.fieldNotes'))}><textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} className="dui-textarea w-full" rows={3} placeholder={locale === 'id' ? (additionalNotesField?.placeholder_id || t('agent.visit.notesPlaceholder')) : (additionalNotesField?.placeholder_en || t('agent.visit.notesPlaceholder'))} /></Field></StepCard>}
+
+      <CmsCustomFields fields={cmsFields} values={customValues} onChange={(key, value) => setCustomValues((current) => ({ ...current, [key]: value }))} locale={locale} />
 
       {error && <div className="dui-alert dui-alert-error" role="alert"><XCircle className="h-5 w-5 shrink-0" /><span>{error}</span></div>}
 

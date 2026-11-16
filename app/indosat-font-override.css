@@ -1,0 +1,6 @@
+/* Final app-wide typography override. Imported after all other styles. */
+html,
+body,
+body * {
+  font-family: var(--font-indosat), Arial, sans-serif !important;
+}

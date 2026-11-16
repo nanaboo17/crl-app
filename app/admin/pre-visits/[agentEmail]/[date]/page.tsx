@@ -88,6 +88,7 @@ export default async function AgentDailyPreVisitsPage({
       .from('pre_visits')
       .select(`
         previsit_id,
+        crl_id,
         customer_id,
         contact_attempt_date,
         contact_confirmed,
@@ -126,20 +127,21 @@ export default async function AgentDailyPreVisitsPage({
     )
   }
 
-  const customerIds = [
+  const crlIds = [
     ...new Set(
-      (preVisits ?? []).map(
-        (item) => item.customer_id
-      )
+      (preVisits ?? [])
+        .map((item) => item.crl_id)
+        .filter(Boolean)
     ),
   ]
 
   let customers: any[] = []
 
-  if (customerIds.length > 0) {
+  if (crlIds.length > 0) {
     const { data } = await supabase
       .from('customers')
       .select(`
+        crl_id,
         customer_id,
         customer_name,
         phone_number,
@@ -151,8 +153,8 @@ export default async function AgentDailyPreVisitsPage({
         visit_status
       `)
       .in(
-        'customer_id',
-        customerIds
+        'crl_id',
+        crlIds
       )
 
     customers = data ?? []
@@ -160,7 +162,7 @@ export default async function AgentDailyPreVisitsPage({
 
   const customerMap = new Map(
     customers.map((customer) => [
-      customer.customer_id,
+      customer.crl_id,
       customer,
     ])
   )

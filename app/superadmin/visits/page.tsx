@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { AlertCircle, CalendarDays, Eye, Inbox, MapPin, Route, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
+import ActivityViewPicker from '@/components/superadmin/ActivityViewPicker'
 import SuperadminState from '@/components/superadmin/SuperadminState'
 import SuperadminPagination from '@/components/superadmin/SuperadminPagination'
 import { getLocale } from '@/lib/i18n/server'
@@ -33,88 +34,46 @@ export default async function SuperadminVisitsPage({ searchParams }: { searchPar
   const { data: currentUser } = await supabase.from('agents').select('role, active').eq('email', email).maybeSingle()
   if (!currentUser || !currentUser.active || currentUser.role !== 'superadmin') redirect('/auth/route')
 
-  const [agentsResult, visitsResult, totalVisitsResult, mismatchResult] = await Promise.all([
-    supabase.from('agents').select('email, agent_name, active').eq('role', 'agent').order('agent_name'),
-    supabase.from('visits').select('agent_email, visit_status_kunjungan, location_match, visit_date'),
-    supabase.from('visits').select('*', { count: 'exact', head: true }),
-    supabase.from('visits').select('*', { count: 'exact', head: true }).eq('location_match', false),
-  ])
-
-  const loadError = agentsResult.error || visitsResult.error || totalVisitsResult.error || mismatchResult.error
-  if (loadError) {
-    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={loadError.message} /></div>
+  const { data: activity, error: activityError } = await supabase.rpc('crl_superadmin_activity_summary_v1', { p_kind: 'visits' })
+  if (activityError || !activity || typeof activity !== 'object' || Array.isArray(activity)) {
+    const message = activityError?.message ?? 'Visit summary unavailable'
+    console.error('superadmin/visits:', message)
+    return <div className={styles.page}><SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} /><SuperadminState tone="error" icon={AlertCircle} title={t('superadmin.visits.errorTitle')} description={message} /></div>
   }
-
-  const allAgents = (agentsResult.data ?? []) as AgentRow[]
-  const visits = (visitsResult.data ?? []) as VisitRow[]
-  const visitMap = new Map<string, VisitRow[]>()
-  for (const visit of visits) {
-    const key = (visit.agent_email || '').toLowerCase()
-    if (!key) continue
-    visitMap.set(key, [...(visitMap.get(key) ?? []), visit])
-  }
-
-  const matches = (agentEmail: string) => {
-    const rows = visitMap.get(agentEmail.toLowerCase()) ?? []
-    if (filter === 'all') return true
-    if (filter === 'none') return rows.length === 0
-    if (filter === 'gps') return rows.some((row) => row.location_match === false)
-    if (filter === 'met') return rows.some((row) => row.visit_status_kunjungan === 'Bertemu dengan pelanggan')
-    return rows.some((row) => row.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')
-  }
-
-  const filteredAgents = allAgents.filter((agent) => matches(agent.email))
+  type VisitAgentSummary = AgentRow & { total: number; met: number; absent: number; gps: number }
+  const summary = activity as unknown as { agents: VisitAgentSummary[]; totalVisits: number; todayVisits: number; gpsMismatches: number }
+  const allAgents = (summary.agents ?? []).filter((agent) => agent.active === true)
+  const matches = (agent: VisitAgentSummary) => filter === 'all' ||
+    (filter === 'none' && agent.total === 0) ||
+    (filter === 'gps' && agent.gps > 0) ||
+    (filter === 'met' && agent.met > 0) ||
+    (filter === 'absent' && agent.absent > 0)
+  const filteredAgents = allAgents.filter(matches)
   const totalAgents = filteredAgents.length
-  const totalPages = Math.max(1, Math.ceil(totalAgents / PAGE_SIZE))
-  const page = Math.min(requestedPage, totalPages)
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(totalAgents / PAGE_SIZE)))
   if (totalAgents > 0 && requestedPage !== page) redirect(`/superadmin/visits?mode=agent&filter=${filter}&page=${page}`)
   const agents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const agentData = agents.map((agent) => ({ ...agent, visit_count: (visitMap.get(agent.email.toLowerCase()) ?? []).length }))
-
+  const agentData = agents.map((agent) => ({ ...agent, visit_count: agent.total }))
   const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })
   const today = dateFormatter.format(new Date())
-  const todayVisits = visits.filter((visit) => dateFormatter.format(new Date(visit.visit_date)) === today).length
   const filters: { key: VisitFilter; label: string; count: number }[] = [
     { key: 'all', label: tx('All agents', 'Semua agen'), count: allAgents.length },
-    { key: 'met', label: tx('Met customer', 'Bertemu pelanggan'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Bertemu dengan pelanggan')).length },
-    { key: 'absent', label: tx('Customer absent', 'Pelanggan tidak di tempat'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.visit_status_kunjungan === 'Pelanggan tidak ada di tempat')).length },
-    { key: 'gps', label: tx('GPS mismatch', 'GPS tidak sesuai'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).some((v) => v.location_match === false)).length },
-    { key: 'none', label: tx('No visits', 'Belum ada kunjungan'), count: allAgents.filter((a) => (visitMap.get(a.email.toLowerCase()) ?? []).length === 0).length },
+    { key: 'met', label: tx('Met customer', 'Bertemu pelanggan'), count: allAgents.filter(a => a.met > 0).length },
+    { key: 'absent', label: tx('Customer absent', 'Pelanggan tidak di tempat'), count: allAgents.filter(a => a.absent > 0).length },
+    { key: 'gps', label: tx('GPS mismatch', 'GPS tidak sesuai'), count: allAgents.filter(a => a.gps > 0).length },
+    { key: 'none', label: tx('No visits', 'Belum ada kunjungan'), count: allAgents.filter(a => a.total === 0).length },
   ]
   const summaries = [
     { label: t('superadmin.visits.totalAgents'), value: allAgents.length, icon: Users, tone: 'purple' },
-    { label: t('superadmin.visits.totalVisits'), value: totalVisitsResult.count ?? 0, icon: MapPin, tone: 'blue' },
-    { label: tx('Visits Today', 'Kunjungan Hari Ini'), value: todayVisits, icon: CalendarDays, tone: 'green' },
-    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: mismatchResult.count ?? 0, icon: Route, tone: 'yellow' },
+    { label: t('superadmin.visits.totalVisits'), value: summary.totalVisits, icon: MapPin, tone: 'blue' },
+    { label: tx('Visits Today', 'Kunjungan Hari Ini'), value: summary.todayVisits, icon: CalendarDays, tone: 'green' },
+    { label: tx('GPS Mismatch', 'GPS Tidak Sesuai'), value: summary.gpsMismatches, icon: Route, tone: 'yellow' },
   ]
 
   return <div className={styles.page}>
     <SuperadminPageHeader breadcrumbs={[{ label: t('superadmin.bc.superadmin'), href: '/superadmin' }, { label: t('superadmin.bc.visits') }]} title={t('superadmin.visits.title')} description={t('superadmin.visits.description')} />
 
-    {mode !== 'agent' && (
-      <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-4 backdrop-blur-sm">
-        <div role="dialog" aria-modal="true" aria-labelledby="visit-view-title" className="w-full max-w-xl rounded-3xl border border-base-300 bg-base-100 p-6 shadow-2xl sm:p-8">
-          <div className="text-center">
-            <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-secondary/15 text-secondary"><CalendarDays className="size-7" /></div>
-            <h2 id="visit-view-title" className="text-2xl font-black">{tx('Choose Visit View', 'Pilih Tampilan Kunjungan')}</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-base-content/60">{tx('Review Visits across a date range, or continue with the existing agent-based monitor.', 'Tinjau Kunjungan dalam rentang tanggal, atau lanjutkan dengan monitoring berbasis agen.')}</p>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Link href={`/superadmin/visits/date?start=${today}&end=${today}`} className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-primary hover:bg-primary/5">
-              <CalendarDays className="mb-3 size-6 text-primary" />
-              <div className="font-black">{tx('View by Date Range', 'Lihat per Rentang Tanggal')}</div>
-              <div className="mt-1 text-xs leading-5 text-base-content/60">{tx('Choose WIB start and end dates, see every Supabase Visit field, and generate a filtered CSV report.', 'Pilih tanggal mulai dan akhir WIB, lihat semua field Visit dari Supabase, dan buat laporan CSV terfilter.')}</div>
-            </Link>
-            <Link href="/superadmin/visits?mode=agent&filter=all&page=1" className="group rounded-2xl border border-base-300 bg-base-100 p-5 transition hover:border-secondary hover:bg-secondary/5">
-              <Users className="mb-3 size-6 text-secondary" />
-              <div className="font-black">{tx('View by Agent', 'Lihat per Agen')}</div>
-              <div className="mt-1 text-xs leading-5 text-base-content/60">{tx('Use the current agent monitor, filters, daily activity, and record details.', 'Gunakan monitoring agen, filter, aktivitas harian, dan detail record.')}</div>
-            </Link>
-          </div>
-        </div>
-      </div>
-    )}
+    {mode !== 'agent' && <ActivityViewPicker kind="visits" today={today} locale={locale} />}
 
     <section className={styles.hero}><div><span className={styles.heroKicker}>{tx('FIELD MONITORING', 'MONITORING LAPANGAN')}</span><h2>{tx('Follow every visit journey.', 'Pantau setiap perjalanan kunjungan.')}</h2><p>{tx('Review agent activity, visit volume and location validation from one place.', 'Tinjau aktivitas agen, volume kunjungan, dan validasi lokasi dari satu tempat.')}</p></div><div className={styles.heroScene} aria-hidden="true"><span>📍</span><span>🛵</span><span>🏘️</span></div></section>
     <section className={styles.summaryGrid} aria-label={tx('Visit summary', 'Ringkasan kunjungan')}>{summaries.map(({ label, value, icon: Icon, tone }) => <article key={label} className={`${styles.summaryCard} ${styles[`tone_${tone}`]}`}><div className={styles.summaryIcon}><Icon aria-hidden="true" className="size-5" /></div><div><div className={styles.summaryValue}>{value}</div><div className={styles.summaryLabel}>{label}</div></div></article>)}</section>

@@ -25,12 +25,12 @@ export default async function CustomerLayout({
     const { data } = await supabase
       .from('customers')
       .select('crl_id,customer_id,speed,speed_test_download_mbps,speed_test_upload_mbps')
-      .eq(customerLookupColumn, decodedCustomerId)
+      .eq('crl_id', decodedCustomerId)
       .ilike('agent_email', user.email.trim())
       .maybeSingle()
 
-    resolvedCustomerId = data?.customer_id || decodedCustomerId
-    resolvedCrlId = data?.crl_id || resolvedCrlId
+    resolvedCustomerId = data?.customer_id || ''
+    resolvedCrlId = data?.crl_id || decodedCustomerId
     speed = data?.speed == null ? null : Number(data.speed)
     download = data?.speed_test_download_mbps == null ? null : Number(data.speed_test_download_mbps)
     upload = data?.speed_test_upload_mbps == null ? null : Number(data.speed_test_upload_mbps)
