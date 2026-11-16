@@ -24,7 +24,7 @@ type CustomerRow = {
   crl_id: string
   customer_id: string
   customer_name: string
-  priority_rank: number | null
+  priority_rank: string | null
   phone_number: string | null
   service_address: string | null
   city: string | null
@@ -53,6 +53,11 @@ const PRIORITY_STYLES: Record<number, { badge: string; ring: string }> = {
   3: { badge: 'dui-badge-info dui-badge-soft', ring: 'border-info/30' },
   4: { badge: 'dui-badge-ghost', ring: 'border-base-300' },
   5: { badge: 'dui-badge-ghost', ring: 'border-base-300' },
+}
+
+function priorityNumber(priority: string | null): number | null {
+  const match = priority?.trim().toUpperCase().match(/^P([1-5])$/)
+  return match ? Number(match[1]) : null
 }
 
 function badgeClass(priority: number | null) {
@@ -218,14 +223,14 @@ export default function AgentCustomersPage() {
           : (customer.payment_status ?? '').trim().toLowerCase() !== 'paid')
 
       const matchesPriority =
-        priorityFilter === 'all' || String(customer.priority_rank ?? '') === priorityFilter
+        priorityFilter === 'all' || customer.priority_rank?.trim().toUpperCase() === `P${priorityFilter}`
 
       return matchesSearch && matchesPayment && matchesPriority
     })
 
     return [...list].sort((a, b) =>
       sort === 'priority'
-        ? (a.priority_rank ?? 99) - (b.priority_rank ?? 99)
+        ? (priorityNumber(a.priority_rank) ?? 99) - (priorityNumber(b.priority_rank) ?? 99)
         : sort === 'churn'
           ? (a.days_left_to_churn ?? 999) - (b.days_left_to_churn ?? 999)
           : (a.customer_name ?? '').localeCompare(b.customer_name ?? '')
@@ -588,7 +593,7 @@ function CustomerCardBody({
   customer: CustomerRow
   visited: boolean
 }) {
-  const priority = customer.priority_rank
+  const priority = priorityNumber(customer.priority_rank)
   const area =
     customer.sub_district ||
     customer.district ||
