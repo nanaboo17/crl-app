@@ -1,11 +1,37 @@
 .page {
   width: 100%;
   max-width: 82rem;
+  min-width: 0;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
   display: grid;
-  gap: 1.5rem;
+  gap: 1.15rem;
 }
+
+/* Never size controls against the viewport: the sidebar reduces available space. */
+.filterPanel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto;
+  align-items: end;
+  gap: .75rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: 1rem;
+  background: var(--color-base-100);
+  box-shadow: 0 5px 16px rgba(93, 63, 211, .04);
+}
+
+.filterField {
+  display: grid;
+  min-width: 0;
+  gap: .35rem;
+  color: var(--color-base-content);
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.filterField select { max-width: 100%; }
 
 .addButton {
   display: inline-flex;
@@ -22,89 +48,25 @@
   box-shadow: 0 8px 20px rgba(96, 63, 175, .18);
 }
 
-.heroCard {
-  position: relative;
-  overflow: hidden;
-  min-height: 12.5rem;
-  display: grid;
-  grid-template-columns: 1.25fr .75fr;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.7rem 1.8rem;
-  border: 1px solid #efe2b8;
-  border-radius: 1.75rem;
-  background: linear-gradient(135deg, #fffdf5 0%, #fff8db 48%, #eef8e8 100%);
-  box-shadow: 0 14px 34px rgba(93, 63, 211, .08);
-}
-
-.heroEyebrow,
-.sectionHeading span {
-  color: #7f67a6;
-  font-size: .68rem;
-  font-weight: 900;
-  letter-spacing: .13em;
-}
-
-.heroCard h2 {
-  max-width: 34rem;
-  margin: .45rem 0 .45rem;
-  color: #542e9e;
-  font-size: clamp(1.45rem, 3vw, 2rem);
-  line-height: 1.15;
-}
-
-.heroCard p {
-  max-width: 36rem;
-  margin: 0;
-  color: #655d72;
-  font-size: .9rem;
-  line-height: 1.6;
-}
-
-.heroVisual {
-  position: relative;
-  min-height: 9.5rem;
-}
-
-.heroSun {
-  position: absolute;
-  right: 1rem;
-  top: .25rem;
-  width: 3.2rem;
-  height: 3.2rem;
-  border-radius: 999px;
-  background: #ffd95b;
-  box-shadow: 0 0 0 .8rem rgba(255, 217, 91, .13);
-}
-
-.heroHill {
-  position: absolute;
-  right: -2rem;
-  bottom: -3rem;
-  width: 120%;
-  height: 9rem;
-  border-radius: 50% 50% 0 0;
-  background: linear-gradient(180deg, #cce9a8, #aad57d);
-}
-
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+  min-width: 0;
+  gap: .75rem;
 }
 
 .summaryCard {
   min-width: 0;
-  min-height: 10.5rem;
-  padding: 1.15rem;
+  min-height: 8.25rem;
+  padding: 1rem;
   border: 1px solid rgba(80, 54, 123, .08);
-  border-radius: 1.5rem;
+  border-radius: 1.15rem;
   box-shadow: 0 8px 22px rgba(93, 63, 211, .07);
 }
 
 .summaryCard span {
   display: block;
-  margin-top: .85rem;
+  margin-top: .55rem;
   color: #655d72;
   font-size: .78rem;
   font-weight: 800;
@@ -127,8 +89,8 @@
 
 .summaryIcon,
 .summaryEmoji {
-  width: 3.2rem;
-  height: 3.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   display: grid;
   place-items: center;
   border-radius: 1rem;
@@ -144,7 +106,8 @@
 .blueCard { background: linear-gradient(180deg, #edf7ff, #e3f0fb); }
 
 .rosterCard {
-  padding: 1.15rem;
+  min-width: 0;
+  padding: 1rem;
   border: 1px solid #efe5ca;
   border-radius: 1.6rem;
   background: rgba(255, 254, 249, .94);
@@ -176,6 +139,8 @@
 }
 
 .tableCard {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid #eee7dc;
   border-radius: 1.2rem;
@@ -287,22 +252,22 @@
   outline-offset: 3px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1350px) {
+  .filterPanel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .filterPanel > button, .filterPanel > a { justify-self: start; }
+}
+
+@media (max-width: 1100px) {
+  .filterPanel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .heroCard { grid-template-columns: 1fr .65fr; }
 }
 
 @media (max-width: 767px) {
   .page { padding: 1rem; gap: 1rem; }
-  .heroCard { grid-template-columns: 1fr; min-height: 0; padding: 1rem 1.1rem; gap: .35rem; border-radius: 1.4rem; }
-  .heroCard h2 { font-size: 1.2rem; line-height: 1.2; max-width: 22rem; margin: .3rem 0; }
-  .heroCard p { font-size: .79rem; line-height: 1.45; max-width: 23rem; }
-  .heroEyebrow { font-size: .61rem; }
-  .heroVisual { min-height: 3.2rem; }
-  .heroSun { width: 2.5rem; height: 2.5rem; top: -.25rem; right: 1rem; }
-  .heroHill { height: 5rem; bottom: -4rem; right: -1.1rem; width: 110%; }
-  .statsGrid { grid-template-columns: 1fr 1fr; gap: .75rem; }
-  .summaryCard { min-height: 8rem; padding: .8rem; border-radius: 1.2rem; }
+  .filterPanel { grid-template-columns: minmax(0, 1fr); }
+  .filterPanel > button, .filterPanel > a { width: 100%; justify-self: stretch; }
+  .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+  .summaryCard { min-height: 7.5rem; padding: .8rem; border-radius: 1rem; }
   .summaryCard strong { font-size: 1.65rem; }
   .tableCard { display: none; }
   .mobileList { display: block; border: 1px solid #eee7dc; border-radius: 1.15rem; background: white; overflow: hidden; }
