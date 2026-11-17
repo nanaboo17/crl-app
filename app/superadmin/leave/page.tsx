@@ -162,7 +162,7 @@ export default function LeaveApprovalsPage() {
               <Search size={16} className="shrink-0 opacity-50"/>
               <input className="min-w-0 grow" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari agent atau alasan…" aria-label="Cari pengajuan"/>
             </label>
-            <select className="dui-select dui-select-bordered" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter status">
+            <select className="dui-select dui-select-bordered !min-h-8 " value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter status">
               <option value="all">{tx('Semua status','All statuses')}</option>
               <option value="pending">{tx('Menunggu','Pending')}</option>
               <option value="approved">{tx('Disetujui','Approved')}</option>
