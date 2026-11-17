@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { CalendarDays, CheckCircle2, Clock3, FileText, Search, ShieldCheck, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { useI18n } from '@/components/providers/i18n-provider'
@@ -129,7 +130,7 @@ export default function LeaveApprovalsPage() {
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 p-4 pb-10 sm:p-6 lg:p-8">
       <div className="space-y-3">
-        <Link href="/superadmin/attendance" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">← Kembali ke Attendance</Link>
+        <Link href="/superadmin/attendance" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"> <ArrowLeft className="h-4 w-4" /> Kembali ke Attendance</Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60"><ShieldCheck size={16}/> Attendance Management</div>
