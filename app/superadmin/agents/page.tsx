@@ -115,22 +115,10 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
         actions={<Link href="/superadmin/agents/new" className={styles.addButton}><UserPlus aria-hidden="true" className="size-4" />{tx('Add Agent', 'Tambah Agen')}</Link>}
       />
 
-      <section className={styles.heroCard}>
-        <div>
-          <span className={styles.heroEyebrow}>{tx('TEAM MANAGEMENT', 'MANAJEMEN TIM')}</span>
-          <h2>{tx('Keep every agent ready for the field.', 'Pastikan setiap agen siap turun ke lapangan.')}</h2>
-          <p>{tx('Review active accounts, role coverage, and agent details from one place.', 'Tinjau akun aktif, cakupan peran, dan detail agen dari satu tempat.')}</p>
-        </div>
-        <div className={styles.heroVisual} aria-hidden="true">
-          <div className={styles.heroSun} />
-          <div className={styles.heroHill} />
-        </div>
-      </section>
-
-      <form method="get" className="grid gap-3 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto_auto] lg:items-end">
-        <label className="grid gap-1 text-sm font-semibold">
+      <form method="get" className={styles.filterPanel}>
+        <label className={styles.filterField}>
           <span>{tx('Organization', 'Organisasi')}</span>
-          <select name="organization" defaultValue={selectedOrganization} className="dui-select dui-select-bordered w-full">
+          <select name="organization" defaultValue={selectedOrganization} className="dui-select dui-select-bordered dui-select-sm w-full min-w-0">
             <option value="">{tx('All organizations', 'Semua organisasi')}</option>
             {organizations.map((organization) => <option key={organization} value={organization}>{organization}</option>)}
           </select>
@@ -149,8 +137,8 @@ export default async function ManageAgentsPage({ searchParams }: { searchParams:
             {leadOptions.map((lead) => <option key={lead.email} value={lead.email}>{lead.name}</option>)}
           </select>
         </label>
-        <button type="submit" className="dui-btn dui-btn-primary">{tx('Apply filter', 'Terapkan filter')}</button>
-        {filterQuery ? <Link href="/superadmin/agents" className="dui-btn dui-btn-ghost">{tx('Clear', 'Hapus')}</Link> : null}
+        <button type="submit" className="dui-btn dui-btn-primary dui-btn-sm">{tx('Apply filter', 'Terapkan filter')}</button>
+        {filterQuery ? <Link href="/superadmin/agents" className="dui-btn dui-btn-ghost dui-btn-sm">{tx('Clear', 'Hapus')}</Link> : null}
       </form>
 
       <section className={styles.statsGrid} aria-label={tx('Agent summary', 'Ringkasan agen')}>
