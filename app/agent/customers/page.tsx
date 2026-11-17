@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   Building2,
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   MapPin,
   RotateCcw,
+  RefreshCcw,
   Search,
   UserRound,
   Users,
@@ -36,6 +37,52 @@ type CustomerRow = {
   days_left_to_churn: number | null
   customer_status: string | null
   visit_status: string | null
+}
+
+type ActivityRow = {
+  crl_id: string | null
+  customer_id: string | null
+  activity_date: string | null
+}
+
+// Date-only comparisons use the Jakarta business day, not the viewer's local timezone.
+function jakartaDate(value = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(value)
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+function activityDay(value: string | null): string | null {
+  if (!value) return null
+  // Postgres date-only strings are already calendar dates.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : jakartaDate(parsed)
+}
+
+function activityDates(rows: ActivityRow[]): Map<string, string> {
+  const dates = new Map<string, string>()
+  for (const row of rows) {
+    const key = row.crl_id || (row.customer_id ? `customer:${row.customer_id}` : '')
+    const day = activityDay(row.activity_date)
+    if (!key || !day) continue
+    if (!dates.has(key) || day < dates.get(key)!) dates.set(key, day)
+  }
+  return dates
+}
+
+function reengagementEntry(customer: CustomerRow, contacts: Map<string, string>, today: string): string | null {
+  const churn = customer.estimated_churn_date?.slice(0, 10)
+  if (!churn || churn.slice(0, 7) !== today.slice(0, 7)) return null
+  if (paymentBadge(customer.payment_status).state === 'paid') return null
+  // Do not match another case month's history when this customer has a CRL ID.
+  const firstContact = contacts.get(customer.crl_id)
+  if (!firstContact) return null
+  const startOfChurnMonth = `${churn.slice(0, 7)}-01`
+  const entry = firstContact > startOfChurnMonth ? firstContact : startOfChurnMonth
+  return entry <= today ? entry : null
 }
 
 type AgentRow = {
@@ -103,11 +150,25 @@ export default function AgentCustomersPage() {
   const [pendingPage, setPendingPage] = useState(1)
   const [visitedPage, setVisitedPage] = useState(1)
   const [preVisitedPage, setPreVisitedPage] = useState(1)
-  const [activeTab, setActiveTab] = useState<'customers' | 'previsited' | 'visited'>('customers')
+  const [reengagementPage, setReengagementPage] = useState(1)
+  const [activeTab, setActiveTab] = useState<'customers' | 'previsited' | 'visited' | 'reengagement'>('customers')
+  const selectedInitialTab = useRef(false)
+  const [todayWib, setTodayWib] = useState(() => jakartaDate())
+  const [contactDates, setContactDates] = useState<Map<string, string>>(new Map())
   const [preVisitedKeys, setPreVisitedKeys] = useState<Set<string>>(new Set())
   const [visitedKeys, setVisitedKeys] = useState<Set<string>>(new Set())
 
   const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    const refreshDate = () => setTodayWib(jakartaDate())
+    const interval = window.setInterval(refreshDate, 60_000)
+    document.addEventListener('visibilitychange', refreshDate)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', refreshDate)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -166,14 +227,14 @@ export default function AgentCustomersPage() {
               .order('crl_id', { ascending: true })
               .range(from, to)
           ),
-          fetchBatches<{ crl_id: string | null; customer_id: string | null }>((from, to) =>
-            supabase.from('pre_visits').select('crl_id, customer_id')
+          fetchBatches<{ crl_id: string | null; customer_id: string | null; created_at: string | null }>((from, to) =>
+            supabase.from('pre_visits').select('crl_id, customer_id, created_at')
               .eq('agent_email', email)
               .order('previsit_id', { ascending: true })
               .range(from, to)
           ),
-          fetchBatches<{ crl_id: string | null; customer_id: string | null }>((from, to) =>
-            supabase.from('visits').select('crl_id, customer_id')
+          fetchBatches<{ crl_id: string | null; customer_id: string | null; visit_date: string | null }>((from, to) =>
+            supabase.from('visits').select('crl_id, customer_id, visit_date')
               .eq('agent_email', email)
               .order('visit_id', { ascending: true })
               .range(from, to)
@@ -186,6 +247,10 @@ export default function AgentCustomersPage() {
         setCustomers(customerData)
         setPreVisitedKeys(keys(preVisits))
         setVisitedKeys(keys(visits))
+        setContactDates(activityDates([
+          ...preVisits.map((row) => ({ crl_id: row.crl_id, customer_id: row.customer_id, activity_date: row.created_at })),
+          ...visits.map((row) => ({ crl_id: row.crl_id, customer_id: row.customer_id, activity_date: row.visit_date })),
+        ]))
       } catch (cause) {
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : tx('Unable to load customers.', 'Gagal memuat pelanggan.'))
@@ -203,6 +268,7 @@ export default function AgentCustomersPage() {
     setPendingPage(1)
     setVisitedPage(1)
     setPreVisitedPage(1)
+    setReengagementPage(1)
   }, [search, paymentFilter, priorityFilter, sort])
 
   const filtered = useMemo(() => {
@@ -248,9 +314,24 @@ export default function AgentCustomersPage() {
   const allPending = filtered.filter((customer) => stageOf(customer) === 'customers')
   const allPreVisited = filtered.filter((customer) => stageOf(customer) === 'previsited')
   const allVisited = filtered.filter((customer) => stageOf(customer) === 'visited')
-  const displayed = activeTab === 'visited' ? allVisited : activeTab === 'previsited' ? allPreVisited : allPending
-  const currentPage = activeTab === 'visited' ? visitedPage : activeTab === 'previsited' ? preVisitedPage : pendingPage
-  const setCurrentPage = activeTab === 'visited' ? setVisitedPage : activeTab === 'previsited' ? setPreVisitedPage : setPendingPage
+  // customers already come from the agent-assigned, actionable=true query.
+  const allReengagement = filtered
+    .filter((customer) => reengagementEntry(customer, contactDates, todayWib) !== null)
+    .sort((a, b) => {
+      // Churn urgency is the default sorting for recovery, regardless of existing tab sort.
+      if (sort === 'name') return (a.customer_name ?? '').localeCompare(b.customer_name ?? '')
+      return (a.estimated_churn_date ?? '').localeCompare(b.estimated_churn_date ?? '')
+    })
+
+  useEffect(() => {
+    if (loading || selectedInitialTab.current) return
+    selectedInitialTab.current = true
+    if (allReengagement.length > 0) setActiveTab('reengagement')
+  }, [loading, allReengagement.length])
+
+  const displayed = activeTab === 'reengagement' ? allReengagement : activeTab === 'visited' ? allVisited : activeTab === 'previsited' ? allPreVisited : allPending
+  const currentPage = activeTab === 'reengagement' ? reengagementPage : activeTab === 'visited' ? visitedPage : activeTab === 'previsited' ? preVisitedPage : pendingPage
+  const setCurrentPage = activeTab === 'reengagement' ? setReengagementPage : activeTab === 'visited' ? setVisitedPage : activeTab === 'previsited' ? setPreVisitedPage : setPendingPage
   const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
   const start = (safePage - 1) * PAGE_SIZE
@@ -264,6 +345,7 @@ export default function AgentCustomersPage() {
     { label: tx('Customers', 'Pelanggan'), value: allPending.length, icon: MapPin, current: activeTab === 'customers' },
     { label: tx('Pre-visited', 'Pra-kunjungan'), value: allPreVisited.length, icon: ClipboardList, current: activeTab === 'previsited' },
     { label: tx('Visited', 'Dikunjungi'), value: allVisited.length, icon: ClipboardList, current: activeTab === 'visited' },
+    { label: 'Re-Engagement', value: allReengagement.length, icon: RefreshCcw, current: activeTab === 'reengagement' },
   ]
 
   return (
@@ -460,22 +542,28 @@ export default function AgentCustomersPage() {
           ['customers', tx('Customers', 'Pelanggan'), allPending.length],
           ['previsited', tx('Pre-visited', 'Pra-kunjungan'), allPreVisited.length],
           ['visited', tx('Visited', 'Dikunjungi'), allVisited.length],
+          ['reengagement', 'Re-Engagement', allReengagement.length],
         ] as const).map(([key, label, count]) => (
           <button key={key} type="button" role="tab" aria-selected={activeTab === key}
-            onClick={() => setActiveTab(key)}
+            onClick={() => { selectedInitialTab.current = true; setActiveTab(key) }}
             className={`dui-tab h-auto min-h-11 flex-1 gap-2 rounded-lg px-3 py-2 ${activeTab === key ? 'dui-tab-active bg-primary text-primary-content' : ''}`}>
             {label} <span className="dui-badge dui-badge-sm">{count}</span>
           </button>
         ))}
       </div>
 
+      {activeTab === 'reengagement' && !loading && (
+        <div className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-base-content" role="status">
+          <strong>{tx('Recovery first', 'Prioritaskan pemulihan')}</strong> · {tx('Unpaid, actionable customers previously contacted and estimated to churn this month. Sorted by nearest churn date.', 'Pelanggan belum bayar, masih actionable, sudah dihubungi, dan estimasi churn bulan ini. Diurutkan berdasarkan tanggal churn terdekat.')}
+        </div>
+      )}
       {loading ? (
         <CustomerSkeleton t={t} />
       ) : (
         <>
           <CustomerSection t={t}
-            title={activeTab === 'customers' ? tx('Customers — Not yet pre-visited', 'Pelanggan — Belum pra-kunjungan') : activeTab === 'previsited' ? tx('Pre-visited — Not yet visited', 'Sudah pra-kunjungan — Belum dikunjungi') : tx('Visited customers', 'Pelanggan sudah dikunjungi')}
-            count={displayed.length} customers={pageCustomers} visited={activeTab === 'visited'} />
+            title={activeTab === 'reengagement' ? tx('Re-Engagement — Recovery Priority', 'Re-Engagement — Prioritas Pemulihan') : activeTab === 'customers' ? tx('Customers — Not yet pre-visited', 'Pelanggan — Belum pra-kunjungan') : activeTab === 'previsited' ? tx('Pre-visited — Not yet visited', 'Sudah pra-kunjungan — Belum dikunjungi') : tx('Visited customers', 'Pelanggan sudah dikunjungi')}
+            count={displayed.length} customers={pageCustomers} visited={activeTab === 'visited'} reengagement={activeTab === 'reengagement'} />
           <SectionPagination label={tx('Customer stage pagination', 'Halaman tahap pelanggan')}
             totalItems={displayed.length} page={safePage} totalPages={totalPages} start={start} setPage={setCurrentPage} />
         </>
@@ -545,12 +633,14 @@ function CustomerSection({
   count,
   customers,
   visited,
+  reengagement = false,
 }: {
   t: (key: string, params?: Record<string, string | number>) => string
   title: string
   count: number
   customers: CustomerRow[]
   visited: boolean
+  reengagement?: boolean
 }) {
   return (
     <section aria-label={title}>
@@ -567,7 +657,7 @@ function CustomerSection({
                 href={`/agent/customers/${encodeURIComponent(customer.crl_id)}`}
                 className="dui-list-row dui-list-col-grow hover:bg-base-200 transition-colors"
               >
-                <CustomerCardBody t={t} customer={customer} visited={visited} />
+                <CustomerCardBody t={t} customer={customer} visited={visited} reengagement={reengagement} />
               </Link>
             </li>
           ))}
@@ -576,7 +666,7 @@ function CustomerSection({
         <div className="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-10 text-center">
           <p className="font-semibold text-base-content">{t('agent.customers.emptyTitle')}</p>
           <p className="mt-1 text-sm text-base-content/60">
-            {visited ? t('agent.customers.emptyVisited') : t('agent.customers.emptyPending')}
+            {reengagement ? 'No eligible customers for Re-Engagement this month.' : visited ? t('agent.customers.emptyVisited') : t('agent.customers.emptyPending')}
           </p>
         </div>
       )}
@@ -588,10 +678,12 @@ function CustomerCardBody({
   t,
   customer,
   visited,
+  reengagement = false,
 }: {
   t: (key: string, params?: Record<string, string | number>) => string
   customer: CustomerRow
   visited: boolean
+  reengagement?: boolean
 }) {
   const priority = priorityNumber(customer.priority_rank)
   const area =
@@ -623,13 +715,15 @@ function CustomerCardBody({
         <div className="flex flex-wrap items-center gap-2">
           <span className="dui-badge dui-badge-sm">P{priority ?? '-'}</span>
           <span className="truncate font-bold text-base-content">{customer.customer_name}</span>
-          {!visited && (
+          {reengagement && <span className="dui-badge dui-badge-sm dui-badge-warning dui-badge-soft">Re-Engagement</span>}
+          {(!visited || reengagement) && (
             <span className={`dui-badge dui-badge-sm ${badgeClass(priority)}`}>{color}</span>
           )}
         </div>
         <p className="mt-0.5 truncate text-sm text-base-content/60">
           {customer.customer_id} · {area}
         </p>
+        {reengagement && <p className="mt-1 text-xs font-medium text-warning">{t('agent.customers.daysUnit', { days: customer.days_left_to_churn ?? 0 })} · {customer.estimated_churn_date?.slice(0, 10) ?? '-'}</p>}
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="inline-flex items-center gap-1 font-semibold text-base-content">
             <MapPin className="h-3.5 w-3.5 text-base-content/40" aria-hidden="true" />
