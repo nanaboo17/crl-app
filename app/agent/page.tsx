@@ -7,6 +7,8 @@ import {
   ArrowRight,
   CheckCircle2,
   RefreshCcw,
+  Trophy,
+  Sparkles,
   LayoutDashboard,
   MapPin,
   Route,
@@ -20,6 +22,22 @@ import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import { getComplaintTickets } from '@/lib/complaints'
 import styles from './page.module.css'
+
+function jakartaMondayKey(now = new Date()) {
+  // Group weeks by Monday in Asia/Jakarta, even when the server runs in UTC.
+  const today = jakartaDateKey(now)
+  const [year, month, day] = today.split('-').map(Number)
+  const utc = new Date(Date.UTC(year, month - 1, day))
+  const daysSinceMonday = (utc.getUTCDay() + 6) % 7
+  utc.setUTCDate(utc.getUTCDate() - daysSinceMonday)
+  return utc.toISOString().slice(0, 10)
+}
+
+function mondayPlusDays(monday: string, days: number) {
+  const date = new Date(`${monday}T00:00:00.000Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
 
 function jakartaDateKey(value: string | Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -54,7 +72,7 @@ export default async function AgentPage() {
     supabase.from('visits').select('*', { count: 'exact', head: true }).eq('agent_email', email),
     supabase.from('customers').select('crl_id,customer_id,customer_name,priority_rank,days_left_to_churn,invoice_amount,payment_status,visit_status,city,district,sub_district').eq('agent_email', email).eq('actionable', true),
     supabase.from('customer_followups').select('followup_id,crl_id,customer_id,due_at,note,status').eq('agent_email', email).eq('status', 'pending').order('due_at', { ascending: true }).limit(5),
-    supabase.from('visits').select('visit_id,visit_date,location_match,visit_photo_url,consent_given,conversation_result,updated_phone').eq('agent_email', email).order('visit_date', { ascending: false }),
+    supabase.from('visits').select('visit_id,crl_id,customer_id,visit_date,location_match,visit_photo_url,consent_given,conversation_result,updated_phone').eq('agent_email', email).order('visit_date', { ascending: false }),
     supabase.from('customers').select('customer_id,customer_name').eq('agent_email', email),
   ])
 
@@ -85,6 +103,30 @@ export default async function AgentPage() {
   const monthKey = jakartaDateKey(new Date()).slice(0, 7)
   const monthVisits = allVisits.filter((row: any) => row.visit_date && jakartaDateKey(row.visit_date).startsWith(monthKey))
   const evidencedVisits = monthVisits.filter((row: any) => row.location_match === true && Boolean(row.visit_photo_url)).length
+  // Weekly challenge counts distinct customer cases with a recorded recovery
+  // conversation and supporting visit evidence; it is NOT a billing-verified save.
+  const monday = jakartaMondayKey()
+  const nextMonday = mondayPlusDays(monday, 7)
+  const weeklyRecoveryCases = new Set(
+    allVisits
+      .filter((visit: any) => {
+        if (!visit.visit_date) return false
+        const visitDay = jakartaDateKey(visit.visit_date)
+        const hasEvidence = visit.location_match === true && Boolean(visit.visit_photo_url)
+        const recoveryResult = ['Sudah melakukan pembayaran', 'Bersedia bayar / Promise to Pay'].includes(
+          String(visit.conversation_result ?? '').trim()
+        )
+        return visitDay >= monday && visitDay < nextMonday && hasEvidence && recoveryResult
+      })
+      .map((visit: any) => String(visit.crl_id || (visit.customer_id ? `customer:${visit.customer_id}` : '')))
+      .filter(Boolean)
+  )
+  const weeklyRecoveryCount = weeklyRecoveryCases.size
+  const weeklyRecoveryTarget = 3
+  const weeklyRecoveryProgress = Math.min(100, Math.round(weeklyRecoveryCount / weeklyRecoveryTarget * 100))
+  const weeklyRecoveryRemaining = Math.max(0, weeklyRecoveryTarget - weeklyRecoveryCount)
+  const weeklyBadgeEarned = weeklyRecoveryCount >= weeklyRecoveryTarget
+
   const unlockTarget = 165 // Full-month proposal: 50% of 330; prorating needs verified first check-in.
   const fullTarget = 330
   const progress = Math.min(100, Math.round(evidencedVisits / fullTarget * 100))
@@ -191,6 +233,43 @@ export default async function AgentPage() {
           </Link>
         </div>
         <p className="mt-4 text-xs text-base-content/60">{tx('Commission preview: Rp20,000 for a verified call save or Rp50,000 for a verified visit save, subject to approved rules. Earnings are not calculated here yet.', 'Gambaran komisi: Rp20.000 untuk save via telepon atau Rp50.000 untuk save setelah visit yang terverifikasi, sesuai aturan yang disetujui. Nominal penghasilan belum dihitung otomatis.')}</p>
+      </section>
+
+      <section className="rounded-3xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5" aria-label={tx('Recovery challenge of the week', 'Tantangan Recovery Minggu Ini')}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-warning/15 text-warning"><Trophy className="h-6 w-6" aria-hidden="true" /></div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-primary">{tx('Weekly Challenge', 'Tantangan Mingguan')}</p>
+              <h2 className="mt-1 text-lg font-bold">{tx('Recovery of the Week', 'Recovery Minggu Ini')}</h2>
+              <p className="mt-1 text-sm text-base-content/65">{weeklyBadgeEarned
+                ? tx('Great work! You reached your weekly recovery-action goal.', 'Keren! Target progres recovery minggu ini tercapai.')
+                : weeklyRecoveryCount === 0
+                  ? tx('Start with one customer you can help toward payment.', 'Mulai dari satu pelanggan yang bisa kamu bantu menuju pembayaran.')
+                  : tx(`Just ${weeklyRecoveryRemaining} more customers to your weekly badge!`, `Tinggal ${weeklyRecoveryRemaining} pelanggan lagi untuk badge mingguan!`)}</p>
+            </div>
+          </div>
+          {weeklyBadgeEarned ? <span className="dui-badge dui-badge-success gap-1"><Sparkles className="h-3 w-3" aria-hidden="true" />{tx('Badge earned', 'Badge tercapai')}</span> : null}
+        </div>
+        <div className="mt-4 rounded-2xl bg-base-200/65 p-4">
+          <div className="flex items-end justify-between gap-3">
+            <div><strong className="text-2xl font-extrabold tabular-nums">{weeklyRecoveryCount} <span className="text-base font-medium text-base-content/55">/ {weeklyRecoveryTarget}</span></strong><p className="text-xs text-base-content/65">{tx('Customers with evidenced recovery progress this week', 'Pelanggan dengan progres recovery berbukti minggu ini')}</p></div>
+            <span className="text-xs font-semibold text-base-content/70">{Math.min(weeklyRecoveryCount, weeklyRecoveryTarget)}/{weeklyRecoveryTarget}</span>
+          </div>
+          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-base-300" role="progressbar" aria-label={tx('Weekly recovery challenge progress', 'Progres tantangan recovery mingguan')} aria-valuemin={0} aria-valuemax={weeklyRecoveryTarget} aria-valuenow={Math.min(weeklyRecoveryCount, weeklyRecoveryTarget)}>
+            <div className="h-full rounded-full bg-warning transition-all" style={{ width: `${weeklyRecoveryProgress}%` }} />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-base-content/65">{tx('Milestones:', 'Milestone:')}</span>
+            {[1, 2, 3].map((milestone) => <span key={milestone} className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${weeklyRecoveryCount >= milestone ? 'border-success/30 bg-success/10 text-success' : 'border-base-300 bg-base-100 text-base-content/55'}`}>{weeklyRecoveryCount >= milestone ? <CheckCircle2 className="h-4 w-4" aria-label={tx('Complete', 'Selesai')} /> : milestone}</span>)}
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-xl text-xs text-base-content/65">{tx('Counts unique customers with GPS-matched photo visits and recorded Paid/PTP outcomes, Monday–Sunday (Jakarta). Not a verified save or commission; billing must confirm payment.', 'Menghitung pelanggan unik dengan kunjungan GPS cocok, foto, dan hasil Paid/PTP tercatat, Senin–Minggu (WIB). Ini bukan save atau komisi terverifikasi; pembayaran harus dikonfirmasi billing.')}</p>
+          <Link href="/agent/customers" className="dui-btn dui-btn-primary dui-btn-sm gap-2">
+            <RefreshCcw className="h-4 w-4" aria-hidden="true" />{tx('Follow up Re-Engagement', 'Follow-up Re-Engagement')}<ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
       </section>
 
       <section aria-label={t('agent.dashboard.statsAria')} className={styles.statsGrid}>
