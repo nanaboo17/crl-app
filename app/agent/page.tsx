@@ -1,18 +1,15 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
-  BadgeCheck,
   Building2,
   ClipboardList,
   Clock3,
-  Flame,
+  ArrowRight,
+  CheckCircle2,
+  RefreshCcw,
   LayoutDashboard,
   MapPin,
-  Medal,
   Route,
-  Sparkles,
-  Target,
-  Trophy,
   TicketCheck,
   UserRound,
 } from 'lucide-react'
@@ -24,8 +21,6 @@ import { allMessages } from '@/lib/i18n/messages'
 import { getComplaintTickets } from '@/lib/complaints'
 import styles from './page.module.css'
 
-const LEVEL_XP = 250
-
 function jakartaDateKey(value: string | Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
@@ -35,25 +30,6 @@ function jakartaDateKey(value: string | Date) {
   }).formatToParts(new Date(value))
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
   return `${get('year')}-${get('month')}-${get('day')}`
-}
-
-function previousWorkdayKey(dateKey: string) {
-  const [year, month, day] = dateKey.split('-').map(Number)
-  const date = new Date(Date.UTC(year, month - 1, day))
-
-  do {
-    date.setUTCDate(date.getUTCDate() - 1)
-  } while (date.getUTCDay() === 0 || date.getUTCDay() === 6)
-
-  return date.toISOString().slice(0, 10)
-}
-
-function normalizeAttendanceStatus(value: unknown) {
-  return String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')
-}
-
-function isOnTimeAttendance(row: any) {
-  return Boolean(row?.check_in_at) && normalizeAttendanceStatus(row?.check_in_status) === 'on_time'
 }
 
 export default async function AgentPage() {
@@ -104,67 +80,15 @@ export default async function AgentPage() {
     { href: '/agent/complaints', label: tx('Complaint Tickets', 'Tiket Keluhan'), count: complaintTickets.length, icon: TicketCheck },
   ]
 
+  // This is a preview of documented visits, NOT the final commission-valid visit count.
+  // Billing timestamps, GPS-distance validation and payouts require separate verification.
   const allVisits = visitDetailsResult.data ?? []
-  const attendance = attendanceResult.data ?? []
-  const todayKey = jakartaDateKey(new Date())
-  const todayVisits = allVisits.filter((row: any) => jakartaDateKey(row.visit_date) === todayKey)
-  const todayAttendance = attendance.find((row: any) => row.attendance_date === todayKey)
-
-  const isProductive = (row: any) => row.location_match !== false && Boolean(row.visit_photo_url) && row.consent_given === true
-  const productiveVisits = allVisits.filter(isProductive).length
-  const productiveToday = todayVisits.filter(isProductive).length
-  const phoneValidations = allVisits.filter((row: any) => Boolean(row.updated_phone)).length
-  const phoneValidationsToday = todayVisits.filter((row: any) => Boolean(row.updated_phone)).length
-  const paidResults = allVisits.filter((row: any) => row.conversation_result === 'Sudah melakukan pembayaran').length
-  const recoveryToday = todayVisits.filter((row: any) => ['Sudah melakukan pembayaran', 'Bersedia bayar / Promise to Pay'].includes(row.conversation_result)).length
-  const onTimeAttendance = attendance.filter(isOnTimeAttendance).length
-
-  const attendanceByDate = new Map(
-    attendance
-      .filter((row: any) => Boolean(row.attendance_date) && Boolean(row.check_in_at))
-      .map((row: any) => [row.attendance_date, row])
-  )
-
-  let onTimeStreak = 0
-  let expectedDate = todayKey
-  while (true) {
-    const row: any = attendanceByDate.get(expectedDate)
-    if (!row || !isOnTimeAttendance(row)) break
-    onTimeStreak += 1
-    expectedDate = previousWorkdayKey(expectedDate)
-  }
-
-  const totalXp =
-    productiveVisits * 30 +
-    phoneValidations * 10 +
-    paidResults * 20 +
-    allVisits.filter((row: any) => row.conversation_result === 'Bersedia bayar / Promise to Pay').length * 10 +
-    onTimeAttendance * 20
-  const level = Math.floor(totalXp / LEVEL_XP) + 1
-  const xpIntoLevel = totalXp % LEVEL_XP
-  const xpToNext = LEVEL_XP - xpIntoLevel
-  const levelProgress = Math.round((xpIntoLevel / LEVEL_XP) * 100)
-
-  const missions = [
-    {
-      label: tx('Check in on time', 'Check-in tepat waktu'),
-      progress: todayAttendance && isOnTimeAttendance(todayAttendance) ? 1 : 0,
-      target: 1,
-      xp: 20,
-    },
-    { label: tx('Complete productive visits', 'Selesaikan kunjungan produktif'), progress: productiveToday, target: 4, xp: 30 },
-    { label: tx('Validate customer phones', 'Validasi nomor pelanggan'), progress: phoneValidationsToday, target: 2, xp: 10 },
-    { label: tx('Secure paid / Promise to Pay', 'Dapatkan Paid / Promise to Pay'), progress: recoveryToday, target: 1, xp: 20 },
-  ]
-
-  const badges = [
-    { label: tx('Early Starter', 'Mulai Tepat Waktu'), unlocked: onTimeAttendance >= 1, icon: Clock3 },
-    { label: tx('GPS Verified', 'GPS Terverifikasi'), unlocked: productiveVisits >= 5, icon: MapPin },
-    { label: tx('Data Cleaner', 'Data Cleaner'), unlocked: phoneValidations >= 3, icon: BadgeCheck },
-    { label: tx('3-Day Streak', 'Streak 3 Hari'), unlocked: onTimeStreak >= 3, icon: Flame },
-    { label: tx('Recovery Win', 'Recovery Win'), unlocked: paidResults >= 1, icon: Trophy },
-  ]
-
+  const monthKey = jakartaDateKey(new Date()).slice(0, 7)
+  const monthVisits = allVisits.filter((row: any) => row.visit_date && jakartaDateKey(row.visit_date).startsWith(monthKey))
+  const evidencedVisits = monthVisits.filter((row: any) => row.location_match === true && Boolean(row.visit_photo_url)).length
+  const unlockTarget = 165 // Full-month proposal: 50% of 330; prorating needs verified first check-in.
+  const progress = Math.min(100, Math.round(evidencedVisits / unlockTarget * 100))
+  const remaining = Math.max(0, unlockTarget - evidencedVisits)
   const scoreCustomer = (c: any) => {
     const priorityScore = Math.max(0, 6 - Number(c.priority_rank ?? 5)) * 24
     const churn = Number(c.days_left_to_churn ?? 999)
@@ -198,45 +122,48 @@ export default async function AgentPage() {
         }
       />
 
-      <section className={styles.gameHero} aria-label={tx('Field progress', 'Progres lapangan')}>
-        <div className={styles.levelBlock}>
-          <div className={styles.levelIcon}><Sparkles className="h-6 w-6" aria-hidden="true" /></div>
-          <div className={styles.levelCopy}>
-            <span>{tx(`Level ${level} · Field Specialist`, `Level ${level} · Field Specialist`)}</span>
-            <strong>{totalXp.toLocaleString()} XP</strong>
-            <div className={styles.progressTrack} aria-label={`${levelProgress}%`}>
-              <span style={{ width: `${levelProgress}%` }} />
+      <section className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6" aria-label={tx('Monthly recovery journey', 'Progres CRL bulan ini')}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">{tx('Your monthly progress', 'Progres bulan ini')}</p>
+            <h2 className="mt-1 text-xl font-bold">{tx('A little closer every day!', 'Sedikit lagi menuju target!')}</h2>
+            <p className="mt-1 text-sm text-base-content/65">{tx('Track documented visits and your next action.', 'Pantau kunjungan berbukti dan langkah berikutnya.')}</p>
+          </div>
+          <span className="dui-badge dui-badge-outline">{tx('Staging preview', 'Uji coba staging')}</span>
+        </div>
+        <div className="rounded-2xl bg-primary/5 p-4 sm:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-base-content/70">{tx('Visits with GPS match and photo, this month', 'Kunjungan dengan GPS cocok dan foto, bulan ini')}</p>
+              <p className="mt-1 text-3xl font-extrabold tabular-nums">{evidencedVisits} <span className="text-base font-medium text-base-content/55">/ {unlockTarget}</span></p>
             </div>
-            <small>{tx(`${xpToNext} XP to Level ${level + 1}`, `${xpToNext} XP menuju Level ${level + 1}`)}</small>
+            <span className={`dui-badge ${remaining === 0 ? 'dui-badge-success' : 'dui-badge-warning'}`}>
+              {remaining === 0 ? tx('Initial milestone reached', 'Milestone awal tercapai') : tx(`${remaining} visits to milestone`, `Kurang ${remaining} kunjungan`)}
+            </span>
           </div>
+          <div className="mt-4 h-3 overflow-hidden rounded-full bg-base-300" role="progressbar" aria-valuenow={evidencedVisits} aria-valuemin={0} aria-valuemax={unlockTarget} aria-label={tx('Progress toward proposed milestone', 'Progres menuju milestone usulan')}>
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="mt-3 text-xs text-base-content/60">{tx('165 visits is the proposed full-month unlock threshold. Final validity, prorated target and payment still need verification.', '165 kunjungan adalah batas unlock usulan untuk bulan penuh. Validitas akhir, target prorata, dan pembayaran tetap perlu diverifikasi.')}</p>
         </div>
-        <div className={styles.streakBlock}>
-          <Flame className="h-6 w-6" aria-hidden="true" />
-          <div><strong>{onTimeStreak}</strong><span>{tx('consecutive on-time workdays', 'hari kerja tepat waktu berturut-turut')}</span></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Link href="/agent/customers" className="group flex items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10">
+            <div>
+              <div className="flex items-center gap-2 font-bold"><RefreshCcw className="h-4 w-4 text-primary" aria-hidden="true" />{tx('Follow up Re-Engagement', 'Follow-up Re-Engagement')}</div>
+              <p className="mt-1 text-xs text-base-content/70">{tx('Help customers at risk of churn.', 'Bantu pelanggan yang masih berisiko churn.')}</p>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform group-hover:translate-x-1" aria-hidden="true" />
+          </Link>
+          <Link href="/agent/visits" className="group flex items-center justify-between gap-3 rounded-2xl border border-base-300 p-4 transition-colors hover:bg-base-200/60">
+            <div>
+              <div className="flex items-center gap-2 font-bold"><CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />{tx('Review your visits', 'Lihat kunjunganmu')}</div>
+              <p className="mt-1 text-xs text-base-content/70">{tx('Check field visits and supporting evidence.', 'Cek hasil visit dan bukti kunjungan.')}</p>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-base-content/50 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+          </Link>
         </div>
+        <p className="mt-4 text-xs text-base-content/60">{tx('Commission preview: Rp20,000 for a verified call save or Rp50,000 for a verified visit save, subject to approved rules. Earnings are not calculated here yet.', 'Gambaran komisi: Rp20.000 untuk save via telepon atau Rp50.000 untuk save setelah visit yang terverifikasi, sesuai aturan yang disetujui. Nominal penghasilan belum dihitung otomatis.')}</p>
       </section>
-
-      <div className={styles.gameGrid}>
-        <section className={styles.gamePanel} aria-label={tx("Today's missions", 'Misi hari ini')}>
-          <div className={styles.gamePanelHeader}><Target className="h-5 w-5" aria-hidden="true" /><div><h2>{tx("Today's Missions", 'Misi Hari Ini')}</h2><p>{tx('Earn XP by completing quality field actions.', 'Dapatkan XP dari aktivitas lapangan yang berkualitas.')}</p></div></div>
-          <div className={styles.missionList}>
-            {missions.map((mission) => {
-              const complete = mission.progress >= mission.target
-              return <div className={`${styles.missionItem} ${complete ? styles.missionComplete : ''}`} key={mission.label}>
-                <span className={styles.missionCheck}>{complete ? '✓' : `${Math.min(mission.progress, mission.target)}/${mission.target}`}</span>
-                <div><strong>{mission.label}</strong><small>+{mission.xp} XP</small></div>
-              </div>
-            })}
-          </div>
-        </section>
-
-        <section className={styles.gamePanel} aria-label={tx('Badges', 'Badge')}>
-          <div className={styles.gamePanelHeader}><Medal className="h-5 w-5" aria-hidden="true" /><div><h2>{tx('Badges', 'Badge')}</h2><p>{tx('Milestones earned from consistent field quality.', 'Pencapaian dari kualitas kerja lapangan yang konsisten.')}</p></div></div>
-          <div className={styles.badgeGrid}>
-            {badges.map(({ label, unlocked, icon: Icon }) => <div className={`${styles.badgeItem} ${unlocked ? styles.badgeUnlocked : ''}`} key={label}><Icon className="h-5 w-5" aria-hidden="true" /><span>{label}</span></div>)}
-          </div>
-        </section>
-      </div>
 
       <section aria-label={t('agent.dashboard.statsAria')} className={styles.statsGrid}>
         {stats.map(({ href, label, count, icon: Icon }) => (
