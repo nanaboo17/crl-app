@@ -26,6 +26,7 @@ function safeCount(value: string) {
 export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { evidenceVisits: number; locale: 'en' | 'id' }) {
   const [expanded, setExpanded] = useState(false)
   const [counts, setCounts] = useState<Counts>(initial)
+  const [draftCounts, setDraftCounts] = useState<Partial<Record<Exclude<keyof Counts, 'bonus'>, string>>>({})
   const [visitTarget, setVisitTarget] = useState(330)
   const [disciplineClear, setDisciplineClear] = useState(true)
   const tx = (en: string, id: string) => locale === 'id' ? id : en
@@ -101,8 +102,17 @@ export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { e
                   min={0}
                   max={LIMIT}
                   step={1}
-                  value={counts[field.key]}
-                  onChange={event => setCounts(prev => ({ ...prev, [field.key]: safeCount(event.target.value) }))}
+                  value={draftCounts[field.key] ?? String(counts[field.key])}
+                  onChange={event => {
+                    const value = event.target.value
+                    setDraftCounts(prev => ({ ...prev, [field.key]: value }))
+                    setCounts(prev => ({ ...prev, [field.key]: safeCount(value) }))
+                  }}
+                  onBlur={() => setDraftCounts(prev => {
+                    const next = { ...prev }
+                    delete next[field.key]
+                    return next
+                  })}
                   className="dui-input dui-input-bordered mt-2 w-full"
                   aria-label={field.label}
                 />
@@ -144,7 +154,7 @@ export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { e
             </div>
             <p className="pt-1 text-xs text-base-content/60">{tx('Simulation only. The approval, real payment timestamps, visit validation, no-duplicate rule, survey quota and monthly budget cap have not been applied automatically.', 'Hanya simulasi. Approval, waktu pembayaran nyata, validasi kunjungan, aturan anti-duplikat, kuota survei, dan batas anggaran bulanan belum diperiksa otomatis.')}</p>
           </div>
-          <button type="button" onClick={() => { setCounts(initial); setVisitTarget(330); setDisciplineClear(true) }} className="dui-btn dui-btn-ghost dui-btn-sm">{tx('Reset simulation', 'Reset simulasi')}</button>
+          <button type="button" onClick={() => { setCounts(initial); setDraftCounts({}); setVisitTarget(330); setDisciplineClear(true) }} className="dui-btn dui-btn-ghost dui-btn-sm">{tx('Reset simulation', 'Reset simulasi')}</button>
         </div>
       )}
     </section>
