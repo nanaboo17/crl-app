@@ -59,7 +59,6 @@ export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { e
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-primary">{tx('Incentive Wallet · Simulation', 'Dompet Insentif · Simulasi')}</p>
             <h2 className="mt-1 text-xl font-bold">{tx('How much could I earn?', 'Berapa potensi insentifku?')}</h2>
-            <p className="mt-1 text-xs text-base-content/65">{tx('Enter verified customer counts to test the proposed scheme.', 'Masukkan jumlah pelanggan yang memenuhi syarat untuk mencoba skema insentif.')}</p>
           </div>
         </div>
         <span className="dui-badge dui-badge-warning dui-badge-outline">{tx('Not a payment balance', 'Bukan saldo pembayaran')}</span>
@@ -69,7 +68,6 @@ export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { e
         <div>
           <p className="text-xs font-medium text-base-content/65">{tx('Potential total · Your input', 'Total potensi · Input kamu')}</p>
           <p className="mt-1 text-3xl font-extrabold tabular-nums">{formatRupiah(potential)}</p>
-          <p className="mt-1 text-xs text-base-content/60">{tx('No financial amount is verified by billing here.', 'Tidak ada nominal yang diverifikasi billing di sini.')}</p>
         </div>
         <div className="rounded-xl border border-base-300 bg-base-100 p-3">
           <div className="flex items-center gap-2 font-bold">
@@ -90,7 +88,6 @@ export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { e
 
       {expanded && (
         <div className="mt-4 space-y-4">
-          <p className="text-xs text-base-content/60">{tx('Only enter distinct eligible customers. For one customer, choose the single highest qualifying main commission; never count both call and visit saves. Re-Engagement does not create an extra commission.', 'Masukkan jumlah pelanggan unik yang memenuhi syarat. Satu pelanggan hanya boleh mendapat satu komisi utama tertinggi; jangan hitung pelanggan yang sama untuk komisi telepon dan kunjungan. Re-Engagement tidak memberikan komisi tambahan.')}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {fields.map(field => (
               <label key={field.key} className="rounded-xl border border-base-300 p-3">
@@ -152,7 +149,6 @@ export default function AgentIncentiveCalculator({ evidenceVisits, locale }: { e
               <div className="flex items-center justify-between gap-3 font-bold"><span>{tx('Potential', 'Total potensi')}</span><strong className="tabular-nums">{formatRupiah(potential)}</strong></div>
               <div className="mt-2 flex items-center justify-between gap-3"><span>{tx('Passes simulated gates', 'Memenuhi syarat simulasi')}</span><strong className="tabular-nums">{formatRupiah(qualifyingSimulation)}</strong></div>
             </div>
-            <p className="pt-1 text-xs text-base-content/60">{tx('Simulation only. The approval, real payment timestamps, visit validation, no-duplicate rule, survey quota and monthly budget cap have not been applied automatically.', 'Hanya simulasi. Approval, waktu pembayaran nyata, validasi kunjungan, aturan anti-duplikat, kuota survei, dan batas anggaran bulanan belum diperiksa otomatis.')}</p>
           </div>
           <button type="button" onClick={() => { setCounts(initial); setDraftCounts({}); setVisitTarget(330); setDisciplineClear(true) }} className="dui-btn dui-btn-ghost dui-btn-sm">{tx('Reset simulation', 'Reset simulasi')}</button>
         </div>
