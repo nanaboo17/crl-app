@@ -3,12 +3,13 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
 import WeeklyAttendanceNavigation from '@/components/superadmin/WeeklyAttendanceNavigation'
+import WeeklyAttendanceCell from '@/components/superadmin/WeeklyAttendanceCell'
 
 const TIMEZONE = 'Asia/Jakarta'
 type Status = 'on_time' | 'late' | 'sick' | 'permission' | 'pending' | 'not_checked_in' | 'unscheduled'
 type Agent = { email: string; agent_name: string | null; organization: string | null }
-type Attendance = { agent_email: string; attendance_date: string; check_in_at: string | null; check_in_status: string | null }
-type Leave = { agent_email: string; request_type: string; status: string; start_date: string; end_date: string }
+type Attendance = { agent_email: string; attendance_date: string; check_in_at: string | null; check_out_at: string | null; check_in_status: string | null; check_in_photo_path: string | null }
+type Leave = { agent_email: string; request_type: string; status: string; start_date: string; end_date: string; reason: string | null; evidence_path: string | null }
 const colors: Record<Status, string> = {
   on_time: 'bg-emerald-100 text-emerald-900 ring-emerald-200',
   late: 'bg-amber-100 text-amber-900 ring-amber-200',
@@ -55,14 +56,27 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
   if(!profile?.active||profile.role!=='superadmin')redirect('/auth/route')
   const [agentsResult,attendanceResult,leaveResult]=await Promise.all([
     sb.from('agents').select('email,agent_name,organization').eq('role','agent').eq('active',true).order('agent_name'),
-    sb.from('agent_attendance').select('agent_email,attendance_date,check_in_at,check_in_status').gte('attendance_date',start).lte('attendance_date',end),
-    sb.from('agent_leave_requests').select('agent_email,request_type,status,start_date,end_date').lte('start_date',end).gte('end_date',start).in('status',['pending','approved']),
+    sb.from('agent_attendance').select('agent_email,attendance_date,check_in_at,check_out_at,check_in_photo_path,check_in_status').gte('attendance_date',start).lte('attendance_date',end),
+    sb.from('agent_leave_requests').select('agent_email,request_type,status,start_date,end_date,reason,evidence_path').lte('start_date',end).gte('end_date',start).in('status',['pending','approved']),
   ])
   const error=agentsResult.error||attendanceResult.error||leaveResult.error
   if(error)throw new Error('Unable to load weekly attendance: '+error.message)
   const agents=(agentsResult.data||[]) as Agent[]
   const attendance=(attendanceResult.data||[]) as Attendance[]
   const leaves=(leaveResult.data||[]) as Leave[]
+  // Evidence buckets are private: sign paths server-side only after the Superadmin guard.
+  const attendancePaths=Array.from(new Set(attendance.map(a=>a.check_in_photo_path).filter((path):path is string=>Boolean(path))))
+  const leavePaths=Array.from(new Set(leaves.map(l=>l.evidence_path).filter((path):path is string=>Boolean(path))))
+  const [signedAttendance,signedLeaves]=await Promise.all([
+    attendancePaths.length?sb.storage.from('attendance-evidence').createSignedUrls(attendancePaths,3600):Promise.resolve({data:[],error:null}),
+    leavePaths.length?sb.storage.from('leave-evidence').createSignedUrls(leavePaths,3600):Promise.resolve({data:[],error:null}),
+  ])
+  if(signedAttendance.error)console.error('Weekly attendance photo signing failed:',signedAttendance.error.message)
+  if(signedLeaves.error)console.error('Weekly leave evidence signing failed:',signedLeaves.error.message)
+  const attendanceUrls=new Map<string,string>()
+  signedAttendance.data?.forEach((item,index)=>{if(item.signedUrl)attendanceUrls.set(attendancePaths[index],item.signedUrl)})
+  const leaveUrls=new Map<string,string>()
+  signedLeaves.data?.forEach((item,index)=>{if(item.signedUrl)leaveUrls.set(leavePaths[index],item.signedUrl)})
   const organizations=Array.from(new Set(agents.map(a=>(a.organization||'').trim()).filter(Boolean))).sort()
   const selected=organization?agents.filter(a=>(a.organization||'').trim()===organization):agents
   const byAttendance=new Map(attendance.map(a=>[a.agent_email.toLowerCase()+'|'+a.attendance_date,a]))
@@ -70,7 +84,27 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
   leaves.forEach(l=>{const k=l.agent_email.toLowerCase();byLeave.set(k,[...(byLeave.get(k)||[]),l])})
   const summaries=selected.map(agent=>{
     const email=agent.email.toLowerCase()
-    const cells=days.map(day=>dayStatus(day,today,byAttendance.get(email+'|'+day),byLeave.get(email)||[]))
+    const cells=days.map(day=>{
+      const attendanceRow=byAttendance.get(email+'|'+day)
+      const agentLeaves=byLeave.get(email)||[]
+      const result=dayStatus(day,today,attendanceRow,agentLeaves)
+      const approved=agentLeaves.find(l=>l.status==='approved'&&l.start_date<=day&&l.end_date>=day)
+      const pending=agentLeaves.find(l=>l.status==='pending'&&l.start_date<=day&&l.end_date>=day)
+      const leave=result.status==='pending'?pending:(result.status==='permission'||result.status==='sick'?approved:undefined)
+      return {
+        ...result,
+        date:formatDate(day),
+        agentName:agent.agent_name||agent.email,
+        checkInAt:attendanceRow?.check_in_at||null,
+        checkOutAt:attendanceRow?.check_out_at||null,
+        checkInPhotoUrl:attendanceRow?.check_in_photo_path?attendanceUrls.get(attendanceRow.check_in_photo_path)||null:null,
+        leaveReason:leave?.reason||null,
+        leaveStart:leave?.start_date||null,
+        leaveEnd:leave?.end_date||null,
+        leaveEvidenceUrl:leave?.evidence_path?leaveUrls.get(leave.evidence_path)||null:null,
+        leaveRequestStatus:leave?.status||null,
+      }
+    })
     const total=(status:Status)=>cells.filter(c=>c.status===status).length
     return {agent,cells,totals:{on_time:total('on_time'),late:total('late'),sick:total('sick'),permission:total('permission'),not_checked_in:total('not_checked_in')}}
   })
@@ -95,7 +129,7 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
       <span className={`rounded-lg px-3 py-1.5 ring-1 ${colors.unscheduled}`}>Weekend / Upcoming</span>
     </div>
     <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
-      <div className="border-b border-base-300 p-4"><h2 className="font-semibold">Weekly matrix <span className="text-base-content/60 font-normal">· {selected.length} active agents</span></h2><p className="mt-1 text-xs text-base-content/60">Swipe horizontally on smaller screens. Color and text both indicate status. Check-in records take precedence over leave approvals.</p></div>
+      <div className="border-b border-base-300 p-4"><h2 className="font-semibold">Weekly matrix <span className="text-base-content/60 font-normal">· {selected.length} active agents</span></h2><p className="mt-1 text-xs text-base-content/60">Swipe horizontally on smaller screens. Klik status Hadir, Late, Sakit, atau Izin untuk melihat foto atau detail pengajuan. Check-in records take precedence over leave approvals.</p></div>
       <div className="w-full overflow-x-auto">
         <table className="w-full min-w-[1050px] border-separate border-spacing-0 text-xs sm:text-sm">
           <thead><tr className="bg-base-200 text-base-content/70"><th scope="col" className="sticky left-0 z-20 min-w-48 border-b border-r border-base-300 bg-base-200 p-3 text-left">Agent</th>
@@ -110,7 +144,7 @@ export default async function WeeklySuperadminAttendance({searchParams}:{searchP
           </tr></thead>
           <tbody>{summaries.map(({agent,cells,totals})=><tr key={agent.email} className="hover:bg-base-200/30">
             <th scope="row" className="sticky left-0 z-10 max-w-52 border-b border-r border-base-300 bg-base-100 p-3 text-left font-medium"><span className="block truncate">{agent.agent_name||agent.email}</span><span className="block truncate text-[11px] font-normal text-base-content/50" title={agent.email}>{agent.email}</span></th>
-            {cells.map((c,i)=><td key={days[i]} className="border-b border-base-300 p-1 text-center"><span title={c.hint} className={`flex min-h-12 items-center justify-center rounded-lg px-1.5 py-2 font-semibold ring-1 ${colors[c.status]}`}>{c.value}</span></td>)}
+            {cells.map((c,i)=><td key={days[i]} className="border-b border-base-300 p-1 text-center"><WeeklyAttendanceCell detail={c} /></td>)}
             {(['on_time','late','sick','permission','not_checked_in'] as const).map(k=><td key={k} title={labels[k]} className={`border-b border-l border-base-300 px-3 text-center font-semibold tabular-nums ${colors[k]}`}>{totals[k]}</td>)}
           </tr>)}</tbody>
           <tfoot><tr className="bg-base-200 text-xs">{Array.from({length:8},(_,i)=><td key={i} className="px-2 py-2">{i===0?'Totals: On Time · Late · Sick · Izin · Missing':''}</td>)}{(['on_time','late','sick','permission','not_checked_in'] as const).map(k=><td key={k} title={labels[k]} className={`border-l border-base-300 p-2 text-center font-bold ${colors[k]}`}>{summaries.reduce((sum,s)=>sum+s.totals[k],0)}</td>)}</tr></tfoot>
