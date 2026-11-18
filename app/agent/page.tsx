@@ -177,7 +177,7 @@ export default async function AgentPage() {
         }
       />
 
-      <AgentIncentiveCalculator evidenceVisits={evidencedVisits} locale={locale === 'id' ? 'id' : 'en'} />
+      <AgentIncentiveCalculator evidenceVisits={evidencedVisits} locale="id" />
 
       <section className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6" aria-label={tx('Monthly recovery journey', 'Progres CRL bulan ini')}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
