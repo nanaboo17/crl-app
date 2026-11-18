@@ -31,6 +31,7 @@ export const shellMessages = defineMessages({
   'nav.reports': { en: 'Reports', id: 'Laporan' },
   'nav.cms': { en: 'CMS', id: 'CMS' },
   'nav.route': { en: 'Route', id: 'Rute' },
+  'nav.incentives': { en: 'Incentive Simulation', id: 'Simulasi Insentif' },
   'nav.brand': { en: 'CRL', id: 'CRL' },
 
   // Navbar / user menu
