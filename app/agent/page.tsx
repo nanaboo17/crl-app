@@ -21,6 +21,7 @@ import { getLocale } from '@/lib/i18n/server'
 import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import { getComplaintTickets } from '@/lib/complaints'
+import AgentIncentiveCalculator from '@/components/agent/AgentIncentiveCalculator'
 import styles from './page.module.css'
 
 function jakartaMondayKey(now = new Date()) {
@@ -175,6 +176,8 @@ export default async function AgentPage() {
           </div>
         }
       />
+
+      <AgentIncentiveCalculator evidenceVisits={evidencedVisits} locale={locale === 'id' ? 'id' : 'en'} />
 
       <section className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6" aria-label={tx('Monthly recovery journey', 'Progres CRL bulan ini')}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
