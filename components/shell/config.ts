@@ -9,6 +9,7 @@ import {
   Route,
   Settings2,
   Users,
+  Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -93,6 +94,7 @@ export const agentConfig: ShellConfig = {
       { href: '/agent', labelKey: 'common.dashboard', icon: LayoutDashboard, exact: true },
     ]),
     managementGroup([
+      { href: '/agent/incentives', labelKey: 'nav.incentives', icon: Wallet },
       { href: '/agent/customers', labelKey: 'nav.customers', icon: Building2 },
       { href: '/agent/route', labelKey: 'nav.route', icon: Route },
       { href: '/agent/pre-visits', labelKey: 'nav.preVisits', icon: ClipboardList },
