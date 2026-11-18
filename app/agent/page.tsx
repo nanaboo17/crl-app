@@ -86,8 +86,21 @@ export default async function AgentPage() {
   const monthVisits = allVisits.filter((row: any) => row.visit_date && jakartaDateKey(row.visit_date).startsWith(monthKey))
   const evidencedVisits = monthVisits.filter((row: any) => row.location_match === true && Boolean(row.visit_photo_url)).length
   const unlockTarget = 165 // Full-month proposal: 50% of 330; prorating needs verified first check-in.
-  const progress = Math.min(100, Math.round(evidencedVisits / unlockTarget * 100))
+  const fullTarget = 330
+  const progress = Math.min(100, Math.round(evidencedVisits / fullTarget * 100))
   const remaining = Math.max(0, unlockTarget - evidencedVisits)
+  const milestones = [50, 100, 165, 250, 330]
+  const nextMilestone = milestones.find((value) => evidencedVisits < value)
+  const nextRemaining = nextMilestone ? nextMilestone - evidencedVisits : 0
+  const encouragement = evidencedVisits >= fullTarget
+    ? tx('Amazing! You reached the full monthly milestone.', 'Luar biasa! Kamu mencapai target penuh bulan ini.')
+    : evidencedVisits >= unlockTarget
+      ? tx('Great progress! Keep going toward 330.', 'Keren! Lanjutkan sampai 330 kunjungan.')
+      : evidencedVisits >= 100
+        ? tx('So close! Keep the momentum going.', 'Sudah dekat! Sedikit lagi menuju unlock.')
+        : evidencedVisits >= 50
+          ? tx('Nice work! You are building momentum.', 'Bagus! Progresmu terus bertambah.')
+          : tx('Every quality visit brings you closer.', 'Setiap kunjungan valid bikin kamu makin dekat.')
   const scoreCustomer = (c: any) => {
     const priorityScore = Math.max(0, 6 - Number(c.priority_rank ?? 5)) * 24
     const churn = Number(c.days_left_to_churn ?? 999)
@@ -125,7 +138,7 @@ export default async function AgentPage() {
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-primary">{tx('Your monthly progress', 'Progres bulan ini')}</p>
-            <h2 className="mt-1 text-xl font-bold">{tx('A little closer every day!', 'Sedikit lagi menuju target!')}</h2>
+            <h2 className="mt-1 text-xl font-bold">{encouragement}</h2>
             <p className="mt-1 text-sm text-base-content/65">{tx('Track documented visits and your next action.', 'Pantau kunjungan berbukti dan langkah berikutnya.')}</p>
           </div>
           <span className="dui-badge dui-badge-outline">{tx('Staging preview', 'Uji coba staging')}</span>
@@ -134,18 +147,34 @@ export default async function AgentPage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-base-content/70">{tx('Visits with GPS match and photo, this month', 'Kunjungan dengan GPS cocok dan foto, bulan ini')}</p>
-              <p className="mt-1 text-3xl font-extrabold tabular-nums">{evidencedVisits} <span className="text-base font-medium text-base-content/55">/ {unlockTarget}</span></p>
+              <p className="mt-1 text-3xl font-extrabold tabular-nums">{evidencedVisits} <span className="text-base font-medium text-base-content/55">/ {fullTarget}</span></p>
             </div>
             <span className={`dui-badge ${remaining === 0 ? 'dui-badge-success' : 'dui-badge-warning'}`}>
-              {remaining === 0 ? tx('Initial milestone reached', 'Milestone awal tercapai') : tx(`${remaining} visits to milestone`, `Kurang ${remaining} kunjungan`)}
+              {remaining === 0 ? tx('165-visit milestone reached', 'Milestone 165 tercapai') : tx(`${remaining} visits to 165`, `Kurang ${remaining} ke 165`)}
             </span>
           </div>
-          <div className="mt-4 h-3 overflow-hidden rounded-full bg-base-300" role="progressbar" aria-valuenow={evidencedVisits} aria-valuemin={0} aria-valuemax={unlockTarget} aria-label={tx('Progress toward proposed milestone', 'Progres menuju milestone usulan')}>
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+          <div className="relative mt-4">
+            <div className="h-3 overflow-hidden rounded-full bg-base-300" role="progressbar" aria-valuenow={Math.min(evidencedVisits, fullTarget)} aria-valuemin={0} aria-valuemax={fullTarget} aria-label={tx('Progress toward monthly target', 'Progres menuju target bulanan')}>
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="pointer-events-none absolute -top-1 bottom-[-4px] left-1/2 w-0.5 bg-base-content/50" aria-hidden="true" />
           </div>
-          <p className="mt-3 text-xs text-base-content/60">{tx('165 visits is the proposed full-month unlock threshold. Final validity, prorated target and payment still need verification.', '165 kunjungan adalah batas unlock usulan untuk bulan penuh. Validitas akhir, target prorata, dan pembayaran tetap perlu diverifikasi.')}</p>
+          <div className="mt-2 flex justify-between text-xs text-base-content/60"><span>0</span><span>{tx('165 · Unlock proposal', '165 · Usulan unlock')}</span><span>330</span></div>
+          <div className="mt-4 flex flex-wrap items-center gap-2" aria-label={tx('Visit milestones', 'Pencapaian kunjungan')}>
+            {milestones.map((milestone) => (
+              <span key={milestone} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${evidencedVisits >= milestone ? 'border-success/30 bg-success/10 text-success' : milestone === nextMilestone ? 'border-primary/30 bg-primary/10 text-primary' : 'border-base-300 bg-base-100 text-base-content/55'}`}>
+                {evidencedVisits >= milestone ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                {milestone}
+              </span>
+            ))}
+          </div>
+          <p className="mt-3 text-sm font-semibold text-base-content">{nextMilestone
+            ? tx(`Next goal: ${nextRemaining} more evidenced visits to ${nextMilestone}!`, `Target berikutnya: ${nextRemaining} kunjungan lagi untuk mencapai ${nextMilestone}!`)
+            : tx('All visit milestones completed. Keep helping customers recover!', 'Semua milestone kunjungan tercapai. Lanjutkan bantu pelanggan!')}</p>
+          <p className="mt-2 text-xs text-base-content/60">{tx('165 visits is the proposed full-month unlock threshold. Final validity, prorated target and payment still need verification.', '165 kunjungan adalah batas unlock usulan untuk bulan penuh. Validitas akhir, target prorata, dan pembayaran tetap perlu diverifikasi.')}</p>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <p className="mt-4 text-sm font-semibold">{tx('Your next move', 'Langkah berikutnya')}</p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <Link href="/agent/customers" className="group flex items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10">
             <div>
               <div className="flex items-center gap-2 font-bold"><RefreshCcw className="h-4 w-4 text-primary" aria-hidden="true" />{tx('Follow up Re-Engagement', 'Follow-up Re-Engagement')}</div>
