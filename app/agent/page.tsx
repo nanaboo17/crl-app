@@ -14,6 +14,7 @@ import {
   Route,
   TicketCheck,
   UserRound,
+  Wallet,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
 import SuperadminPageHeader from '@/components/superadmin/SuperadminPageHeader'
@@ -21,7 +22,6 @@ import { getLocale } from '@/lib/i18n/server'
 import { translate } from '@/lib/i18n'
 import { allMessages } from '@/lib/i18n/messages'
 import { getComplaintTickets } from '@/lib/complaints'
-import AgentIncentiveCalculator from '@/components/agent/AgentIncentiveCalculator'
 import styles from './page.module.css'
 
 function jakartaMondayKey(now = new Date()) {
@@ -172,12 +172,11 @@ export default async function AgentPage() {
               <Clock3 className="h-4 w-4" aria-hidden="true" />
               {tx('Attendance', 'Absensi')}
             </Link>
+            <Link href="/agent/incentives" className="dui-btn dui-btn-outline dui-btn-sm gap-2"><Wallet className="h-4 w-4" aria-hidden="true" />{tx('Incentives', 'Insentif')}</Link>
             <Link href="/agent/customers" className="dui-btn dui-btn-primary dui-btn-sm">{t('agent.dashboard.myCustomers')}</Link>
           </div>
         }
       />
-
-      <AgentIncentiveCalculator evidenceVisits={evidencedVisits} locale="id" />
 
       <section className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6" aria-label={tx('Monthly recovery journey', 'Progres CRL bulan ini')}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
