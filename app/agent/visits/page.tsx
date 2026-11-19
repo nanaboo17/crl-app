@@ -24,28 +24,89 @@ export default function VisitsPage() {
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let active = true
-    const timer = setTimeout(async () => {
-      setLoading(true)
-      setError('')
-      const s = createClient()
-      const { data, error } = await s.rpc('crl_agent_history_page_v1', { p_kind: 'visits', p_page: page, p_search: search })
-      if (!active) return
-      if (error) setError(error.message)
-      else {
-        const result = data as { rows: Visit[]; total: number; filteredTotal: number; completed: number; recentDays: number }
-        setRows(result.rows ?? [])
-        setTotal(result.total ?? 0)
-        setFilteredTotal(result.filteredTotal ?? 0)
-        setCompleted(result.completed ?? 0)
-        setRecentDays(result.recentDays ?? 0)
+    const timer = setTimeout(() => {
+      async function load() {
+        setLoading(true)
+        setError('')
+        const s = createClient()
+        try {
+          // Keep the existing RPC for its summary metrics when it works.
+          const { data, error: rpcError } = await s.rpc('crl_agent_history_page_v1', {
+            p_kind: 'visits', p_page: page, p_search: search,
+          })
+          if (!active) return
+          if (!rpcError && data) {
+            const result = data as { rows: Visit[]; total: number; filteredTotal: number; completed: number; recentDays: number }
+            setRows(result.rows ?? [])
+            setTotal(result.total ?? 0)
+            setFilteredTotal(result.filteredTotal ?? 0)
+            setCompleted(result.completed ?? 0)
+            setRecentDays(result.recentDays ?? 0)
+            return
+          }
+
+          // The all-in-one RPC sometimes exceeds the database statement timeout.
+          // Fall back to a small, indexed page query rather than blocking the whole UI.
+          const { data: { user }, error: authError } = await s.auth.getUser()
+          if (authError || !user?.email) throw authError || new Error('Sesi login tidak ditemukan.')
+          const email = user.email.trim().toLowerCase()
+          const baseColumns = 'visit_id,customer_id,crl_id,visit_date,visit_result,visit_address,visit_summary'
+          let query = s.from('visits')
+            .select(baseColumns, { count: 'exact' })
+            .eq('agent_email', email)
+          const term = search.trim().replace(/[%,()]/g, ' ').slice(0, 80)
+          if (term) {
+            query = query.or(
+              `customer_id.ilike.%${term}%,crl_id.ilike.%${term}%,visit_id.ilike.%${term}%,visit_address.ilike.%${term}%,visit_summary.ilike.%${term}%,visit_result.ilike.%${term}%`
+            )
+          }
+          const { data: pageData, count, error: pageError } = await query
+            .order('visit_date', { ascending: false, nullsFirst: false })
+            .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+          if (pageError) throw pageError
+          if (!active) return
+          setRows((pageData || []) as unknown as Visit[])
+          setFilteredTotal(count ?? 0)
+
+          // Use an independent count so a search doesn't distort the headline total.
+          if (!term) {
+            setTotal(count ?? 0)
+          } else {
+            const { count: overallCount, error: overallError } = await s.from('visits')
+              .select('visit_id', { count: 'exact', head: true })
+              .eq('agent_email', email)
+            if (!active) return
+            if (!overallError) setTotal(overallCount ?? 0)
+          }
+          // Optional summaries must never block the history list.
+          const { count: completedCount } = await s.from('visits')
+            .select('visit_id', { count: 'exact', head: true })
+            .eq('agent_email', email)
+            .not('visit_result', 'is', null)
+            .neq('visit_result', '')
+          if (!active) return
+          setCompleted(completedCount ?? 0)
+          const { data: dates } = await s.from('visits')
+            .select('visit_date')
+            .eq('agent_email', email)
+            .order('visit_date', { ascending: false })
+            .limit(1000)
+          if (!active) return
+          if (dates) setRecentDays(new Set(dates.filter(row => row.visit_date).map(row => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(row.visit_date)))).size)
+        } catch (err) {
+          if (active) setError(err instanceof Error ? err.message : 'Riwayat kunjungan gagal dimuat. Silakan coba lagi.')
+        } finally {
+          if (active) setLoading(false)
+        }
       }
-      setLoading(false)
+      void load()
     }, search ? 250 : 0)
     return () => { active = false; clearTimeout(timer) }
-  }, [page, search])
+  }, [page, search, reloadKey])
 
   const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -76,10 +137,10 @@ export default function VisitsPage() {
         </div>
       </section>
 
-      <section className={styles.summaryGrid}>
-        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{total}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
-        <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{completed}</strong><span>{tx('Completed records', 'Data selesai')}</span></article>
-        <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
+      <section className={styles.summaryGrid} aria-busy={loading}>
+        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{loading ? '…' : total}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{loading ? '…' : completed}</strong><span>{tx('Completed records', 'Data selesai')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{loading ? '…' : recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
       </section>
 
       {!loading && !error && total > 0 && (
@@ -93,7 +154,7 @@ export default function VisitsPage() {
       )}
       {!loading && !error && total > 0 && filteredTotal === 0 && <div className={styles.state}>{tx('No visits match your search.', 'Tidak ada kunjungan yang cocok dengan pencarian.')}</div>}
       {loading && <div className={styles.state}>{tx('Loading visit history…', 'Memuat riwayat kunjungan…')}</div>}
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className={styles.error}><span>{tx('Visit history could not be loaded. Please retry.', 'Riwayat kunjungan gagal dimuat. Silakan coba lagi.')}</span><button type="button" className="dui-btn dui-btn-outline dui-btn-sm" onClick={() => setReloadKey(value => value + 1)}>{tx('Try again', 'Coba lagi')}</button></div>}
       {!loading && !error && total === 0 && <div className={styles.state}><CrlRouteIllustration className="visit-empty-illustration" /><strong>{tx('No visit history yet', 'Belum ada riwayat kunjungan')}</strong><span>{tx('Completed visits will appear here.', 'Kunjungan yang selesai akan tampil di sini.')}</span></div>}
 
       {!loading && !error && grouped.map(([day, visits]) => (
