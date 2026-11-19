@@ -80,8 +80,7 @@ export default function VisitsPage() {
               .select('visit_id', { count: 'exact', head: true })
               .ilike('agent_email', email)
             if (!active) return
-            if (overallError) throw overallError
-            setTotal(overallCount ?? 0)
+            if (!overallError) setTotal(overallCount ?? 0)
           }
           // Optional summaries must never block the history list.
           const { count: completedCount } = await s.from('visits')
@@ -97,7 +96,7 @@ export default function VisitsPage() {
             .order('visit_date', { ascending: false })
             .limit(1000)
           if (!active) return
-          if (dates) setRecentDays(new Set(dates.map(row => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(row.visit_date)))).size)
+          if (dates) setRecentDays(new Set(dates.filter(row => row.visit_date).map(row => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(row.visit_date)))).size)
         } catch (err) {
           if (active) setError(err instanceof Error ? err.message : 'Riwayat kunjungan gagal dimuat. Silakan coba lagi.')
         } finally {
@@ -138,10 +137,10 @@ export default function VisitsPage() {
         </div>
       </section>
 
-      <section className={styles.summaryGrid}>
-        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{total}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
-        <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{completed}</strong><span>{tx('Completed records', 'Data selesai')}</span></article>
-        <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
+      <section className={styles.summaryGrid} aria-busy={loading}>
+        <article className={`${styles.summaryCard} ${styles.tonePurple}`}><div className={styles.summaryIcon}><Route /></div><strong>{loading ? '…' : total}</strong><span>{tx('Submitted visits', 'Kunjungan terkirim')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.toneGreen}`}><div className={styles.summaryIcon}><CheckCircle2 /></div><strong>{loading ? '…' : completed}</strong><span>{tx('Completed records', 'Data selesai')}</span></article>
+        <article className={`${styles.summaryCard} ${styles.toneBlue}`}><div className={styles.summaryIcon}><CalendarDays /></div><strong>{loading ? '…' : recentDays}</strong><span>{tx('Active visit days', 'Hari kunjungan aktif')}</span></article>
       </section>
 
       {!loading && !error && total > 0 && (
